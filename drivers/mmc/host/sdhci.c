@@ -635,9 +635,6 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
 		target_timeout = data->timeout_ns / 1000 +
 			data->timeout_clks / host->clock;
 
-	if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)
-		host->timeout_clk = host->clock / 1000;
-
 	/*
 	 * Figure out needed cycles.
 	 * We do this in steps in order to fit inside a 32 bit int.
@@ -648,7 +645,6 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
 	 *     =>
 	 *     (1) / (2) > 2^6
 	 */
-	BUG_ON(!host->timeout_clk);
 	count = 0;
 	current_timeout = (1 << 13) * 1000 / host->timeout_clk;
 	while (current_timeout < target_timeout) {
@@ -2506,21 +2502,8 @@ int sdhci_add_host(struct sdhci_host *host)
 	if (caps[0] & SDHCI_TIMEOUT_CLK_UNIT)
 		host->timeout_clk *= 1000;
 
- 	/*
-	 * In case of Host Controller v3.00, find out whether clock
-	 * multiplier is supported.
-	 */
-	host->clk_mul = (caps[1] & SDHCI_CLOCK_MUL_MASK) >>
-		SDHCI_CLOCK_MUL_SHIFT;
-
-	/*
-	 * In case the value in Clock Multiplier is 0, then programmable
-	 * clock mode is not supported, otherwise the actual clock
-	 * multiplier is one more than the value of Clock Multiplier
-	 * in the Capabilities Register.
-	 */
-	if (host->clk_mul)
-		host->clk_mul += 1;
+	if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)
+		host->timeout_clk = host->clock / 1000;
 
 	/*
 	 * In case of Host Controller v3.00, find out whether clock
