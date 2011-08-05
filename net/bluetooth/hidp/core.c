@@ -784,6 +784,7 @@ static int hidp_session(void *arg)
 
 	up_write(&hidp_session_sem);
 
+	kfree(session->rd_data);
 	kfree(session);
 	return 0;
 }
