@@ -866,6 +866,8 @@ static int hidp_setup_input(struct hidp_session *session,
 
 	err = input_register_device(input);
 	if (err < 0) {
+		input_free_device(input);
+		session->input = NULL;
 		hci_conn_put_device(session->conn);
 		return err;
 	}
@@ -1117,7 +1119,6 @@ purge:
 failed:
 	up_write(&hidp_session_sem);
 
-	input_free_device(session->input);
 	kfree(session);
 	return err;
 }
