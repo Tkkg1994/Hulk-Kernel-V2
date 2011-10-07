@@ -830,7 +830,7 @@ static int hidp_setup_input(struct hidp_session *session,
 				struct hidp_connadd_req *req)
 {
 	struct input_dev *input;
-	int err, i;
+	int i;
 
 	input = input_allocate_device();
 	if (!input)
@@ -876,13 +876,6 @@ static int hidp_setup_input(struct hidp_session *session,
 	input->dev.parent = &session->conn->dev;
 
 	input->event = hidp_input_event;
-
-	err = input_register_device(input);
-	if (err < 0) {
-		input_free_device(input);
-		session->input = NULL;
-		return err;
-	}
 
 	return 0;
 }
@@ -1089,7 +1082,11 @@ int hidp_add_connection(struct hidp_connadd_req *req, struct socket *ctrl_sock, 
 			!session->waiting_for_startup);
 	}
 
-	err = hid_add_device(session->hid);
+	if (session->hid)
+		err = hid_add_device(session->hid);
+	else
+		err = input_register_device(session->input);
+
 	if (err < 0) {
 		atomic_inc(&session->terminate);
 		wake_up_process(session->task);
