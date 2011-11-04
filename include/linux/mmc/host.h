@@ -376,8 +376,6 @@ struct mmc_host {
 	struct fault_attr	fail_mmc_request;
 #endif
 
-	unsigned int		actual_clock;	/* Actual HC clock rate */
-
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
 	struct {
 		struct sdio_cis			*cis;
@@ -414,6 +412,9 @@ struct mmc_host {
 		struct delayed_work work;
 		enum mmc_load	state;
 	} clk_scaling;
+
+	unsigned int		actual_clock;	/* Actual HC clock rate */
+
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
