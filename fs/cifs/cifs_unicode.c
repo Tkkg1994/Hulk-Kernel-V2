@@ -353,4 +353,3 @@ ctoUTF16_out:
 	put_unaligned(0, &target[j]); /* Null terminate target unicode string */
 	return j;
 }
-
