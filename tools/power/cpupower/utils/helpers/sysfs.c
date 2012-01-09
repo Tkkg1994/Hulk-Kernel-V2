@@ -373,5 +373,5 @@ int sysfs_get_sched(const char *smt_mc)
  */
 int sysfs_set_sched(const char *smt_mc, int val)
 {
-	return -ENODEV; 
+	return -ENODEV;
 }

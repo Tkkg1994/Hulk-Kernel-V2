@@ -6864,7 +6864,6 @@ sd_numa_init(struct sched_domain_topology_level *tl, int cpu)
 					| 0*SD_WAKE_AFFINE
 					| 0*SD_PREFER_LOCAL
 					| 0*SD_SHARE_CPUPOWER
-					| 0*SD_POWERSAVINGS_BALANCE
 					| 0*SD_SHARE_PKG_RESOURCES
 					| 1*SD_SERIALIZE
 					| 0*SD_PREFER_SIBLING
