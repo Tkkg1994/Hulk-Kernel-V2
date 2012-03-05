@@ -379,9 +379,14 @@ void blk_drain_queue(struct request_queue *q, bool drain_all)
 
 		spin_lock_irq(q->queue_lock);
 
-		elv_drain_elevator(q);
-		if (drain_all)
-			blk_throtl_drain(q);
+		/*
+		 * The caller might be trying to drain @q before its
+		 * elevator is initialized.
+		 */
+		if (q->elevator)
+			elv_drain_elevator(q);
+
+		blk_throtl_drain(q);
 
 		/*
 		 * This function might be called on a queue which failed
@@ -422,8 +427,8 @@ void blk_drain_queue(struct request_queue *q, bool drain_all)
  *
  * In bypass mode, only the dispatch FIFO queue of @q is used.  This
  * function makes @q enter bypass mode and drains all requests which were
- * issued before.  On return, it's guaranteed that no request has ELVPRIV
- * set.
+ * throttled or issued before.  On return, it's guaranteed that no request
+ * is being throttled or has ELVPRIV set.
  */
 void blk_queue_bypass_start(struct request_queue *q)
 {
@@ -468,6 +473,11 @@ void blk_cleanup_queue(struct request_queue *q)
 	queue_flag_set_unlocked(QUEUE_FLAG_DEAD, q);
 
 	spin_lock_irq(lock);
+
+	/* dead queue is permanently in bypass mode till released */
+	q->bypass_depth++;
+	queue_flag_set(QUEUE_FLAG_BYPASS, q);
+
 	queue_flag_set(QUEUE_FLAG_NOMERGES, q);
 	queue_flag_set(QUEUE_FLAG_NOXMERGES, q);
 	queue_flag_set(QUEUE_FLAG_DEAD, q);
