@@ -46,10 +46,9 @@ static struct alarm_base {
 static ktime_t freezer_delta;
 static DEFINE_SPINLOCK(freezer_delta_lock);
 
-static struct rtc_timer		rtctimer;
-
 #ifdef CONFIG_RTC_CLASS
 /* rtc timer and device for setting alarm wakeups at suspend */
+static struct rtc_timer		rtctimer;
 static struct rtc_device	*rtcdev;
 static DEFINE_SPINLOCK(rtcdev_lock);
 
@@ -824,7 +823,7 @@ static int __init alarmtimer_init(void)
 		.nsleep		= alarm_timer_nsleep,
 	};
 
-	rtc_timer_init(&rtctimer, NULL, NULL);
+	alarmtimer_rtc_timer_init();
 
 	posix_timers_register_clock(CLOCK_REALTIME_ALARM, &alarm_clock);
 	posix_timers_register_clock(CLOCK_BOOTTIME_ALARM, &alarm_clock);
