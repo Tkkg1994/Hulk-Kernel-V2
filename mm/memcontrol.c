@@ -4709,6 +4709,7 @@ static struct cftype memsw_cgroup_files[] = {
 		.trigger = mem_cgroup_reset,
 		.read_u64 = mem_cgroup_read,
 	},
+	{ },	/* terminate */
 };
 
 static int register_memsw_files(struct cgroup *cont, struct cgroup_subsys *ss)
@@ -5607,6 +5608,7 @@ struct cgroup_subsys mem_cgroup_subsys = {
 	.can_attach = mem_cgroup_can_attach,
 	.cancel_attach = mem_cgroup_cancel_attach,
 	.attach = mem_cgroup_move_task,
+	.base_cftypes = mem_cgroup_files,
 	.early_init = 0,
 	.use_id = 1,
 	.__DEPRECATED_clear_css_refs = true,
