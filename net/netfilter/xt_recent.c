@@ -316,7 +316,7 @@ static int recent_mt_check(const struct xt_mtchk_param *par)
 	kuid_t uid;
 	kgid_t gid;
 #endif
-	unsigned i;
+	unsigned int i;
 	int ret = -EINVAL;
 
 	if (unlikely(!hash_rnd_inited)) {
