@@ -118,6 +118,7 @@
 #include <linux/prefetch.h>
 
 #include <asm/uaccess.h>
+#include <asm/socket.h>	
 
 #include <linux/netdevice.h>
 #include <net/protocol.h>
