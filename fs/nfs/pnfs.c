@@ -1138,7 +1138,7 @@ pnfs_generic_pg_test(struct nfs_pageio_descriptor *pgio, struct nfs_page *prev,
 }
 EXPORT_SYMBOL_GPL(pnfs_generic_pg_test);
 
-static int pnfs_write_done_resend_to_mds(struct inode *inode,
+int pnfs_write_done_resend_to_mds(struct inode *inode,
 				struct list_head *head,
 				const struct nfs_pgio_completion_ops *compl_ops)
 {
@@ -1166,6 +1166,7 @@ static int pnfs_write_done_resend_to_mds(struct inode *inode,
 	}
 	return 0;
 }
+EXPORT_SYMBOL_GPL(pnfs_write_done_resend_to_mds);
 
 static void pnfs_ld_handle_write_error(struct nfs_write_data *data)
 {
@@ -1292,7 +1293,7 @@ pnfs_generic_pg_writepages(struct nfs_pageio_descriptor *desc)
 }
 EXPORT_SYMBOL_GPL(pnfs_generic_pg_writepages);
 
-static int pnfs_read_done_resend_to_mds(struct inode *inode,
+int pnfs_read_done_resend_to_mds(struct inode *inode,
 				struct list_head *head,
 				const struct nfs_pgio_completion_ops *compl_ops)
 {
@@ -1316,6 +1317,7 @@ static int pnfs_read_done_resend_to_mds(struct inode *inode,
 	}
 	return 0;
 }
+EXPORT_SYMBOL_GPL(pnfs_read_done_resend_to_mds);
 
 static void pnfs_ld_handle_read_error(struct nfs_read_data *data)
 {
