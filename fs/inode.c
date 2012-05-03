@@ -529,6 +529,7 @@ static void evict(struct inode *inode)
 		inode_wb_list_del(inode);
 
 	inode_sb_list_del(inode);
+
 	/*
 	 * Wait for flusher thread to be done with the inode so that filesystem
 	 * does not start destroying it while writeback is still running. Since
