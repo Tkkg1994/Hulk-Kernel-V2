@@ -1008,7 +1008,6 @@ MODULE_DEVICE_TABLE(usb, id_table_combined);
 
 static struct usb_driver ftdi_driver = {
 	.name =		"ftdi_sio",
-	.probe =	usb_serial_probe,
 	.disconnect =	usb_serial_disconnect,
 	.id_table =	id_table_combined,
 };
