@@ -2721,7 +2721,7 @@ nfs4_remote_mount(struct file_system_type *fs_type, int flags,
 	}
 	sb_mntdata.server = server;
 
-	if (server->flags & NFS4_MOUNT_UNSHARED)
+	if (server->flags & NFS_MOUNT_UNSHARED)
 		compare_super = NULL;
 
 	/* -o noac implies -o sync */
@@ -2985,7 +2985,7 @@ nfs4_xdev_mount(struct file_system_type *fs_type, int flags,
 	}
 	sb_mntdata.server = server;
 
-	if (server->flags & NFS4_MOUNT_UNSHARED)
+	if (server->flags & NFS_MOUNT_UNSHARED)
 		compare_super = NULL;
 
 	/* -o noac implies -o sync */
@@ -3076,7 +3076,7 @@ nfs4_remote_referral_mount(struct file_system_type *fs_type, int flags,
 	}
 	sb_mntdata.server = server;
 
-	if (server->flags & NFS4_MOUNT_UNSHARED)
+	if (server->flags & NFS_MOUNT_UNSHARED)
 		compare_super = NULL;
 
 	/* -o noac implies -o sync */
