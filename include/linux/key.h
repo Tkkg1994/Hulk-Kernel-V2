@@ -138,6 +138,7 @@ struct key {
 	};
 	uid_t			uid;
 	gid_t			gid;
+	time_t			last_used_at;	/* last time used for LRU keyring discard */
 	key_perm_t		perm;		/* access permissions */
 	unsigned short		quotalen;	/* length added to quota */
 	unsigned short		datalen;	/* payload data length
