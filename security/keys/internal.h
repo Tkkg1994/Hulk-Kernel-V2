@@ -14,6 +14,7 @@
 
 #include <linux/sched.h>
 #include <linux/key-type.h>
+#include <linux/task_work.h>
 
 #ifdef __KDEBUG
 #define kenter(FMT, ...) \
@@ -152,6 +153,7 @@ struct kludge {	/* this will die off very soon */
 	struct cred *cred;
 };
 extern long join_session_keyring(const char *name);
+extern void key_change_session_keyring(struct task_work *twork);
 
 extern struct work_struct key_gc_work;
 extern unsigned key_gc_delay;
