@@ -563,3 +563,10 @@ Why:	Remount currently allows changing bound subsystems and
 	when the hierarchy is empty and release_agent itself should be
 	replaced with conventional fsnotify.
 
+----------------------------
+
+What:  xt_recent rev 0
+When:  2013
+Who:   Pablo Neira Ayuso <pablo@netfilter.org>
+Files: net/netfilter/xt_recent.c
+
