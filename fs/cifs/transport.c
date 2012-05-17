@@ -304,7 +304,8 @@ wait_for_free_credits(struct TCP_Server_Info *server, const int optype,
 static int
 wait_for_free_request(struct TCP_Server_Info *server, const int optype)
 {
-	return wait_for_free_credits(server, optype, get_credits_field(server));
+	return wait_for_free_credits(server, optype,
+				     server->ops->get_credits_field(server));
 }
 
 static int allocate_mid(struct cifs_ses *ses, struct smb_hdr *in_buf,
@@ -396,7 +397,7 @@ cifs_call_async(struct TCP_Server_Info *server, struct kvec *iov,
 	rc = cifs_setup_async_request(server, iov, nvec, &mid);
 	if (rc) {
 		mutex_unlock(&server->srv_mutex);
-		cifs_add_credits(server, 1);
+		add_credits(server, 1);
 		wake_up(&server->request_q);
 		return rc;
 	}
@@ -418,7 +419,7 @@ cifs_call_async(struct TCP_Server_Info *server, struct kvec *iov,
 	return rc;
 out_err:
 	delete_mid(mid);
-	cifs_add_credits(server, 1);
+	add_credits(server, 1);
 	wake_up(&server->request_q);
 	return rc;
 }
@@ -589,7 +590,7 @@ SendReceive2(const unsigned int xid, struct cifs_ses *ses,
 		mutex_unlock(&ses->server->srv_mutex);
 		cifs_small_buf_release(buf);
 		/* Update # of requests on wire to server */
-		cifs_add_credits(ses->server, 1);
+		add_credits(ses->server, 1);
 		return rc;
 	}
 
@@ -619,7 +620,7 @@ SendReceive2(const unsigned int xid, struct cifs_ses *ses,
 			midQ->callback = DeleteMidQEntry;
 			spin_unlock(&GlobalMid_Lock);
 			cifs_small_buf_release(buf);
-			cifs_add_credits(ses->server, 1);
+			add_credits(ses->server, 1);
 			return rc;
 		}
 		spin_unlock(&GlobalMid_Lock);
@@ -629,7 +630,7 @@ SendReceive2(const unsigned int xid, struct cifs_ses *ses,
 
 	rc = cifs_sync_mid_result(midQ, ses->server);
 	if (rc != 0) {
-		cifs_add_credits(ses->server, 1);
+		add_credits(ses->server, 1);
 		return rc;
 	}
 
@@ -655,7 +656,7 @@ SendReceive2(const unsigned int xid, struct cifs_ses *ses,
 		midQ->resp_buf = NULL;
 out:
 	delete_mid(midQ);
-	cifs_add_credits(ses->server, 1);
+	add_credits(ses->server, 1);
 
 	return rc;
 }
@@ -705,7 +706,7 @@ SendReceive(const unsigned int xid, struct cifs_ses *ses,
 	if (rc) {
 		mutex_unlock(&ses->server->srv_mutex);
 		/* Update # of requests on wire to server */
-		cifs_add_credits(ses->server, 1);
+		add_credits(ses->server, 1);
 		return rc;
 	}
 
@@ -737,7 +738,7 @@ SendReceive(const unsigned int xid, struct cifs_ses *ses,
 			/* no longer considered to be "in-flight" */
 			midQ->callback = DeleteMidQEntry;
 			spin_unlock(&GlobalMid_Lock);
-			cifs_add_credits(ses->server, 1);
+			add_credits(ses->server, 1);
 			return rc;
 		}
 		spin_unlock(&GlobalMid_Lock);
@@ -745,7 +746,7 @@ SendReceive(const unsigned int xid, struct cifs_ses *ses,
 
 	rc = cifs_sync_mid_result(midQ, ses->server);
 	if (rc != 0) {
-		cifs_add_credits(ses->server, 1);
+		add_credits(ses->server, 1);
 		return rc;
 	}
 
@@ -761,7 +762,7 @@ SendReceive(const unsigned int xid, struct cifs_ses *ses,
 	rc = cifs_check_receive(midQ, ses->server, 0);
 out:
 	delete_mid(midQ);
-	cifs_add_credits(ses->server, 1);
+	add_credits(ses->server, 1);
 
 	return rc;
 }
