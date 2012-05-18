@@ -275,7 +275,7 @@ extern struct ipv6_txoptions *	ipv6_renew_options(struct sock *sk, struct ipv6_t
 struct ipv6_txoptions *ipv6_fixup_options(struct ipv6_txoptions *opt_space,
 					  struct ipv6_txoptions *opt);
 
-extern int ipv6_opt_accepted(struct sock *sk, struct sk_buff *skb);
+extern bool ipv6_opt_accepted(const struct sock *sk, const struct sk_buff *skb);
 
 int ip6_frag_nqueues(struct net *net);
 int ip6_frag_mem(struct net *net);
@@ -365,8 +365,8 @@ static inline void ipv6_addr_set(struct in6_addr *addr,
 	addr->s6_addr32[3] = w4;
 }
 
-static inline int ipv6_addr_equal(const struct in6_addr *a1,
-				  const struct in6_addr *a2)
+static inline bool ipv6_addr_equal(const struct in6_addr *a1,
+				   const struct in6_addr *a2)
 {
 #if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS) && BITS_PER_LONG == 64
 	const unsigned long *ul1 = (const unsigned long *)a1;
@@ -381,27 +381,27 @@ static inline int ipv6_addr_equal(const struct in6_addr *a1,
 #endif
 }
 
-static inline int __ipv6_prefix_equal(const __be32 *a1, const __be32 *a2,
-				      unsigned int prefixlen)
+static inline bool __ipv6_prefix_equal(const __be32 *a1, const __be32 *a2,
+				       unsigned int prefixlen)
 {
 	unsigned int pdw, pbi;
 
 	/* check complete u32 in prefix */
 	pdw = prefixlen >> 5;
 	if (pdw && memcmp(a1, a2, pdw << 2))
-		return 0;
+		return false;
 
 	/* check incomplete u32 in prefix */
 	pbi = prefixlen & 0x1f;
 	if (pbi && ((a1[pdw] ^ a2[pdw]) & htonl((0xffffffff) << (32 - pbi))))
-		return 0;
+		return false;
 
-	return 1;
+	return true;
 }
 
-static inline int ipv6_prefix_equal(const struct in6_addr *a1,
-				    const struct in6_addr *a2,
-				    unsigned int prefixlen)
+static inline bool ipv6_prefix_equal(const struct in6_addr *a1,
+				     const struct in6_addr *a2,
+				     unsigned int prefixlen)
 {
 	return __ipv6_prefix_equal(a1->s6_addr32, a2->s6_addr32,
 				   prefixlen);
@@ -445,7 +445,7 @@ static inline u32 ipv6_addr_jhash(const struct in6_addr *a)
 	return __ipv6_addr_jhash(a, ipv6_hash_secret);
 }
 
-static inline int ipv6_addr_any(const struct in6_addr *a)
+static inline bool ipv6_addr_any(const struct in6_addr *a)
 {
 #if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS) && BITS_PER_LONG == 64
 	const unsigned long *ul = (const unsigned long *)a;
@@ -457,13 +457,13 @@ static inline int ipv6_addr_any(const struct in6_addr *a)
 #endif
 }
 
-static inline int ipv6_addr_loopback(const struct in6_addr *a)
+static inline bool ipv6_addr_loopback(const struct in6_addr *a)
 {
 	return (a->s6_addr32[0] | a->s6_addr32[1] |
 		a->s6_addr32[2] | (a->s6_addr32[3] ^ htonl(1))) == 0;
 }
 
-static inline int ipv6_addr_v4mapped(const struct in6_addr *a)
+static inline bool ipv6_addr_v4mapped(const struct in6_addr *a)
 {
 	return (a->s6_addr32[0] | a->s6_addr32[1] |
 		 (a->s6_addr32[2] ^ htonl(0x0000ffff))) == 0;
@@ -473,7 +473,7 @@ static inline int ipv6_addr_v4mapped(const struct in6_addr *a)
  * Check for a RFC 4843 ORCHID address
  * (Overlay Routable Cryptographic Hash Identifiers)
  */
-static inline int ipv6_addr_orchid(const struct in6_addr *a)
+static inline bool ipv6_addr_orchid(const struct in6_addr *a)
 {
 	return (a->s6_addr32[0] & htonl(0xfffffff0)) == htonl(0x20010010);
 }
