@@ -427,7 +427,7 @@ struct ip6_create_arg {
 };
 
 void ip6_frag_init(struct inet_frag_queue *q, void *a);
-int ip6_frag_match(struct inet_frag_queue *q, void *a);
+bool ip6_frag_match(struct inet_frag_queue *q, void *a);
 
 /* more secured version of ipv6_addr_hash() */
 static inline u32 __ipv6_addr_jhash(const struct in6_addr *a, const u32 initval)
