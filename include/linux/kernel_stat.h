@@ -63,8 +63,6 @@ static inline unsigned int kstat_irqs_cpu(unsigned int irq, int cpu)
 }
 #else
 #include <linux/irq.h>
-=======
->>>>>>> 8f945a3... genirq: Move kstat_incr_irqs_this_cpu() to core
 extern unsigned int kstat_irqs_cpu(unsigned int irq, int cpu);
 extern void kstat_incr_irq_this_cpu(unsigned int irq);
 
