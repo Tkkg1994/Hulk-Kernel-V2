@@ -193,15 +193,19 @@ static u32 flow_get_rtclassid(const struct sk_buff *skb)
 
 static u32 flow_get_skuid(const struct sk_buff *skb)
 {
-	if (skb->sk && skb->sk->sk_socket && skb->sk->sk_socket->file)
-		return skb->sk->sk_socket->file->f_cred->fsuid;
+	if (skb->sk && skb->sk->sk_socket && skb->sk->sk_socket->file) {
+		kuid_t skuid = skb->sk->sk_socket->file->f_cred->fsuid;
+		return from_kuid(&init_user_ns, skuid);
+	}
 	return 0;
 }
 
 static u32 flow_get_skgid(const struct sk_buff *skb)
 {
-	if (skb->sk && skb->sk->sk_socket && skb->sk->sk_socket->file)
-		return skb->sk->sk_socket->file->f_cred->fsgid;
+	if (skb->sk && skb->sk->sk_socket && skb->sk->sk_socket->file) {
+		kgid_t skgid = skb->sk->sk_socket->file->f_cred->fsgid;
+		return from_kgid(&init_user_ns, skgid);
+	}
 	return 0;
 }
 
@@ -385,6 +389,10 @@ static int flow_change(struct tcf_proto *tp, unsigned long base,
 			return -EINVAL;
 
 		if (fls(keymask) - 1 > FLOW_KEY_MAX)
+			return -EOPNOTSUPP;
+
+		if ((keymask & (FLOW_KEY_SKUID|FLOW_KEY_SKGID)) &&
+		    sk_user_ns(NETLINK_CB(in_skb).ssk) != &init_user_ns)
 			return -EOPNOTSUPP;
 	}
 
