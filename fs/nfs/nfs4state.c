@@ -256,7 +256,7 @@ int nfs41_init_clientid(struct nfs_client *clp, struct rpc_cred *cred)
 		goto out;
 	set_bit(NFS4CLNT_LEASE_CONFIRM, &clp->cl_state);
 do_confirm:
-	status = nfs4_proc_create_session(clp);
+	status = nfs4_proc_create_session(clp, cred);
 	if (status != 0)
 		goto out;
 	clear_bit(NFS4CLNT_LEASE_CONFIRM, &clp->cl_state);
@@ -1698,10 +1698,12 @@ void nfs41_handle_sequence_flag_errors(struct nfs_client *clp, u32 flags)
 
 static int nfs4_reset_session(struct nfs_client *clp)
 {
+	struct rpc_cred *cred;
 	int status;
 
 	nfs4_begin_drain_session(clp);
-	status = nfs4_proc_destroy_session(clp->cl_session);
+	cred = nfs4_get_exchange_id_cred(clp);
+	status = nfs4_proc_destroy_session(clp->cl_session, cred);
 	switch (status) {
 	case 0:
 	case -NFS4ERR_BADSESSION:
@@ -1719,7 +1721,7 @@ static int nfs4_reset_session(struct nfs_client *clp)
 	}
 
 	memset(clp->cl_session->sess_id.data, 0, NFS4_MAX_SESSIONID_LEN);
-	status = nfs4_proc_create_session(clp);
+	status = nfs4_proc_create_session(clp, cred);
 	if (status) {
 		status = nfs4_recovery_handle_error(clp, status);
 		goto out;
@@ -1733,6 +1735,8 @@ static int nfs4_reset_session(struct nfs_client *clp)
 	if (!test_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state))
 		nfs41_setup_state_renewal(clp);
 out:
+	if (cred)
+		put_rpccred(cred);
 	return status;
 }
 
