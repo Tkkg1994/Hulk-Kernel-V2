@@ -55,6 +55,7 @@ struct nfulnl_instance {
 	unsigned int qlen;		/* number of nlmsgs in skb */
 	struct sk_buff *skb;		/* pre-allocatd skb */
 	struct timer_list timer;
+	struct user_namespace *peer_user_ns;	/* User namespace of the peer process */
 	int peer_portid;			/* PID of the peer process */
 
 	/* configurable parameters */
@@ -131,7 +132,7 @@ instance_put(struct nfulnl_instance *inst)
 static void nfulnl_timer(unsigned long data);
 
 static struct nfulnl_instance *
-instance_create(u_int16_t group_num, int portid)
+instance_create(u_int16_t group_num, int portid, struct user_namespace *user_ns)
 {
 	struct nfulnl_instance *inst;
 	int err;
@@ -161,6 +162,7 @@ instance_create(u_int16_t group_num, int portid)
 
 	setup_timer(&inst->timer, nfulnl_timer, (unsigned long)inst);
 
+	inst->peer_user_ns = user_ns;
 	inst->peer_pid = portid;
 	inst->group_num = group_num;
 
@@ -484,8 +486,10 @@ __build_packet_message(struct nfulnl_instance *inst,
 		read_lock_bh(&skb->sk->sk_callback_lock);
 		if (skb->sk->sk_socket && skb->sk->sk_socket->file) {
 			struct file *file = skb->sk->sk_socket->file;
-			__be32 uid = htonl(file->f_cred->fsuid);
-			__be32 gid = htonl(file->f_cred->fsgid);
+			__be32 uid = htonl(from_kuid_munged(inst->peer_user_ns,
+							    file->f_cred->fsuid));
+			__be32 gid = htonl(from_kgid_munged(inst->peer_user_ns,
+							    file->f_cred->fsgid));
 			/* need to unlock here since NLA_PUT may goto */
 			read_unlock_bh(&skb->sk->sk_callback_lock);
 			NLA_PUT_BE32(inst->skb, NFULA_UID, uid);
@@ -764,6 +768,7 @@ nfulnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 
 			inst = instance_create(group_num,
 					       NETLINK_CB(skb).portid);
+					       sk_user_ns(NETLINK_CB(skb).ssk));
 			if (IS_ERR(inst)) {
 				ret = PTR_ERR(inst);
 				goto out;
