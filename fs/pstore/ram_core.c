@@ -321,6 +321,13 @@ void persistent_ram_free_old(struct persistent_ram_zone *prz)
 	prz->old_log_size = 0;
 }
 
+void persistent_ram_zap(struct persistent_ram_zone *prz)
+{
+	atomic_set(&prz->buffer->start, 0);
+	atomic_set(&prz->buffer->size, 0);
+	persistent_ram_update_header_ecc(prz);
+}
+
 static void *persistent_ram_vmap(phys_addr_t start, size_t size)
 {
 	struct page **pages;
@@ -415,8 +422,7 @@ static int __init persistent_ram_post_init(struct persistent_ram_zone *prz, bool
 	}
 
 	prz->buffer->sig = PERSISTENT_RAM_SIG;
-	atomic_set(&prz->buffer->start, 0);
-	atomic_set(&prz->buffer->size, 0);
+	persistent_ram_zap(prz);
 
 	return 0;
 }
@@ -451,7 +457,6 @@ struct persistent_ram_zone * __init persistent_ram_new(phys_addr_t start,
 		goto err;
 
 	persistent_ram_post_init(prz, ecc);
-	persistent_ram_update_header_ecc(prz);
 
 	return prz;
 err:
