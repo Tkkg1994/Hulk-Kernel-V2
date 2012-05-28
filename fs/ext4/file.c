@@ -95,7 +95,7 @@ ext4_file_write(struct kiocb *iocb, const struct iovec *iov,
 {
 	struct inode *inode = file_inode(iocb->ki_filp);
 	int unaligned_aio = 0;
-	int ret;
+	ssize_t ret;
 
 	/*
 	 * If we have encountered a bitmap-format file, the size limit
