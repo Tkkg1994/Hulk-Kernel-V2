@@ -1143,10 +1143,6 @@ unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	if (error)
 		return error;
 
-	error = security_mmap_file(file, reqprot, prot, flags);
-	if (error)
-		return error;
-
 	return mmap_region(file, addr, len, flags, vm_flags, pgoff);
 }
 
@@ -1169,9 +1165,12 @@ unsigned long vm_mmap(struct file *file, unsigned long addr,
 	unsigned long ret;
 	struct mm_struct *mm = current->mm;
 
-	down_write(&mm->mmap_sem);
-	ret = do_mmap(file, addr, len, prot, flag, offset);
-	up_write(&mm->mmap_sem);
+	ret = security_mmap_file(file, prot, flag);
+	if (!ret) {
+		down_write(&mm->mmap_sem);
+		ret = do_mmap(file, addr, len, prot, flag, offset);
+		up_write(&mm->mmap_sem);
+	}
 	return ret;
 }
 EXPORT_SYMBOL(vm_mmap);
@@ -1211,9 +1210,12 @@ SYSCALL_DEFINE6(mmap_pgoff, unsigned long, addr, unsigned long, len,
 
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 
-	down_write(&current->mm->mmap_sem);
-	retval = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
-	up_write(&current->mm->mmap_sem);
+	retval = security_mmap_file(file, prot, flags);
+	if (!retval) {
+		down_write(&current->mm->mmap_sem);
+		retval = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
+		up_write(&current->mm->mmap_sem);
+	}
 
 	if (file)
 		fput(file);
