@@ -352,6 +352,10 @@ extern u64 hwpoison_filter_flags_mask;
 extern u64 hwpoison_filter_flags_value;
 extern u64 hwpoison_filter_memcg;
 
+extern unsigned long vm_mmap_pgoff(struct file *, unsigned long,
+        unsigned long, unsigned long,
+        unsigned long, unsigned long);
+
 extern void set_pageblock_order(void);
 
 /* The ALLOC_WMARK bits are used as an index to zone->watermark */
@@ -367,3 +371,4 @@ extern void set_pageblock_order(void);
 #define ALLOC_HIGH		0x20 /* __GFP_HIGH set */
 #define ALLOC_CPUSET		0x40 /* check for correct cpuset */
 #define ALLOC_CMA		0x80 /* allow allocations from CMA areas */
+
