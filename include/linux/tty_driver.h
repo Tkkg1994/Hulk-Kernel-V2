@@ -308,6 +308,7 @@ struct tty_driver {
 	 * Pointer to the tty data structures
 	 */
 	struct tty_struct **ttys;
+	struct tty_port **ports;
 	struct ktermios **termios;
 	void *driver_state;
 
