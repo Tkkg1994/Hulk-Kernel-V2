@@ -1745,6 +1745,8 @@ static int nfs4_reset_session(struct nfs_client *clp)
 	struct rpc_cred *cred;
 	int status;
 
+	if (!nfs4_has_session(clp))
+		return 0;
 	nfs4_begin_drain_session(clp);
 	cred = nfs4_get_exchange_id_cred(clp);
 	status = nfs4_proc_destroy_session(clp->cl_session, cred);
@@ -1815,6 +1817,8 @@ static int nfs4_bind_conn_to_session(struct nfs_client *clp)
 	struct rpc_cred *cred;
 	int ret;
 
+	if (!nfs4_has_session(clp))
+		return 0;
 	nfs4_begin_drain_session(clp);
 	cred = nfs4_get_exchange_id_cred(clp);
 	ret = nfs4_proc_bind_conn_to_session(clp, cred);
@@ -1892,8 +1896,7 @@ static void nfs4_state_manager(struct nfs_client *clp)
 		}
 
 		/* Initialize or reset the session */
-		if (test_and_clear_bit(NFS4CLNT_SESSION_RESET, &clp->cl_state)
-		   && nfs4_has_session(clp)) {
+		if (test_and_clear_bit(NFS4CLNT_SESSION_RESET, &clp->cl_state)) {
 			section = "reset session";
 			status = nfs4_reset_session(clp);
 			if (test_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state))
@@ -1904,7 +1907,7 @@ static void nfs4_state_manager(struct nfs_client *clp)
 
 		/* Send BIND_CONN_TO_SESSION */
 		if (test_and_clear_bit(NFS4CLNT_BIND_CONN_TO_SESSION,
-				&clp->cl_state) && nfs4_has_session(clp)) {
+				&clp->cl_state)) {
 			section = "bind conn to session";
 			status = nfs4_bind_conn_to_session(clp);
 			if (status < 0)
