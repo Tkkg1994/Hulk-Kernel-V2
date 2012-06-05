@@ -18,6 +18,7 @@
 struct mmc_cid {
 	unsigned int		manfid;
 	char			prod_name[8];
+	unsigned char		prv;
 	unsigned int		serial;
 	unsigned short		oemid;
 	unsigned short		year;
@@ -233,6 +234,21 @@ struct mmc_queue;
 
 #define SDIO_MAX_FUNCS		7
 
+enum mmc_blk_status {
+	MMC_BLK_SUCCESS = 0,
+	MMC_BLK_PARTIAL,
+	MMC_BLK_CMD_ERR,
+	MMC_BLK_RETRY,
+	MMC_BLK_ABORT,
+	MMC_BLK_DATA_ERR,
+	MMC_BLK_ECC_ERR,
+	MMC_BLK_NOMEDIUM,
+	MMC_BLK_NEW_REQUEST,
+	MMC_BLK_URGENT,
+	MMC_BLK_URGENT_DONE,
+	MMC_BLK_NO_REQ_TO_STOP,
+};
+
 enum mmc_packed_stop_reasons {
 	EXCEEDS_SEGMENTS = 0,
 	EXCEEDS_SECTORS,
@@ -253,21 +269,6 @@ struct mmc_wr_pack_stats {
 	spinlock_t lock;
 	bool enabled;
 	bool print_in_read;
-};
-
-enum mmc_blk_status {
-	MMC_BLK_SUCCESS = 0,
-	MMC_BLK_PARTIAL,
-	MMC_BLK_CMD_ERR,
-	MMC_BLK_RETRY,
-	MMC_BLK_ABORT,
-	MMC_BLK_DATA_ERR,
-	MMC_BLK_ECC_ERR,
-	MMC_BLK_NOMEDIUM,
-	MMC_BLK_NEW_REQUEST,
-	MMC_BLK_URGENT,
-	MMC_BLK_URGENT_DONE,
-	MMC_BLK_NO_REQ_TO_STOP,
 };
 
 /* The number of MMC physical partitions.  These consist of:
@@ -319,6 +320,7 @@ struct mmc_bkops_stats {
  * @size_percentage_to_queue_delayed_work: the changed
  *        percentage of sectors that should issue check for
  *        BKOPS need
+ * @bkops_stats: BKOPS statistics
  * @cancel_delayed_work: A flag to indicate if the delayed work
  *        should be cancelled
  * @sectors_changed:  number of  sectors written or
@@ -330,7 +332,7 @@ struct mmc_bkops_info {
 	unsigned int		delay_ms;
 	unsigned int		min_sectors_to_queue_delayed_work;
 	unsigned int		size_percentage_to_queue_delayed_work;
-	struct mmc_bkops_stats  bkops_stats;    /* BKOPS statistics */
+	struct mmc_bkops_stats  bkops_stats;
 /*
  * A default time for checking the need for non urgent BKOPS once mmcqd
  * is idle.
