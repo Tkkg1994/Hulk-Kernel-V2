@@ -464,6 +464,7 @@ int ip6_forward(struct sk_buff *skb)
 	 */
 	if (skb->dev == dst->dev && opt->srcrt == 0 && !skb_sec_path(skb)) {
 		struct in6_addr *target = NULL;
+		struct inet_peer *peer;
 		struct rt6_info *rt;
 
 		/*
@@ -477,13 +478,12 @@ int ip6_forward(struct sk_buff *skb)
 		else
 			target = &hdr->daddr;
 
-		if (!rt->rt6i_peer)
-			rt6_bind_peer(rt, 1);
+		peer = rt6_get_peer_create(rt);
 
 		/* Limit redirects both by destination (here)
 		   and by source (inside ndisc_send_redirect)
 		 */
-		if (inet_peer_xrlim_allow(rt->rt6i_peer, 1*HZ))
+		if (inet_peer_xrlim_allow(peer, 1*HZ))
 			ndisc_send_redirect(skb, target);
 	} else {
 		int addrtype = ipv6_addr_type(&hdr->saddr);
