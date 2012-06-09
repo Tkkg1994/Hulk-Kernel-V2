@@ -112,8 +112,7 @@ static inline struct inet_peer *inet_getpeer_v6(struct net *net,
 extern void inet_putpeer(struct inet_peer *p);
 extern bool inet_peer_xrlim_allow(struct inet_peer *peer, int timeout);
 
-extern void __inetpeer_invalidate_tree(struct inet_peer_base *);
-extern void inetpeer_invalidate_tree(struct net *net, int family);
+extern void inetpeer_invalidate_tree(struct inet_peer_base *);
 
 /*
  * temporary check to make sure we dont access rid, tcp_ts,

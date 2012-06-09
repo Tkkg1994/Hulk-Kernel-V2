@@ -939,7 +939,7 @@ static void rt_cache_invalidate(struct net *net)
 
 	get_random_bytes(&shuffle, sizeof(shuffle));
 	atomic_add(shuffle + 1U, &net->ipv4.rt_genid);
-	inetpeer_invalidate_tree(net, AF_INET);
+	inetpeer_invalidate_tree(net->ipv4.peers);
 }
 
 /*
@@ -3455,7 +3455,7 @@ static void __net_exit ipv4_inetpeer_exit(struct net *net)
 	struct inet_peer_base *bp = net->ipv4.peers;
 
 	net->ipv4.peers = NULL;
-	__inetpeer_invalidate_tree(bp);
+	inetpeer_invalidate_tree(bp);
 	kfree(bp);
 }
 

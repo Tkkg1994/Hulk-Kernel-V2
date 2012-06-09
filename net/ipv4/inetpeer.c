@@ -546,7 +546,7 @@ static void inetpeer_inval_rcu(struct rcu_head *head)
 	schedule_delayed_work(&gc_work, gc_delay);
 }
 
-void __inetpeer_invalidate_tree(struct inet_peer_base *base)
+void inetpeer_invalidate_tree(struct inet_peer_base *base)
 {
 	struct inet_peer *old, *new, *prev;
 
@@ -566,13 +566,5 @@ void __inetpeer_invalidate_tree(struct inet_peer_base *base)
 
 out:
 	write_sequnlock_bh(&base->lock);
-}
-EXPORT_SYMBOL(__inetpeer_invalidate_tree);
-
-void inetpeer_invalidate_tree(struct net *net, int family)
-{
-	struct inet_peer_base *base = family_to_base(net, family);
-
-	__inetpeer_invalidate_tree(base);
 }
 EXPORT_SYMBOL(inetpeer_invalidate_tree);
