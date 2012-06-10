@@ -67,6 +67,7 @@ struct inet_peer {
 struct inet_peer_base {
 	struct inet_peer __rcu	*root;
 	seqlock_t		lock;
+	u32			flush_seq;
 	int			total;
 };
 
@@ -167,6 +168,7 @@ extern void inet_putpeer(struct inet_peer *p);
 extern bool inet_peer_xrlim_allow(struct inet_peer *peer, int timeout);
 
 extern void inetpeer_invalidate_tree(struct inet_peer_base *);
+extern void inetpeer_invalidate_family(int family);
 
 /*
  * temporary check to make sure we dont access rid, tcp_ts,
