@@ -669,8 +669,7 @@ int open_check_o_direct(struct file *f)
 	return 0;
 }
 
-static int do_dentry_open(struct dentry *dentry, struct vfsmount *mnt,
-			  struct file *f,
+static int do_dentry_open(struct file *f,
 			  int (*open)(struct inode *, struct file *),
 			  const struct cred *cred)
 {
@@ -686,7 +685,7 @@ static int do_dentry_open(struct dentry *dentry, struct vfsmount *mnt,
 
 	inode = file_inode(f);
 	if (f->f_mode & FMODE_WRITE) {
-		error = __get_file_write_access(inode, mnt);
+		error = __get_file_write_access(inode, f->f_path.mnt);
 		if (error)
 			goto cleanup_file;
 		if (!special_file(inode->i_mode))
@@ -694,8 +693,6 @@ static int do_dentry_open(struct dentry *dentry, struct vfsmount *mnt,
 	}
 
 	f->f_mapping = inode->i_mapping;
-	f->f_path.dentry = dentry;
-	f->f_path.mnt = mnt;
 	f->f_pos = 0;
 	file_sb_list_add(f, inode->i_sb);
 
@@ -742,15 +739,14 @@ cleanup_all:
 			 * here, so just reset the state.
 			 */
 			file_reset_write(f);
-			mnt_drop_write(mnt);
+			mnt_drop_write(f->f_path.mnt);
 		}
 	}
 	file_sb_list_del(f);
-	f->f_path.dentry = NULL;
-	f->f_path.mnt = NULL;
 cleanup_file:
-	dput(dentry);
-	mntput(mnt);
+	path_put(&f->f_path);
+	f->f_path.mnt = NULL;
+	f->f_path.dentry = NULL;
 	return error;
 }
 
@@ -773,9 +769,9 @@ int finish_open(struct file *file, struct dentry *dentry,
 	BUG_ON(*opened & FILE_OPENED); /* once it's opened, it's opened */
 
 	mntget(file->f_path.mnt);
-	dget(dentry);
+	file->f_path.dentry = dget(dentry);
 
-	error = do_dentry_open(dentry, file->f_path.mnt, file, open, current_cred());
+	error = do_dentry_open(file, open, current_cred());
 	if (!error)
 		*opened |= FILE_OPENED;
 
@@ -823,7 +819,9 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags,
 	}
 
 	f->f_flags = flags;
-	error = do_dentry_open(dentry, mnt, f, NULL, cred);
+	f->f_path.mnt = mnt;
+	f->f_path.dentry = dentry;
+	error = do_dentry_open(f, NULL, cred);
 	if (!error) {
 		error = open_check_o_direct(f);
 		if (error) {
