@@ -2090,7 +2090,7 @@ void unlock_rename(struct dentry *p1, struct dentry *p2)
 }
 
 int vfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
-		struct nameidata *nd)
+		bool want_excl)
 {
 	int error = may_create(dir, dentry);
 	if (error)
@@ -2103,14 +2103,13 @@ int vfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	error = security_inode_create(dir, dentry, mode);
 	if (error)
 		return error;
-	error = dir->i_op->create(dir, dentry, mode, !nd || (nd->flags & LOOKUP_EXCL));
+	error = dir->i_op->create(dir, dentry, mode, want_excl);
 	if (error)
 		return error;
 
 	error = security_inode_post_create(dir, dentry, mode);
 	if (error)
 		return error;
-
 	if (!error)
 		fsnotify_create(dir, dentry);
 	return error;
@@ -2414,7 +2413,8 @@ static int lookup_open(struct nameidata *nd, struct path *path,
 		error = security_path_mknod(&nd->path, dentry, mode, 0);
 		if (error)
 			goto out_dput;
-		error = vfs_create(dir->d_inode, dentry, mode, nd);
+		error = vfs_create(dir->d_inode, dentry, mode,
+				   nd->flags & LOOKUP_EXCL);
 		if (error)
 			goto out_dput;
 	}
@@ -2908,7 +2908,7 @@ SYSCALL_DEFINE4(mknodat, int, dfd, const char __user *, filename, umode_t, mode,
 		goto out_drop_write;
 	switch (mode & S_IFMT) {
 		case 0: case S_IFREG:
-			error = vfs_create(path.dentry->d_inode,dentry,mode,NULL);
+			error = vfs_create(path.dentry->d_inode,dentry,mode,true);
 			break;
 		case S_IFCHR: case S_IFBLK:
 			error = vfs_mknod(path.dentry->d_inode,dentry,mode,
