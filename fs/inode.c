@@ -1562,7 +1562,7 @@ void file_update_time(struct file *file)
 		return;
 
 	/* Finally allowed to write? Takes lock. */
-	if (mnt_want_write_file(file))
+	if (__mnt_want_write_file(file))
 		return;
 
 	/* Only change inode inside the lock region */
@@ -1573,7 +1573,7 @@ void file_update_time(struct file *file)
 	if (sync_it & S_MTIME)
 		inode->i_mtime = now;
 	mark_inode_dirty_sync(inode);
-	mnt_drop_write_file(file);
+	__mnt_drop_write_file(file);
 }
 EXPORT_SYMBOL(file_update_time);
 
