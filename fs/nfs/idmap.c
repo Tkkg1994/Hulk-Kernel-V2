@@ -57,16 +57,16 @@ unsigned int nfs_idmap_cache_timeout = 600;
 static const struct cred *id_resolver_cache;
 static struct key_type key_type_id_resolver_legacy;
 
-struct idmap {
-	struct rpc_pipe		*idmap_pipe;
-	struct key_construction	*idmap_key_cons;
-	struct mutex		idmap_mutex;
-};
-
 struct idmap_legacy_upcalldata {
 	struct rpc_pipe_msg pipe_msg;
 	struct idmap_msg idmap_msg;
 	struct idmap *idmap;
+};
+
+struct idmap {
+	struct rpc_pipe		*idmap_pipe;
+	struct idmap_legacy_upcalldata *idmap_upcall_data;
+	struct mutex		idmap_mutex;
 };
 
 /**
@@ -332,7 +332,6 @@ static ssize_t nfs_idmap_get_key(const char *name, size_t namelen,
 		ret = nfs_idmap_request_key(&key_type_id_resolver_legacy,
 					    name, namelen, type, data,
 					    data_size, idmap);
-		idmap->idmap_key_cons = NULL;
 		mutex_unlock(&idmap->idmap_mutex);
 	}
 	return ret;
