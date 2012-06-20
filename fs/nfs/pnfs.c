@@ -614,7 +614,14 @@ send_layoutget(struct pnfs_layout_hdr *lo,
 	return lseg;
 }
 
-/* Initiates a LAYOUTRETURN(FILE) */
+/*
+ * Initiates a LAYOUTRETURN(FILE), and removes the pnfs_layout_hdr
+ * when the layout segment list is empty.
+ *
+ * Note that a pnfs_layout_hdr can exist with an empty layout segment
+ * list when LAYOUTGET has failed, or when LAYOUTGET succeeded, but the
+ * deviceid is marked invalid.
+ */
 int
 _pnfs_return_layout(struct inode *ino)
 {
@@ -623,7 +630,7 @@ _pnfs_return_layout(struct inode *ino)
 	LIST_HEAD(tmp_list);
 	struct nfs4_layoutreturn *lrp;
 	nfs4_stateid stateid;
-	int status = 0;
+	int status = 0, empty;
 
 	dprintk("NFS: %s for inode %lu\n", __func__, ino->i_ino);
 
@@ -631,13 +638,21 @@ _pnfs_return_layout(struct inode *ino)
 	lo = nfsi->layout;
 	if (!lo || pnfs_test_layout_returned(lo)) {
 		spin_unlock(&ino->i_lock);
-		dprintk("%s: no layout to return\n", __func__);
-		return status;
+		dprintk("NFS: %s no layout to return\n", __func__);
+		goto out;
 	}
 	stateid = nfsi->layout->plh_stateid;
 	/* Reference matched in nfs4_layoutreturn_release */
 	get_layout_hdr(lo);
+	empty = list_empty(&lo->plh_segs);
 	mark_matching_lsegs_invalid(lo, &tmp_list, NULL);
+	/* Don't send a LAYOUTRETURN if list was initially empty */
+	if (empty) {
+		spin_unlock(&ino->i_lock);
+		put_layout_hdr(lo);
+		dprintk("NFS: %s no layout segments to return\n", __func__);
+		goto out;
+	}
 	lo->plh_block_lgets++;
 	pnfs_mark_layout_returned(lo);
 	spin_unlock(&ino->i_lock);
