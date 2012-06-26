@@ -1663,11 +1663,27 @@ void ip_rt_send_redirect(struct sk_buff *skb)
 
 static int ip_error(struct sk_buff *skb)
 {
+	struct in_device *in_dev = __in_dev_get_rcu(skb->dev);
 	struct rtable *rt = skb_rtable(skb);
 	struct inet_peer *peer;
 	unsigned long now;
+	struct net *net;
 	bool send;
 	int code;
+
+	net = dev_net(rt->dst.dev);
+	if (!IN_DEV_FORWARD(in_dev)) {
+		switch (rt->dst.error) {
+		case EHOSTUNREACH:
+			IP_INC_STATS_BH(net, IPSTATS_MIB_INADDRERRORS);
+			break;
+
+		case ENETUNREACH:
+			IP_INC_STATS_BH(net, IPSTATS_MIB_INNOROUTES);
+			break;
+		}
+		goto out;
+	}
 
 	switch (rt->dst.error) {
 	case EINVAL:
@@ -1678,8 +1694,7 @@ static int ip_error(struct sk_buff *skb)
 		break;
 	case ENETUNREACH:
 		code = ICMP_NET_UNREACH;
-		IP_INC_STATS_BH(dev_net(rt->dst.dev),
-				IPSTATS_MIB_INNOROUTES);
+		IP_INC_STATS_BH(net, IPSTATS_MIB_INNOROUTES);
 		break;
 	case EACCES:
 		code = ICMP_PKT_FILTERED;
@@ -2312,11 +2327,8 @@ static int ip_route_input_slow(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 	fl4.daddr = daddr;
 	fl4.saddr = saddr;
 	err = fib_lookup(net, &fl4, &res);
-	if (err != 0) {
-		if (!IN_DEV_FORWARD(in_dev))
-			goto e_hostunreach;
+	if (err != 0)
 		goto no_route;
-	}
 
 	RT_CACHE_STAT_INC(in_slow_tot);
 
@@ -2336,7 +2348,7 @@ static int ip_route_input_slow(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 	}
 
 	if (!IN_DEV_FORWARD(in_dev))
-		goto e_hostunreach;
+		goto no_route;
 	if (res.type != RTN_UNICAST)
 		goto martian_destination;
 
@@ -2424,10 +2436,6 @@ martian_destination:
 		net_warn_ratelimited("martian destination %pI4 from %pI4, dev %s\n",
 				     &daddr, &saddr, dev->name);
 #endif
-
-e_hostunreach:
-	err = -EHOSTUNREACH;
-	goto out;
 
 e_inval:
 	err = -EINVAL;
