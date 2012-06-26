@@ -850,7 +850,6 @@ out_putfd:
 	}
 	mutex_unlock(&root->d_inode->i_mutex);
 	if (!ro)
-		mnt_drop_write(mnt);
 out_putname:
 	putname(name);
 	return fd;
