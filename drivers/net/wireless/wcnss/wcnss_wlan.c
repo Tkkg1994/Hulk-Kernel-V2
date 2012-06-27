@@ -33,11 +33,12 @@
 #include <linux/wait.h>
 #include <linux/uaccess.h>
 
-#include <mach/peripheral-loader.h>
 #include <mach/msm_smd.h>
 #include <mach/msm_iomap.h>
 #include <linux/mfd/pm8xxx/misc.h>
 #include <mach/subsystem_notif.h>
+#include <mach/subsystem_restart.h>
+
 #ifdef CONFIG_WCNSS_MEM_PRE_ALLOC
 #include "wcnss_prealloc.h"
 #endif
@@ -1556,7 +1557,7 @@ wcnss_trigger_config(struct platform_device *pdev)
 	}
 
 	/* trigger initialization of the WCNSS */
-	penv->pil = pil_get(WCNSS_PIL_DEVICE);
+	penv->pil = subsystem_get(WCNSS_PIL_DEVICE);
 	if (IS_ERR(penv->pil)) {
 		dev_err(&pdev->dev, "Peripheral Loader failed on WCNSS.\n");
 		ret = PTR_ERR(penv->pil);
@@ -1597,7 +1598,7 @@ fail_wake:
 
 fail_res:
 	if (penv->pil)
-		pil_put(penv->pil);
+		subsystem_put(penv->pil);
 fail_pil:
 	wcnss_wlan_power(&pdev->dev, &penv->wlan_config,
 				WCNSS_WLAN_SWITCH_OFF);
@@ -1857,7 +1858,7 @@ static void __exit wcnss_wlan_exit(void)
 {
 	if (penv) {
 		if (penv->pil)
-			pil_put(penv->pil);
+			subsystem_put(penv->pil);
 
 
 		kfree(penv);
