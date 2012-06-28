@@ -445,7 +445,7 @@ static int rt_cache_seq_show(struct seq_file *seq, void *v)
 			r->rt_key_tos,
 			-1,
 			HHUptod,
-			r->rt_spec_dst, &len);
+			0, &len);
 
 		seq_printf(seq, "%*s\n", 127 - len, "");
 	}
@@ -2029,7 +2029,6 @@ static int ip_route_input_mc(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 {
 	unsigned int hash;
 	struct rtable *rth;
-	__be32 spec_dst;
 	struct in_device *in_dev = __in_dev_get_rcu(dev);
 	u32 itag = 0;
 	int err;
@@ -2050,10 +2049,8 @@ static int ip_route_input_mc(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 	if (ipv4_is_zeronet(saddr)) {
 		if (!ipv4_is_local_multicast(daddr))
 			goto e_inval;
-		spec_dst = inet_select_addr(dev, 0, RT_SCOPE_LINK);
 	} else {
-		err = fib_validate_source(skb, saddr, 0, tos, 0, dev, &spec_dst,
-					  &itag);
+		err = fib_validate_source(skb, saddr, 0, tos, 0, dev, &itag);
 		if (err < 0)
 			goto e_err;
 	}
@@ -2081,7 +2078,6 @@ static int ip_route_input_mc(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 	rth->rt_mark    = skb->mark;
 	rth->rt_uid	= 0;
 	rth->rt_gateway	= daddr;
-	rth->rt_spec_dst= spec_dst;
 	rth->rt_peer_genid = 0;
 	rt_init_peer(rth, dev_net(dev)->ipv4.peers);
 	rth->fi = NULL;
@@ -2145,7 +2141,6 @@ static int __mkroute_input(struct sk_buff *skb,
 	int err;
 	struct in_device *out_dev;
 	unsigned int flags = 0;
-	__be32 spec_dst;
 	u32 itag = 0;
 
 	/* get a working reference to the output device */
@@ -2157,7 +2152,7 @@ static int __mkroute_input(struct sk_buff *skb,
 
 
 	err = fib_validate_source(skb, saddr, daddr, tos, FIB_RES_OIF(*res),
-				  in_dev->dev, &spec_dst, &itag);
+				  in_dev->dev, &itag);
 	if (err < 0) {
 		ip_handle_martian_source(in_dev->dev, in_dev, skb, daddr,
 					 saddr);
@@ -2210,7 +2205,6 @@ static int __mkroute_input(struct sk_buff *skb,
 	rth->rt_mark    = skb->mark;
 	rth->rt_uid	= 0;
 	rth->rt_gateway	= daddr;
-	rth->rt_spec_dst= spec_dst;
 	rth->rt_peer_genid = 0;
 	rt_init_peer(rth, &res->table->tb_peers);
 	rth->fi = NULL;
@@ -2276,7 +2270,6 @@ static int ip_route_input_slow(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 	u32		itag = 0;
 	struct rtable	*rth;
 	unsigned int	hash;
-	__be32		spec_dst;
 	int		err = -EINVAL;
 	struct net	*net = dev_net(dev);
 
@@ -2334,12 +2327,11 @@ static int ip_route_input_slow(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 	if (res.type == RTN_LOCAL) {
 		err = fib_validate_source(skb, saddr, daddr, tos,
 					  net->loopback_dev->ifindex,
-					  dev, &spec_dst, &itag);
+					  dev, &itag);
 		if (err < 0)
 			goto martian_source_keep_err;
 		if (err)
 			flags |= RTCF_DIRECTSRC;
-		spec_dst = daddr;
 		goto local_input;
 	}
 
@@ -2355,11 +2347,8 @@ brd_input:
 	if (skb->protocol != htons(ETH_P_IP))
 		goto e_inval;
 
-	if (ipv4_is_zeronet(saddr))
-		spec_dst = inet_select_addr(dev, 0, RT_SCOPE_LINK);
-	else {
-		err = fib_validate_source(skb, saddr, 0, tos, 0, dev, &spec_dst,
-					  &itag);
+	if (!ipv4_is_zeronet(saddr)) {
+		err = fib_validate_source(skb, saddr, 0, tos, 0, dev, &itag);
 		if (err < 0)
 			goto martian_source_keep_err;
 		if (err)
@@ -2395,7 +2384,6 @@ local_input:
 	rth->rt_mark    = skb->mark;
 	rth->rt_uid	= 0;
 	rth->rt_gateway	= daddr;
-	rth->rt_spec_dst= spec_dst;
 	rth->rt_peer_genid = 0;
 	rt_init_peer(rth, net->ipv4.peers);
 	rth->fi = NULL;
@@ -2413,7 +2401,6 @@ local_input:
 
 no_route:
 	RT_CACHE_STAT_INC(in_no_route);
-	spec_dst = inet_select_addr(dev, 0, RT_SCOPE_UNIVERSE);
 	res.type = RTN_UNREACHABLE;
 	if (err == -ESRCH)
 		err = -ENETUNREACH;
@@ -2597,7 +2584,6 @@ static struct rtable *__mkroute_output(const struct fib_result *res,
 	rth->rt_mark    = fl4->flowi4_mark;
 	rth->rt_uid	= fl4->flowi4_uid;
 	rth->rt_gateway = fl4->daddr;
-	rth->rt_spec_dst= fl4->saddr;
 	rth->rt_peer_genid = 0;
 	rt_init_peer(rth, (res->table ?
 			   &res->table->tb_peers :
@@ -2606,12 +2592,9 @@ static struct rtable *__mkroute_output(const struct fib_result *res,
 
 	RT_CACHE_STAT_INC(out_slow_tot);
 
-	if (flags & RTCF_LOCAL) {
+	if (flags & RTCF_LOCAL)
 		rth->dst.input = ip_local_deliver;
-		rth->rt_spec_dst = fl4->daddr;
-	}
 	if (flags & (RTCF_BROADCAST | RTCF_MULTICAST)) {
-		rth->rt_spec_dst = fl4->saddr;
 		if (flags & RTCF_LOCAL &&
 		    !(dev_out->flags & IFF_LOOPBACK)) {
 			rth->dst.output = ip_mc_output;
@@ -2944,7 +2927,6 @@ struct dst_entry *ipv4_blackhole_route(struct net *net, struct dst_entry *dst_or
 		rt->rt_dst = ort->rt_dst;
 		rt->rt_src = ort->rt_src;
 		rt->rt_gateway = ort->rt_gateway;
-		rt->rt_spec_dst = ort->rt_spec_dst;
 		rt_transfer_peer(rt, ort);
 		rt->fi = ort->fi;
 		if (rt->fi)
@@ -3015,9 +2997,8 @@ static int rt_fill_info(struct net *net,
 	if (rt->dst.tclassid)
 		NLA_PUT_U32(skb, RTA_FLOW, rt->dst.tclassid);
 #endif
-	if (rt_is_input_route(rt))
-		NLA_PUT_BE32(skb, RTA_PREFSRC, rt->rt_spec_dst);
-	else if (rt->rt_src != rt->rt_key_src)
+	if (!rt_is_input_route(rt) &&
+		rt->rt_src != rt->rt_key_src)
 		NLA_PUT_BE32(skb, RTA_PREFSRC, rt->rt_src);
 
 	if (rt->rt_dst != rt->rt_gateway)
