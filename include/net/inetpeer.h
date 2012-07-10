@@ -46,14 +46,12 @@ struct inet_peer {
 	};
 	/*
 	 * Once inet_peer is queued for deletion (refcnt == -1), following fields
-	 * are not available: rid, tcp_ts, tcp_ts_stamp
+	 * are not available: rid
 	 * We can share memory with rcu_head to help keep inet_peer small.
 	 */
 	union {
 		struct {
 			atomic_t			rid;		/* Frag reception counter */
-			__u32				tcp_ts;
-			__u32				tcp_ts_stamp;
 		};
 		struct rcu_head         rcu;
 		struct inet_peer	*gc_next;
