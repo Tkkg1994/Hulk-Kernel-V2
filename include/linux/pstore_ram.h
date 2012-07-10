@@ -65,7 +65,7 @@ int persistent_ram_early_init(struct persistent_ram *ram);
 
 struct persistent_ram_zone * __devinit persistent_ram_new(phys_addr_t start,
 							  size_t size,
-							  bool ecc);
+							  int ecc_size);
 void persistent_ram_free(struct persistent_ram_zone *prz);
 void persistent_ram_zap(struct persistent_ram_zone *prz);
 struct persistent_ram_zone *persistent_ram_init_ringbuffer(struct device *dev,
@@ -93,7 +93,7 @@ struct ramoops_platform_data {
 	unsigned long	record_size;
 	unsigned long	console_size;
 	int		dump_oops;
-	bool		ecc;
+	int		ecc_size;
 };
 
 #endif
