@@ -1554,7 +1554,7 @@ static int dn_rt_fill_info(struct sk_buff *skb, u32 portid, u32 seq,
 	if (rtnetlink_put_metrics(skb, dst_metrics_ptr(&rt->dst)) < 0)
 		goto rtattr_failure;
 	expires = rt->dst.expires ? rt->dst.expires - jiffies : 0;
-	if (rtnl_put_cacheinfo(skb, &rt->dst, 0, 0, 0, expires,
+	if (rtnl_put_cacheinfo(skb, &rt->dst, 0, expires,
 			       rt->dst.error) < 0)
 		goto rtattr_failure;
 	if (dn_is_input_route(rt))
