@@ -8,6 +8,7 @@
 #include <linux/uidgid.h>
 #include <net/inet_frag.h>
 
+struct tcpm_hash_bucket;
 struct ctl_table_header;
 struct ipv4_devconf;
 struct fib_rules_ops;
@@ -32,6 +33,8 @@ struct netns_ipv4 {
 	struct sock		**icmp_sk;
 	struct sock		*tcp_sock;
 	struct inet_peer_base	*peers;
+	struct tcpm_hash_bucket	*tcp_metrics_hash;
+	unsigned int		tcp_metrics_hash_mask;
 	struct netns_frags	frags;
 #ifdef CONFIG_NETFILTER
 	struct xt_table		*iptable_filter;
