@@ -117,7 +117,7 @@ static void notrace persistent_ram_update_ecc(struct persistent_ram_zone *prz,
 	int ecc_size = prz->ecc_size;
 	int size = prz->ecc_block_size;
 
-	if (!prz->ecc)
+	if (!prz->ecc_size)
 		return;
 
 	block = buffer->data + (start & ~(ecc_block_size - 1));
@@ -136,7 +136,7 @@ static void persistent_ram_update_header_ecc(struct persistent_ram_zone *prz)
 {
 	struct persistent_ram_buffer *buffer = prz->buffer;
 
-	if (!prz->ecc)
+	if (!prz->ecc_size)
 		return;
 
 	persistent_ram_encode_rs8(prz, (uint8_t *)buffer, sizeof(*buffer),
@@ -149,7 +149,7 @@ static void persistent_ram_ecc_old(struct persistent_ram_zone *prz)
 	uint8_t *block;
 	uint8_t *par;
 
-	if (!prz->ecc)
+	if (!prz->ecc_size)
 		return;
 
 	block = buffer->data;
@@ -184,7 +184,7 @@ static int persistent_ram_init_ecc(struct persistent_ram_zone *prz,
 	int ecc_symsize = 8;
 	int ecc_poly = 0x11d;
 
-	if (!prz->ecc)
+	if (!ecc_size)
 		return 0;
 
 	prz->ecc_block_size = 128;
@@ -397,8 +397,6 @@ static int __devinit persistent_ram_post_init(struct persistent_ram_zone *prz,
 					      int ecc_size)
 {
 	int ret;
-
-	prz->ecc = ecc_size;
 
 	ret = persistent_ram_init_ecc(prz, ecc_size);
 	if (ret)
