@@ -1785,7 +1785,8 @@ static int nfs41_check_expired_stateid(struct nfs4_state *state, nfs4_stateid *s
 	if (state->flags & flags) {
 		status = nfs41_test_stateid(server, stateid);
 		if (status != NFS_OK) {
-			nfs41_free_stateid(server, stateid);
+			if (status != -NFS4ERR_BAD_STATEID)
+				nfs41_free_stateid(server, stateid);
 			state->flags &= ~flags;
 		}
 	}
@@ -4740,7 +4741,9 @@ static int nfs41_check_expired_locks(struct nfs4_state *state)
 		if (lsp->ls_flags & NFS_LOCK_INITIALIZED) {
 			status = nfs41_test_stateid(server, &lsp->ls_stateid);
 			if (status != NFS_OK) {
-				nfs41_free_stateid(server, &lsp->ls_stateid);
+				if (status != -NFS4ERR_BAD_STATEID)
+					nfs41_free_stateid(server,
+							&lsp->ls_stateid);
 				lsp->ls_flags &= ~NFS_LOCK_INITIALIZED;
 				ret = status;
 			}
