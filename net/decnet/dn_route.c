@@ -117,6 +117,7 @@ static void dn_dst_destroy(struct dst_entry *);
 static struct dst_entry *dn_dst_negative_advice(struct dst_entry *);
 static void dn_dst_link_failure(struct sk_buff *);
 static void dn_dst_update_pmtu(struct dst_entry *dst, u32 mtu);
+static void dn_dst_redirect(struct dst_entry *dst, struct sk_buff *skb);
 static struct neighbour *dn_dst_neigh_lookup(const struct dst_entry *dst,
 					     struct sk_buff *skb,
 					     const void *daddr);
@@ -143,6 +144,7 @@ static struct dst_ops dn_dst_ops = {
 	.negative_advice =	dn_dst_negative_advice,
 	.link_failure =		dn_dst_link_failure,
 	.update_pmtu =		dn_dst_update_pmtu,
+	.redirect =		dn_dst_redirect,
 	.neigh_lookup =		dn_dst_neigh_lookup,
 };
 
@@ -269,6 +271,10 @@ static void dn_dst_update_pmtu(struct dst_entry *dst, u32 mtu)
 				dst_metric_set(dst, RTAX_ADVMSS, mss);
 		}
 	}
+}
+
+static void dn_dst_redirect(struct dst_entry *dst, struct sk_buff *skb)
+{
 }
 
 /*
