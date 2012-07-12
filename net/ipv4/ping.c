@@ -538,6 +538,7 @@ void ping_err(struct sk_buff *skb, int offset, u32 info)
 			break;
 		case ICMP_REDIRECT:
 			/* See ICMP_SOURCE_QUENCH */
+			ipv4_sk_redirect(skb, sk);
 			err = EREMOTEIO;
 			break;
 		}

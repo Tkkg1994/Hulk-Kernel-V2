@@ -318,6 +318,14 @@ static void tcp_v4_mtu_reduced(struct sock *sk)
 	} /* else let the usual retransmit timer handle it */
 }
 
+static void do_redirect(struct sk_buff *skb, struct sock *sk)
+{
+	struct dst_entry *dst = __sk_dst_check(sk, 0);
+
+	if (dst && dst->ops->redirect)
+		dst->ops->redirect(dst, skb);
+}
+
 /*
  * This routine is called by the ICMP module when it gets some
  * sort of error condition.  If err < 0 then the socket should
@@ -395,6 +403,9 @@ void tcp_v4_err(struct sk_buff *icmp_skb, u32 info)
 	}
 
 	switch (type) {
+	case ICMP_REDIRECT:
+		do_redirect(icmp_skb, sk);
+		goto out;
 	case ICMP_SOURCE_QUENCH:
 		/* Just silently ignore these. */
 		goto out;
