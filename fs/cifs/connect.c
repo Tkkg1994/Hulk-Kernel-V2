@@ -3656,7 +3656,7 @@ try_mount_again:
 	}
 
 	/* tell server which Unix caps we support */
-	if (tcon->ses->capabilities & CAP_UNIX) {
+	if (cap_unix(tcon->ses)) {
 		/* reset of caps checks mount to see if unix extensions
 		   disabled for just this mount */
 		reset_cifs_unix_caps(xid, tcon, cifs_sb, volume_info);
@@ -4015,7 +4015,7 @@ cifs_setup_session(const unsigned int xid, struct cifs_ses *ses,
 	ses->flags = 0;
 	ses->capabilities = server->capabilities;
 	if (linuxExtEnabled == 0)
-		ses->capabilities &= (~CAP_UNIX);
+		ses->capabilities &= (~server->vals->cap_unix);
 
 	cFYI(1, "Security Mode: 0x%x Capabilities: 0x%x TimeAdjust: %d",
 		 server->sec_mode, server->capabilities, server->timeAdj);
@@ -4122,7 +4122,7 @@ cifs_construct_tcon(struct cifs_sb_info *cifs_sb, uid_t fsuid)
 		goto out;
 	}
 
-	if (ses->capabilities & CAP_UNIX)
+	if (cap_unix(ses))
 		reset_cifs_unix_caps(0, tcon, NULL, vol_info);
 out:
 	kfree(vol_info->username);
