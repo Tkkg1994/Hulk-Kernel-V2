@@ -968,7 +968,7 @@ static DEFINE_MUTEX(tmp_buf_mutex);
 /* Calculate the chartime depending on baudrate, numbor of bits etc. */
 static void update_char_time(struct e100_serial * info)
 {
-	tcflag_t cflags = info->port.tty->termios->c_cflag;
+	tcflag_t cflags = info->port.tty->termios.c_cflag;
 	int bits;
 
 	/* calc. number of bits / data byte */
@@ -1486,7 +1486,7 @@ rs_stop(struct tty_struct *tty)
 		xoff = IO_FIELD(R_SERIAL0_XOFF, xoff_char,
 				STOP_CHAR(info->port.tty));
 		xoff |= IO_STATE(R_SERIAL0_XOFF, tx_stop, stop);
-		if (tty->termios->c_iflag & IXON ) {
+		if (tty->termios.c_iflag & IXON ) {
 			xoff |= IO_STATE(R_SERIAL0_XOFF, auto_xoff, enable);
 		}
 
@@ -1509,7 +1509,7 @@ rs_start(struct tty_struct *tty)
 					 info->xmit.tail,SERIAL_XMIT_SIZE)));
 		xoff = IO_FIELD(R_SERIAL0_XOFF, xoff_char, STOP_CHAR(tty));
 		xoff |= IO_STATE(R_SERIAL0_XOFF, tx_stop, enable);
-		if (tty->termios->c_iflag & IXON ) {
+		if (tty->termios.c_iflag & IXON ) {
 			xoff |= IO_STATE(R_SERIAL0_XOFF, auto_xoff, enable);
 		}
 
@@ -2942,7 +2942,7 @@ shutdown(struct e100_serial * info)
 			descr[i].buf = 0;
 		}
 
-	if (!info->port.tty || (info->port.tty->termios->c_cflag & HUPCL)) {
+	if (!info->port.tty || (info->port.tty->termios.c_cflag & HUPCL)) {
 		/* hang up DTR and RTS if HUPCL is enabled */
 		e100_dtr(info, 0);
 		e100_rts(info, 0); /* could check CRTSCTS before doing this */
@@ -2966,12 +2966,12 @@ change_speed(struct e100_serial *info)
 	unsigned long flags;
 	/* first some safety checks */
 
-	if (!info->port.tty || !info->port.tty->termios)
+	if (!info->port.tty)
 		return;
 	if (!info->ioport)
 		return;
 
-	cflag = info->port.tty->termios->c_cflag;
+	cflag = info->port.tty->termios.c_cflag;
 
 	/* possibly, the tx/rx should be disabled first to do this safely */
 
@@ -3101,7 +3101,7 @@ change_speed(struct e100_serial *info)
 	info->ioport[REG_REC_CTRL] = info->rx_ctrl;
 	xoff = IO_FIELD(R_SERIAL0_XOFF, xoff_char, STOP_CHAR(info->port.tty));
 	xoff |= IO_STATE(R_SERIAL0_XOFF, tx_stop, enable);
-	if (info->port.tty->termios->c_iflag & IXON ) {
+	if (info->port.tty->termios.c_iflag & IXON ) {
 		DFLOW(DEBUG_LOG(info->line, "FLOW XOFF enabled 0x%02X\n",
 				STOP_CHAR(info->port.tty)));
 		xoff |= IO_STATE(R_SERIAL0_XOFF, auto_xoff, enable);
@@ -3368,7 +3368,7 @@ rs_throttle(struct tty_struct * tty)
 	DFLOW(DEBUG_LOG(info->line,"rs_throttle %lu\n", tty->ldisc.chars_in_buffer(tty)));
 
 	/* Do RTS before XOFF since XOFF might take some time */
-	if (tty->termios->c_cflag & CRTSCTS) {
+	if (tty->termios.c_cflag & CRTSCTS) {
 		/* Turn off RTS line */
 		e100_rts(info, 0);
 	}
@@ -3390,7 +3390,7 @@ rs_unthrottle(struct tty_struct * tty)
 	DFLOW(DEBUG_LOG(info->line,"rs_unthrottle ldisc %d\n", tty->ldisc.chars_in_buffer(tty)));
 	DFLOW(DEBUG_LOG(info->line,"rs_unthrottle flip.count: %i\n", tty->flip.count));
 	/* Do RTS before XOFF since XOFF might take some time */
-	if (tty->termios->c_cflag & CRTSCTS) {
+	if (tty->termios.c_cflag & CRTSCTS) {
 		/* Assert RTS line  */
 		e100_rts(info, 1);
 	}
@@ -3761,7 +3761,7 @@ rs_set_termios(struct tty_struct *tty, struct ktermios *old_termios)
 
 	/* Handle turning off CRTSCTS */
 	if ((old_termios->c_cflag & CRTSCTS) &&
-	    !(tty->termios->c_cflag & CRTSCTS)) {
+	    !(tty->termios.c_cflag & CRTSCTS)) {
 		tty->hw_stopped = 0;
 		rs_start(tty);
 	}
@@ -3828,7 +3828,7 @@ rs_close(struct tty_struct *tty, struct file * filp)
 	 * separate termios for callout and dialin.
 	 */
 	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
+		info->normal_termios = tty->termios;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify
 	 * the line discipline to only process XON/XOFF characters.
@@ -4011,7 +4011,7 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
 		return 0;
 	}
 
-	if (tty->termios->c_cflag & CLOCAL) {
+	if (tty->termios.c_cflag & CLOCAL) {
 			do_clocal = 1;
 	}
 
@@ -4244,7 +4244,7 @@ rs_open(struct tty_struct *tty, struct file * filp)
 	}
 
 	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
+		tty->termios = info->normal_termios;
 		change_speed(info);
 	}
 

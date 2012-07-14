@@ -269,17 +269,17 @@ static void pl2303_set_termios(struct tty_struct *tty,
 	   serial settings even to the same values as before. Thus
 	   we actually need to filter in this specific case */
 
-	if (old_termios && !tty_termios_hw_change(tty->termios, old_termios))
+	if (old_termios && !tty_termios_hw_change(&tty->termios, old_termios))
 		return;
 
-	cflag = tty->termios->c_cflag;
+	cflag = tty->termios.c_cflag;
 
 	buf = kzalloc(7, GFP_KERNEL);
 	if (!buf) {
 		dev_err(&port->dev, "%s - out of memory.\n", __func__);
 		/* Report back no change occurred */
 		if (old_termios)
-			*tty->termios = *old_termios;
+			tty->termios = *old_termios;
 		return;
 	}
 
@@ -545,14 +545,9 @@ static int pl2303_tiocmget(struct tty_struct *tty)
 	unsigned int status;
 	unsigned int result;
 
-<<<<<<< HEAD
-	dbg("%s (%d)", __func__, port->number);
-
 	if (!usb_get_intfdata(port->serial->interface))
 		return -ENODEV;
 
-=======
->>>>>>> d8789b2... USB: serial: pl2303: convert dbg() calls to dev_dbg()
 	spin_lock_irqsave(&priv->lock, flags);
 	mcr = priv->line_control;
 	status = priv->line_status;

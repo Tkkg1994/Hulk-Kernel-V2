@@ -1155,7 +1155,7 @@ static void firm_setup_port(struct tty_struct *tty)
 {
 	struct usb_serial_port *port = tty->driver_data;
 	struct whiteheat_port_settings port_settings;
-	unsigned int cflag = tty->termios->c_cflag;
+	unsigned int cflag = tty->termios.c_cflag;
 
 	port_settings.port = port->number - port->serial->minor + 1;
 

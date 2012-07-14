@@ -397,7 +397,7 @@ static void sierra_set_termios(struct tty_struct *tty,
 		struct usb_serial_port *port, struct ktermios *old_termios)
 {
 	dev_dbg(&port->dev, "%s\n", __func__);
-	tty_termios_copy_hw(tty->termios, old_termios);
+	tty_termios_copy_hw(&tty->termios, old_termios);
 	sierra_send_setup(port);
 }
 

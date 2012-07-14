@@ -1002,15 +1002,15 @@ isdn_tty_change_speed(modem_info *info)
 		quot;
 	int i;
 
-	if (!info->tty || !info->tty->termios)
+	if (!info->tty)
 		return;
-	cflag = info->tty->termios->c_cflag;
+	cflag = info->tty->termios.c_cflag;
 
 	quot = i = cflag & CBAUD;
 	if (i & CBAUDEX) {
 		i &= ~CBAUDEX;
 		if (i < 1 || i > 2)
-			info->tty->termios->c_cflag &= ~CBAUDEX;
+			info->tty->termios.c_cflag &= ~CBAUDEX;
 		else
 			i += 15;
 	}
@@ -1090,7 +1090,7 @@ isdn_tty_shutdown(modem_info *info)
 #endif
 	isdn_unlock_drivers();
 	info->msr &= ~UART_MSR_RI;
-	if (!info->tty || (info->tty->termios->c_cflag & HUPCL)) {
+	if (!info->tty || (info->tty->termios.c_cflag & HUPCL)) {
 		info->mcr &= ~(UART_MCR_DTR | UART_MCR_RTS);
 		if (info->emu.mdmreg[REG_DTRHUP] & BIT_DTRHUP) {
 			isdn_tty_modem_reset_regs(info, 0);
@@ -1462,13 +1462,13 @@ isdn_tty_set_termios(struct tty_struct *tty, struct ktermios *old_termios)
 	if (!old_termios)
 		isdn_tty_change_speed(info);
 	else {
-		if (tty->termios->c_cflag == old_termios->c_cflag &&
-		    tty->termios->c_ispeed == old_termios->c_ispeed &&
-		    tty->termios->c_ospeed == old_termios->c_ospeed)
+		if (tty->termios.c_cflag == old_termios->c_cflag &&
+		    tty->termios.c_ispeed == old_termios->c_ispeed &&
+		    tty->termios.c_ospeed == old_termios->c_ospeed)
 			return;
 		isdn_tty_change_speed(info);
 		if ((old_termios->c_cflag & CRTSCTS) &&
-		    !(tty->termios->c_cflag & CRTSCTS))
+		    !(tty->termios.c_cflag & CRTSCTS))
 			tty->hw_stopped = 0;
 	}
 }
