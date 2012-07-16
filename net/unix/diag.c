@@ -189,6 +189,7 @@ static int unix_diag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	struct unix_diag_req *req;
 	int num, s_num, slot, s_slot;
+	struct net *net = sock_net(skb->sk);
 
 	req = NLMSG_DATA(cb->nlh);
 
@@ -203,6 +204,8 @@ static int unix_diag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 
 		num = 0;
 		sk_for_each(sk, &unix_socket_table[slot]) {
+			if (!net_eq(sock_net(sk), net))
+				continue;
 			if (num < s_num)
 				goto next;
 			if (!(req->udiag_states & (1 << sk->sk_state)))
@@ -252,6 +255,7 @@ static int unix_diag_get_exact(struct sk_buff *in_skb,
 	struct sock *sk;
 	struct sk_buff *rep;
 	unsigned int extra_len;
+	struct net *net = sock_net(in_skb->sk);
 
 	if (req->udiag_ino == 0)
 		goto out_nosk;
@@ -283,7 +287,11 @@ again:
 
 		goto again;
 	}
+<<<<<<< HEAD
 	err = netlink_unicast(sock_diag_nlsk, rep, NETLINK_CB(in_skb).portid,
+=======
+	err = netlink_unicast(net->diag_nlsk, rep, NETLINK_CB(in_skb).pid,
+>>>>>>> 51d7ccc... net: make sock diag per-namespace
 			      MSG_DONTWAIT);
 	if (err > 0)
 		err = 0;
@@ -297,6 +305,7 @@ out_nosk:
 static int unix_diag_handler_dump(struct sk_buff *skb, struct nlmsghdr *h)
 {
 	int hdrlen = sizeof(struct unix_diag_req);
+	struct net *net = sock_net(skb->sk);
 
 	if (nlmsg_len(h) < hdrlen)
 		return -EINVAL;
@@ -305,7 +314,7 @@ static int unix_diag_handler_dump(struct sk_buff *skb, struct nlmsghdr *h)
 		struct netlink_dump_control c = {
 			.dump = unix_diag_dump,
 		};
-		return netlink_dump_start(sock_diag_nlsk, skb, h, &c);
+		return netlink_dump_start(net->diag_nlsk, skb, h, &c);
 	} else
 		return unix_diag_get_exact(skb, h, (struct unix_diag_req *)NLMSG_DATA(h));
 }

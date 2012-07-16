@@ -171,23 +171,20 @@ static void sock_diag_rcv(struct sk_buff *skb)
 	mutex_unlock(&sock_diag_mutex);
 }
 
-struct sock *sock_diag_nlsk;
-EXPORT_SYMBOL_GPL(sock_diag_nlsk);
-
-static int __init sock_diag_init(void)
+static int __net_init diag_net_init(struct net *net)
 {
 	struct netlink_kernel_cfg cfg = {
 		.input	= sock_diag_rcv,
 	};
 
-	sock_diag_nlsk = netlink_kernel_create(&init_net, NETLINK_SOCK_DIAG,
+	net->diag_nlsk = netlink_kernel_create(net, NETLINK_SOCK_DIAG,
 					       &cfg);
 	return sock_diag_nlsk == NULL ? -ENOMEM : 0;
 }
 
 static void __exit sock_diag_exit(void)
 {
-	netlink_kernel_release(sock_diag_nlsk);
+	unregister_pernet_subsys(&diag_net_ops);
 }
 
 module_init(sock_diag_init);
