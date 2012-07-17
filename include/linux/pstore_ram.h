@@ -64,7 +64,7 @@ struct persistent_ram_zone {
 int persistent_ram_early_init(struct persistent_ram *ram);
 
 struct persistent_ram_zone * __devinit persistent_ram_new(phys_addr_t start,
-							  size_t size,
+							  size_t size, u32 sig,
 							  int ecc_size);
 void persistent_ram_free(struct persistent_ram_zone *prz);
 void persistent_ram_zap(struct persistent_ram_zone *prz);
