@@ -1457,7 +1457,7 @@ static int __mkroute_input(struct sk_buff *skb,
 		if (!(flags & RTCF_DIRECTSRC) && !itag) {
 			rth = FIB_RES_NH(*res).nh_rth_input;
 			if (rt_cache_valid(rth)) {
-				dst_use(&rth->dst, jiffies);
+				dst_hold(&rth->dst);
 				goto out;
 			}
 			do_cache = true;
@@ -1634,7 +1634,7 @@ local_input:
 		if (!(flags & RTCF_DIRECTSRC) && !itag) {
 			rth = FIB_RES_NH(res).nh_rth_input;
 			if (rt_cache_valid(rth)) {
-				dst_use(&rth->dst, jiffies);
+				dst_hold(&rth->dst);
 				goto set_and_out;
 			}
 			do_cache = true;
@@ -1805,7 +1805,7 @@ static struct rtable *__mkroute_output(const struct fib_result *res,
 		if (!fnhe) {
 			rth = FIB_RES_NH(*res).nh_rth_output;
 			if (rt_cache_valid(rth)) {
-				dst_use(&rth->dst, jiffies);
+				dst_hold(&rth->dst);
 				return rth;
 			}
 		}
