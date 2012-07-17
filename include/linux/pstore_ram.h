@@ -24,6 +24,7 @@
 #include <linux/init.h>
 
 struct persistent_ram_buffer;
+struct rs_control;
 
 struct persistent_ram_descriptor {
 	const char	*name;
