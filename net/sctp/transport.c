@@ -242,7 +242,7 @@ void sctp_transport_update_pmtu(struct sctp_transport *t, u32 pmtu)
 
 	dst = sctp_transport_dst_check(t);
 	if (dst)
-		dst->ops->update_pmtu(dst, pmtu);
+		dst->ops->update_pmtu(dst, sk, NULL, pmtu);
 }
 
 /* Caches the dst entry and source address for a transport's destination
