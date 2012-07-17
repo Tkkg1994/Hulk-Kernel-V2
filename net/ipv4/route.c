@@ -1345,7 +1345,6 @@ static int ip_route_input_mc(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 	rth->rt_type	= RTN_MULTICAST;
 	rth->rt_route_iif = dev->ifindex;
 	rth->rt_iif	= dev->ifindex;
-	rth->rt_oif	= 0;
 	rth->rt_pmtu	= 0;
 	rth->rt_uid	= 0;
 	rth->rt_gateway	= 0;
@@ -1477,7 +1476,6 @@ static int __mkroute_input(struct sk_buff *skb,
 	rth->rt_type = res->type;
 	rth->rt_route_iif = in_dev->dev->ifindex;
 	rth->rt_iif 	= in_dev->dev->ifindex;
-	rth->rt_oif 	= 0;
 	rth->rt_pmtu	= 0;
 	rth->rt_uid	= 0;
 	rth->rt_gateway	= 0;
@@ -1657,7 +1655,6 @@ local_input:
 	rth->rt_type	= res.type;
 	rth->rt_route_iif = dev->ifindex;
 	rth->rt_iif	= dev->ifindex;
-	rth->rt_oif	= 0;
 	rth->rt_pmtu	= 0;
 	rth->rt_uid	= 0;
 	rth->rt_gateway	= 0;
@@ -1824,7 +1821,6 @@ static struct rtable *__mkroute_output(const struct fib_result *res,
 	rth->rt_type	= type;
 	rth->rt_route_iif = 0;
 	rth->rt_iif	= orig_oif ? : dev_out->ifindex;
-	rth->rt_oif	= orig_oif;
 	rth->rt_pmtu	= 0;
 	rth->rt_uid	= fl4->flowi4_uid;
 	rth->rt_gateway = 0;
@@ -2102,7 +2098,6 @@ struct dst_entry *ipv4_blackhole_route(struct net *net, struct dst_entry *dst_or
 
 		rt->rt_route_iif = ort->rt_route_iif;
 		rt->rt_iif = ort->rt_iif;
-		rt->rt_oif = ort->rt_oif;
 		rt->rt_pmtu = ort->rt_pmtu;
 		rt->rt_uid = ort->rt_uid;
 

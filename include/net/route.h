@@ -50,7 +50,6 @@ struct rtable {
 
 	int			rt_route_iif;
 	int			rt_iif;
-	int			rt_oif;
 	uid_t			rt_uid;
 
 	/* Info on neighbour */
