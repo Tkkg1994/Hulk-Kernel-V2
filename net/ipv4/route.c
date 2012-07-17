@@ -2541,9 +2541,6 @@ static struct rtable *__mkroute_output(const struct fib_result *res,
 
 	rt_set_nexthop(rth, fl4, res, fi, type, 0);
 
-	if (fl4->flowi4_flags & FLOWI_FLAG_RT_NOCACHE)
-		rth->dst.flags |= DST_NOCACHE;
-
 	return rth;
 }
 

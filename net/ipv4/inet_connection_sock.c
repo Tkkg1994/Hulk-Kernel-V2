@@ -356,8 +356,7 @@ EXPORT_SYMBOL(inet_csk_reset_keepalive_timer);
 
 struct dst_entry *inet_csk_route_req(struct sock *sk,
 				     struct flowi4 *fl4,
-				     const struct request_sock *req,
-				     bool nocache)
+				     const struct request_sock *req)
 {
 	struct rtable *rt;
 	const struct inet_request_sock *ireq = inet_rsk(req);
@@ -366,10 +365,6 @@ struct dst_entry *inet_csk_route_req(struct sock *sk,
 	int flags = inet_sk_flowi_flags(sk);
 
 	flowi4_init_output(fl4, sk->sk_bound_dev_if, ireq->ir_mark,
-
-	if (nocache)
-		flags |= FLOWI_FLAG_RT_NOCACHE;
-	flowi4_init_output(fl4, sk->sk_bound_dev_if, sk->sk_mark,
 			   RT_CONN_FLAGS(sk), RT_SCOPE_UNIVERSE,
 			   sk->sk_protocol,
 			   flags,
