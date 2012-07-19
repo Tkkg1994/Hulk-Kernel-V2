@@ -607,8 +607,8 @@ static long inet_wait_for_connect(struct sock *sk, long timeo, int writebias)
  *	Connect to a remote host. There is regrettably still a little
  *	TCP 'magic' in here.
  */
-int inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
-			int addr_len, int flags)
+int __inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
+			  int addr_len, int flags)
 {
 	struct sock *sk = sock->sk;
 	int err;
@@ -616,8 +616,6 @@ int inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 
 	if (addr_len < sizeof(uaddr->sa_family))
 		return -EINVAL;
-
-	lock_sock(sk);
 
 	if (uaddr->sa_family == AF_UNSPEC) {
 		err = sk->sk_prot->disconnect(sk, flags);
@@ -685,7 +683,6 @@ int inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	sock->state = SS_CONNECTED;
 	err = 0;
 out:
-	release_sock(sk);
 	return err;
 
 sock_error:
@@ -694,6 +691,18 @@ sock_error:
 	if (sk->sk_prot->disconnect(sk, flags))
 		sock->state = SS_DISCONNECTING;
 	goto out;
+}
+EXPORT_SYMBOL(__inet_stream_connect);
+
+int inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
+			int addr_len, int flags)
+{
+	int err;
+
+	lock_sock(sock->sk);
+	err = __inet_stream_connect(sock, uaddr, addr_len, flags);
+	release_sock(sock->sk);
+	return err;
 }
 EXPORT_SYMBOL(inet_stream_connect);
 

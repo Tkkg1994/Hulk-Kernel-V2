@@ -271,6 +271,7 @@
 #include <linux/uid_stat.h>
 
 #include <net/icmp.h>
+#include <net/inet_common.h>
 #include <net/tcp.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
@@ -993,26 +994,67 @@ static inline int select_size(const struct sock *sk, bool sg)
 	return tmp;
 }
 
+void tcp_free_fastopen_req(struct tcp_sock *tp)
+{
+	if (tp->fastopen_req != NULL) {
+		kfree(tp->fastopen_req);
+		tp->fastopen_req = NULL;
+	}
+}
+
+static int tcp_sendmsg_fastopen(struct sock *sk, struct msghdr *msg, int *size)
+{
+	struct tcp_sock *tp = tcp_sk(sk);
+	int err, flags;
+
+	if (!(sysctl_tcp_fastopen & TFO_CLIENT_ENABLE))
+		return -EOPNOTSUPP;
+	if (tp->fastopen_req != NULL)
+		return -EALREADY; /* Another Fast Open is in progress */
+
+	tp->fastopen_req = kzalloc(sizeof(struct tcp_fastopen_request),
+				   sk->sk_allocation);
+	if (unlikely(tp->fastopen_req == NULL))
+		return -ENOBUFS;
+	tp->fastopen_req->data = msg;
+
+	flags = (msg->msg_flags & MSG_DONTWAIT) ? O_NONBLOCK : 0;
+	err = __inet_stream_connect(sk->sk_socket, msg->msg_name,
+				    msg->msg_namelen, flags);
+	*size = tp->fastopen_req->copied;
+	tcp_free_fastopen_req(tp);
+	return err;
+}
+
 int tcp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		size_t size)
 {
 	struct iovec *iov;
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct sk_buff *skb;
-	int iovlen, flags, err, copied;
-	int mss_now = 0, size_goal;
+	int iovlen, flags, err, copied = 0;
+	int mss_now = 0, size_goal, copied_syn = 0, offset = 0;
 	bool sg;
 	long timeo;
 
 	lock_sock(sk);
 
 	flags = msg->msg_flags;
+	if (flags & MSG_FASTOPEN) {
+		err = tcp_sendmsg_fastopen(sk, msg, &copied_syn);
+		if (err == -EINPROGRESS && copied_syn > 0)
+			goto out;
+		else if (err)
+			goto out_err;
+		offset = copied_syn;
+	}
+
 	timeo = sock_sndtimeo(sk, flags & MSG_DONTWAIT);
 
 	/* Wait for a connection to finish. */
 	if ((1 << sk->sk_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT))
 		if ((err = sk_stream_wait_connect(sk, &timeo)) != 0)
-			goto out_err;
+			goto do_error;
 
 	if (unlikely(tp->repair)) {
 		if (tp->repair_queue == TCP_RECV_QUEUE) {
@@ -1048,6 +1090,15 @@ int tcp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		unsigned char __user *from = iov->iov_base;
 
 		iov++;
+		if (unlikely(offset > 0)) {  /* Skip bytes copied in SYN */
+			if (offset >= seglen) {
+				offset -= seglen;
+				continue;
+			}
+			seglen -= offset;
+			from += offset;
+			offset = 0;
+		}
 
 		while (seglen > 0) {
 			int copy = 0;
@@ -1213,7 +1264,7 @@ out:
 
 	if (copied > 0)
 		uid_stat_tcp_snd(current_uid(), copied);
-	return copied;
+	return copied + copied_syn;
 
 do_fault:
 	if (!skb->len) {
@@ -1226,7 +1277,7 @@ do_fault:
 	}
 
 do_error:
-	if (copied)
+	if (copied + copied_syn)
 		goto out;
 out_err:
 	err = sk_stream_error(sk, flags, err);
