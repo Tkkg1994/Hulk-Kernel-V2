@@ -1461,6 +1461,7 @@ void tty_free_termios(struct tty_struct *tty)
 			pr_warn("tty: no memory to save termios state.\n");
 			return;
 		}
+		tty->driver->termios[idx] = tp;
 	}
 	*tp = tty->termios;
 }
