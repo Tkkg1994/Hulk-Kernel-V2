@@ -623,13 +623,14 @@ nlm_gc_hosts(void)
 	struct hlist_head *chain;
 	struct hlist_node *next;
 	struct nlm_host	*host;
+	struct net *net = &init_net;
 
 	dprintk("lockd: host garbage collection\n");
 	for_each_host(host, chain, nlm_server_hosts)
 		host->h_inuse = 0;
 
 	/* Mark all hosts that hold locks, blocks or shares */
-	nlmsvc_mark_resources();
+	nlmsvc_mark_resources(net);
 
 	for_each_host_safe(host, next, chain, nlm_server_hosts) {
 		if (atomic_read(&host->h_count) || host->h_inuse
