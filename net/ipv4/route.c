@@ -1220,12 +1220,17 @@ static inline void rt_release_rcu(struct rcu_head *head)
 	dst_release(dst);
 }
 
+static inline void rt_free(struct rtable *rt)
+{
+	call_rcu(&rt->dst.rcu_head, dst_rcu_free);
+}
+
 static void rt_cache_route(struct fib_nh *nh, struct rtable *rt)
 {
-	struct rtable *orig, *prev, **p = &nh->nh_rth_output;
+	struct rtable *orig, *prev, **p = (struct rtable **)&nh->nh_rth_output;
 
 	if (rt_is_input_route(rt))
-		p = &nh->nh_rth_input;
+		p = (struct rtable **)&nh->nh_rth_input;
 
 	orig = *p;
 
@@ -1233,7 +1238,14 @@ static void rt_cache_route(struct fib_nh *nh, struct rtable *rt)
 	if (prev == orig) {
 		dst_clone(&rt->dst);
 		if (orig)
-			call_rcu_bh(&orig->dst.rcu_head, rt_release_rcu);
+			rt_free(orig);
+	} else {
+		/* Routes we intend to cache in the FIB nexthop have
+		 * the DST_NOCACHE bit clear.  However, if we are
+		 * unsuccessful at storing this route into the cache
+		 * we really need to set it.
+		 */
+		rt->dst.flags |= DST_NOCACHE;
 	}
 }
 
@@ -1430,7 +1442,7 @@ static int __mkroute_input(struct sk_buff *skb,
 	do_cache = false;
 	if (res->fi) {
 		if (!itag) {
-			rth = FIB_RES_NH(*res).nh_rth_input;
+			rth = rcu_dereference(FIB_RES_NH(*res).nh_rth_input);
 			if (rt_cache_valid(rth)) {
 				dst_hold(&rth->dst);
 				goto out;
@@ -1601,7 +1613,7 @@ local_input:
 	do_cache = false;
 	if (res.fi) {
 		if (!itag) {
-			rth = FIB_RES_NH(res).nh_rth_input;
+			rth = rcu_dereference(FIB_RES_NH(res).nh_rth_input);
 			if (rt_cache_valid(rth)) {
 				dst_hold(&rth->dst);
 				goto set_and_out;
@@ -1770,7 +1782,7 @@ static struct rtable *__mkroute_output(const struct fib_result *res,
 	if (fi) {
 		fnhe = find_exception(&FIB_RES_NH(*res), fl4->daddr);
 		if (!fnhe) {
-			rth = FIB_RES_NH(*res).nh_rth_output;
+			rth = rcu_dereference(FIB_RES_NH(*res).nh_rth_output);
 			if (rt_cache_valid(rth)) {
 				dst_hold(&rth->dst);
 				return rth;
