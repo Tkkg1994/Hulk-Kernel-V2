@@ -366,6 +366,5 @@ extern void set_pageblock_order(void);
 #define ALLOC_HARDER		0x10 /* try to alloc harder */
 #define ALLOC_HIGH		0x20 /* __GFP_HIGH set */
 #define ALLOC_CPUSET		0x40 /* check for correct cpuset */
-#define ALLOC_PFMEMALLOC	0x80 /* Caller has PF_MEMALLOC set */
 #define ALLOC_CMA		0x80 /* allow allocations from CMA areas */
 
