@@ -493,7 +493,7 @@ static int add_tty(int j,
 	ttys[j]->tty_type = tty_type;
 	mutex_init(&ttys[j]->ipw_tty_mutex);
 
-	tty_register_device(ipw_tty_driver, j, NULL);
+	tty_port_register_device(&ttys[j]->port, ipw_tty_driver, j, NULL);
 	ipwireless_associate_network_tty(network, channel_idx, ttys[j]);
 
 	if (secondary_channel_idx != -1)
