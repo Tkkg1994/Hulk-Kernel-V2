@@ -492,7 +492,8 @@ int timekeeping_inject_offset(struct timespec *ts)
 
 	timekeeping_forward_now(tk);
 
-	tmp = timespec_add(timekeeper.xtime,  *ts);
+	/* Make sure the proposed value is valid */
+	tmp = timespec_add(tk_xtime(tk),  *ts);
 	if (!timespec_valid_strict(&tmp)) {
 		ret = -EINVAL;
 		goto error;
