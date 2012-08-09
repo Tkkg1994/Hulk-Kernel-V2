@@ -67,6 +67,12 @@ struct idmap {
 	struct mutex		idmap_mutex;
 };
 
+struct idmap_legacy_upcalldata {
+	struct rpc_pipe_msg pipe_msg;
+	struct idmap_msg idmap_msg;
+	struct idmap *idmap;
+};
+
 /**
  * nfs_fattr_init_names - initialise the nfs_fattr owner_name/group_name fields
  * @fattr: fully initialised struct nfs_fattr
@@ -330,6 +336,7 @@ static ssize_t nfs_idmap_get_key(const char *name, size_t namelen,
 		ret = nfs_idmap_request_key(&key_type_id_resolver_legacy,
 					    name, namelen, type, data,
 					    data_size, idmap);
+		idmap->idmap_key_cons = NULL;
 		mutex_unlock(&idmap->idmap_mutex);
 	}
 	return ret;
