@@ -766,14 +766,8 @@ idmap_pipe_downcall(struct file *filp, const char __user *src, size_t mlen)
 	}
 
 	if (!(im.im_status & IDMAP_STATUS_SUCCESS)) {
-<<<<<<< HEAD
 		ret = -ENOKEY;
 		goto out;
-=======
-		ret = mlen;
-		complete_request_key(cons, -ENOKEY);
-		goto out_incomplete;
->>>>>>> a427b9e... NFS: Fix a number of bugs in the idmapper
 	}
 
 	namelen_in = strnlen(im.im_name, IDMAP_NAMESZ);
@@ -790,10 +784,6 @@ idmap_pipe_downcall(struct file *filp, const char __user *src, size_t mlen)
 
 out:
 	complete_request_key(cons, ret);
-<<<<<<< HEAD
-=======
-out_incomplete:
->>>>>>> a427b9e... NFS: Fix a number of bugs in the idmapper
 	return ret;
 }
 
