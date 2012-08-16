@@ -1032,8 +1032,8 @@ static int __init moxa_init(void)
 	printk(KERN_INFO "MOXA Intellio family driver version %s\n",
 			MOXA_VERSION);
 	moxaDriver = alloc_tty_driver(MAX_PORTS + 1);
-	if (!moxaDriver)
-		return -ENOMEM;
+	if (IS_ERR(moxaDriver))
+		return PTR_ERR(moxaDriver);
 
 	moxaDriver->name = "ttyMX";
 	moxaDriver->major = ttymajor;
