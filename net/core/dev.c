@@ -5692,6 +5692,8 @@ int register_netdevice(struct net_device *dev)
 
 	set_bit(__LINK_STATE_PRESENT, &dev->state);
 
+	linkwatch_init_dev(dev);
+
 	dev_init_scheduler(dev);
 	dev_hold(dev);
 	list_netdevice(dev);

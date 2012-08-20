@@ -2207,6 +2207,7 @@ static inline void dev_hold(struct net_device *dev)
  * kind of lower layer not just hardware media.
  */
 
+extern void linkwatch_init_dev(struct net_device *dev);
 extern void linkwatch_fire_event(struct net_device *dev);
 extern void linkwatch_forget_dev(struct net_device *dev);
 
