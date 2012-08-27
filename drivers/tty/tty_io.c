@@ -2256,8 +2256,7 @@ static int tioccons(struct file *file)
 		spin_unlock(&redirect_lock);
 		return -EBUSY;
 	}
-	get_file(file);
-	redirect = file;
+	redirect = get_file(file);
 	spin_unlock(&redirect_lock);
 	return 0;
 }

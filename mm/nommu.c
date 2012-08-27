@@ -1285,6 +1285,10 @@ unsigned long do_mmap_pgoff(struct file *file,
 	if (file) {
 		region->vm_file = get_file(file);
 		vma->vm_file = get_file(file);
+		if (vm_flags & VM_EXECUTABLE) {
+			added_exe_file_vma(current->mm);
+			vma->vm_mm = current->mm;
+		}
 	}
 
 	down_write(&nommu_region_sem);
