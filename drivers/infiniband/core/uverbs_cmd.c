@@ -700,7 +700,7 @@ ssize_t ib_uverbs_open_xrcd(struct ib_uverbs_file *file,
 	struct ib_udata			udata;
 	struct ib_uxrcd_object         *obj;
 	struct ib_xrcd                 *xrcd = NULL;
-	struct file                    *f = NULL;
+	struct fd			f = {NULL, 0};
 	struct inode                   *inode = NULL;
 	int				ret = 0;
 	int				new_xrcd = 0;
@@ -719,13 +719,13 @@ ssize_t ib_uverbs_open_xrcd(struct ib_uverbs_file *file,
 
 	if (cmd.fd != -1) {
 		/* search for file descriptor */
-		f = fget(cmd.fd);
-		if (!f) {
+		f = fdget(cmd.fd);
+		if (!f.file) {
 			ret = -EBADF;
 			goto err_tree_mutex_unlock;
 		}
 
-		inode = f->f_dentry->d_inode;
+		inode = f.file->f_path.dentry->d_inode;
 		if (!inode) {
 			ret = -EBADF;
 			goto err_tree_mutex_unlock;
@@ -824,8 +824,8 @@ err:
 	put_uobj_write(&obj->uobject);
 
 err_tree_mutex_unlock:
-	if (f)
-		fput(f);
+	if (f.file)
+		fdput(f);
 
 	mutex_unlock(&file->device->xrcd_tree_mutex);
 

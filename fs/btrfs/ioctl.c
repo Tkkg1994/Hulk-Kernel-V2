@@ -1374,7 +1374,6 @@ static noinline int btrfs_ioctl_snap_create_transid(struct file *file,
 						    bool readonly)
 {
 	struct btrfs_root *root = BTRFS_I(fdentry(file)->d_inode)->root;
-	struct file *src_file;
 	int namelen;
 	int ret = 0;
 
@@ -1397,8 +1396,8 @@ static noinline int btrfs_ioctl_snap_create_transid(struct file *file,
 		ret = btrfs_mksubvol(&file->f_path, name, namelen,
 				     NULL, transid, readonly);
 	} else {
+		struct fd src = fdget(fd);
 		struct inode *src_inode;
-		src_file = fget(fd);
 		if (!src_file) {
 			ret = -EINVAL;
 			goto out;
@@ -2280,7 +2279,7 @@ static noinline long btrfs_ioctl_clone(struct file *file, unsigned long srcfd,
 {
 	struct inode *inode = file_inode(file);
 	struct btrfs_root *root = BTRFS_I(inode)->root;
-	struct file *src_file;
+	struct fd src_file;
 	struct inode *src;
 	struct btrfs_trans_handle *trans;
 	struct btrfs_path *path;
@@ -2328,7 +2327,7 @@ static noinline long btrfs_ioctl_clone(struct file *file, unsigned long srcfd,
 		goto out_fput;
 
 	/* the src must be open for reading */
-	if (!(src_file->f_mode & FMODE_READ))
+	if (!(src_file.file->f_mode & FMODE_READ))
 		goto out_fput;
 
 	/* don't make the dst file partly checksummed */

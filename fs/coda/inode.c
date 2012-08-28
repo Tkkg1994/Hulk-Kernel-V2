@@ -107,7 +107,7 @@ static const struct super_operations coda_super_operations =
 
 static int get_device_index(struct coda_mount_data *data)
 {
-	struct file *file;
+	struct fd f;
 	struct inode *inode;
 	int idx;
 
