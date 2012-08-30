@@ -1766,7 +1766,6 @@ generic_make_request_checks(struct bio *bio)
 		goto end_io;
 	}
 
-<<<<<<< HEAD
 	if ((bio->bi_rw & REQ_SANITIZE) &&
 	    (!blk_queue_sanitize(q))) {
 		pr_info("%s - got a SANITIZE request but the queue "
@@ -1774,7 +1773,7 @@ generic_make_request_checks(struct bio *bio)
 		err = -EOPNOTSUPP;
 		goto end_io;
 	}
-=======
+
 	/*
 	 * Various block parts want %current->io_context and lazy ioc
 	 * allocation ends up trading a lot of pain for a small amount of
@@ -1782,7 +1781,6 @@ generic_make_request_checks(struct bio *bio)
 	 * layer knows how to live with it.
 	 */
 	create_io_context(GFP_ATOMIC, q->node);
->>>>>>> 7f4b35d... block: allocate io_context upfront
 
 	if (blk_throtl_bio(q, bio))
 		return false;	/* throttled, will be resubmitted later */
@@ -2345,11 +2343,11 @@ bool blk_update_request(struct request *req, int error, unsigned int nr_bytes)
 			error_type = "I/O";
 			break;
 		}
-		printk_ratelimited(
-			KERN_ERR "end_request: %s error, dev %s, sector %llu\n",
-			error_type,
-			req->rq_disk ? req->rq_disk->disk_name : "?",
-			(unsigned long long)blk_rq_pos(req));
+		printk_ratelimited(KERN_ERR "end_request: %s error, dev %s, sector %llu\n",
+				   error_type, req->rq_disk ?
+				   req->rq_disk->disk_name : "?",
+				   (unsigned long long)blk_rq_pos(req));
+
 	}
 
 	blk_account_io_completion(req, nr_bytes);
