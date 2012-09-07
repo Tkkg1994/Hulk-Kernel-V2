@@ -1507,7 +1507,7 @@ nla_put_failure:
 }
 
 static int dcbnl_notify(struct net_device *dev, int event, int cmd,
-			u32 seq, u32 pid, int dcbx_ver)
+			u32 seq, u32 portid, int dcbx_ver)
 {
 	struct net *net = dev_net(dev);
 	struct sk_buff *skb;
@@ -1553,16 +1553,16 @@ static int dcbnl_notify(struct net_device *dev, int event, int cmd,
 }
 
 int dcbnl_ieee_notify(struct net_device *dev, int event, int cmd,
-		      u32 seq, u32 pid)
+		      u32 seq, u32 portid)
 {
-	return dcbnl_notify(dev, event, cmd, seq, pid, DCB_CAP_DCBX_VER_IEEE);
+	return dcbnl_notify(dev, event, cmd, seq, portid, DCB_CAP_DCBX_VER_IEEE);
 }
 EXPORT_SYMBOL(dcbnl_ieee_notify);
 
 int dcbnl_cee_notify(struct net_device *dev, int event, int cmd,
-		     u32 seq, u32 pid)
+		     u32 seq, u32 portid)
 {
-	return dcbnl_notify(dev, event, cmd, seq, pid, DCB_CAP_DCBX_VER_CEE);
+	return dcbnl_notify(dev, event, cmd, seq, portid, DCB_CAP_DCBX_VER_CEE);
 }
 EXPORT_SYMBOL(dcbnl_cee_notify);
 
@@ -1901,7 +1901,7 @@ static int dcb_doit(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	struct net_device *netdev;
 	struct dcbmsg  *dcb = (struct dcbmsg *)NLMSG_DATA(nlh);
 	struct nlattr *tb[DCB_ATTR_MAX + 1];
-	u32 pid = skb ? NETLINK_CB(skb).pid : 0;
+	u32 portid = skb ? NETLINK_CB(skb).portid : 0;
 	int ret = -EINVAL;
 
 	if (!net_eq(net, &init_net))
@@ -1924,44 +1924,44 @@ static int dcb_doit(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 
 	switch (dcb->cmd) {
 	case DCB_CMD_GSTATE:
-		ret = dcbnl_getstate(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_getstate(netdev, tb, portid, nlh->nlmsg_seq,
 		                     nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PFC_GCFG:
-		ret = dcbnl_getpfccfg(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_getpfccfg(netdev, tb, portid, nlh->nlmsg_seq,
 		                      nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_GPERM_HWADDR:
-		ret = dcbnl_getperm_hwaddr(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_getperm_hwaddr(netdev, tb, portid, nlh->nlmsg_seq,
 		                           nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PGTX_GCFG:
-		ret = dcbnl_pgtx_getcfg(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_pgtx_getcfg(netdev, tb, portid, nlh->nlmsg_seq,
 		                        nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PGRX_GCFG:
-		ret = dcbnl_pgrx_getcfg(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_pgrx_getcfg(netdev, tb, portid, nlh->nlmsg_seq,
 		                        nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_BCN_GCFG:
-		ret = dcbnl_bcn_getcfg(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_bcn_getcfg(netdev, tb, portid, nlh->nlmsg_seq,
 		                       nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_SSTATE:
-		ret = dcbnl_setstate(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_setstate(netdev, tb, portid, nlh->nlmsg_seq,
 		                     nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PFC_SCFG:
-		ret = dcbnl_setpfccfg(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_setpfccfg(netdev, tb, portid, nlh->nlmsg_seq,
 		                      nlh->nlmsg_flags);
 		goto out;
 
 	case DCB_CMD_SET_ALL:
-		ret = dcbnl_setall(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_setall(netdev, tb, portid, nlh->nlmsg_seq,
 		                   nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PGTX_SCFG:
-		ret = dcbnl_pgtx_setcfg(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_pgtx_setcfg(netdev, tb, portid, nlh->nlmsg_seq,
 		                        nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PGRX_SCFG:
@@ -1969,67 +1969,67 @@ static int dcb_doit(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		                        nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_GCAP:
-		ret = dcbnl_getcap(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_getcap(netdev, tb, portid, nlh->nlmsg_seq,
 		                   nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_GNUMTCS:
-		ret = dcbnl_getnumtcs(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_getnumtcs(netdev, tb, portid, nlh->nlmsg_seq,
 		                      nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_SNUMTCS:
-		ret = dcbnl_setnumtcs(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_setnumtcs(netdev, tb, portid, nlh->nlmsg_seq,
 		                      nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PFC_GSTATE:
-		ret = dcbnl_getpfcstate(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_getpfcstate(netdev, tb, portid, nlh->nlmsg_seq,
 		                        nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PFC_SSTATE:
-		ret = dcbnl_setpfcstate(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_setpfcstate(netdev, tb, portid, nlh->nlmsg_seq,
 		                        nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_BCN_SCFG:
-		ret = dcbnl_bcn_setcfg(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_bcn_setcfg(netdev, tb, portid, nlh->nlmsg_seq,
 		                       nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_GAPP:
-		ret = dcbnl_getapp(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_getapp(netdev, tb, portid, nlh->nlmsg_seq,
 		                   nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_SAPP:
-		ret = dcbnl_setapp(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_setapp(netdev, tb, portid, nlh->nlmsg_seq,
 		                   nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_IEEE_SET:
-		ret = dcbnl_ieee_set(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_ieee_set(netdev, tb, portid, nlh->nlmsg_seq,
 				     nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_IEEE_GET:
-		ret = dcbnl_ieee_get(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_ieee_get(netdev, tb, portid, nlh->nlmsg_seq,
 				     nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_IEEE_DEL:
-		ret = dcbnl_ieee_del(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_ieee_del(netdev, tb, portid, nlh->nlmsg_seq,
 				     nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_GDCBX:
-		ret = dcbnl_getdcbx(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_getdcbx(netdev, tb, portid, nlh->nlmsg_seq,
 				    nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_SDCBX:
-		ret = dcbnl_setdcbx(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_setdcbx(netdev, tb, portid, nlh->nlmsg_seq,
 				    nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_GFEATCFG:
-		ret = dcbnl_getfeatcfg(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_getfeatcfg(netdev, tb, portid, nlh->nlmsg_seq,
 				       nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_SFEATCFG:
-		ret = dcbnl_setfeatcfg(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_setfeatcfg(netdev, tb, portid, nlh->nlmsg_seq,
 				       nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_CEE_GET:
-		ret = dcbnl_cee_get(netdev, tb, pid, nlh->nlmsg_seq,
+		ret = dcbnl_cee_get(netdev, tb, portid, nlh->nlmsg_seq,
 				    nlh->nlmsg_flags);
 		goto out;
 	default:

@@ -56,7 +56,7 @@ static int nfc_genl_send_target(struct sk_buff *msg, struct nfc_target *target,
 {
 	void *hdr;
 
-	hdr = genlmsg_put(msg, NETLINK_CB(cb->skb).pid, cb->nlh->nlmsg_seq,
+	hdr = genlmsg_put(msg, NETLINK_CB(cb->skb).portid, cb->nlh->nlmsg_seq,
 			  &nfc_genl_family, flags, NFC_CMD_GET_TARGET);
 	if (!hdr)
 		return -EMSGSIZE;
@@ -159,7 +159,7 @@ int nfc_genl_targets_found(struct nfc_dev *dev)
 	struct sk_buff *msg;
 	void *hdr;
 
-	dev->genl_data.poll_req_pid = 0;
+	dev->genl_data.poll_req_portid = 0;
 
 	msg = nlmsg_new(NLMSG_GOODSIZE, GFP_ATOMIC);
 	if (!msg)
@@ -245,13 +245,13 @@ free_msg:
 }
 
 static int nfc_genl_send_device(struct sk_buff *msg, struct nfc_dev *dev,
-				u32 pid, u32 seq,
+				u32 portid, u32 seq,
 				struct netlink_callback *cb,
 				int flags)
 {
 	void *hdr;
 
-	hdr = genlmsg_put(msg, pid, seq, &nfc_genl_family, flags,
+	hdr = genlmsg_put(msg, portid, seq, &nfc_genl_family, flags,
 			  NFC_CMD_GET_DEVICE);
 	if (!hdr)
 		return -EMSGSIZE;
@@ -298,7 +298,7 @@ static int nfc_genl_dump_devices(struct sk_buff *skb,
 	while (dev) {
 		int rc;
 
-		rc = nfc_genl_send_device(skb, dev, NETLINK_CB(cb->skb).pid,
+		rc = nfc_genl_send_device(skb, dev, NETLINK_CB(cb->skb).portid,
 					  cb->nlh->nlmsg_seq, cb, NLM_F_MULTI);
 		if (rc < 0)
 			break;
@@ -413,7 +413,7 @@ static int nfc_genl_get_device(struct sk_buff *skb, struct genl_info *info)
 		goto out_putdev;
 	}
 
-	rc = nfc_genl_send_device(msg, dev, info->snd_pid, info->snd_seq,
+	rc = nfc_genl_send_device(msg, dev, info->snd_portid, info->snd_seq,
 				  NULL, 0);
 	if (rc < 0)
 		goto out_free;
@@ -495,7 +495,7 @@ static int nfc_genl_start_poll(struct sk_buff *skb, struct genl_info *info)
 
 	rc = nfc_start_poll(dev, protocols);
 	if (!rc)
-		dev->genl_data.poll_req_pid = info->snd_pid;
+		dev->genl_data.poll_req_portid = info->snd_portid;
 
 	mutex_unlock(&dev->genl_data.genl_data_mutex);
 
@@ -520,13 +520,13 @@ static int nfc_genl_stop_poll(struct sk_buff *skb, struct genl_info *info)
 
 	mutex_lock(&dev->genl_data.genl_data_mutex);
 
-	if (dev->genl_data.poll_req_pid != info->snd_pid) {
+	if (dev->genl_data.poll_req_portid != info->snd_portid) {
 		rc = -EBUSY;
 		goto out;
 	}
 
 	rc = nfc_stop_poll(dev);
-	dev->genl_data.poll_req_pid = 0;
+	dev->genl_data.poll_req_portid = 0;
 
 out:
 	mutex_unlock(&dev->genl_data.genl_data_mutex);
@@ -646,15 +646,15 @@ static int nfc_genl_rcv_nl_event(struct notifier_block *this,
 	if (event != NETLINK_URELEASE || n->protocol != NETLINK_GENERIC)
 		goto out;
 
-	pr_debug("NETLINK_URELEASE event from id %d\n", n->pid);
+	pr_debug("NETLINK_URELEASE event from id %d\n", n->portid);
 
 	nfc_device_iter_init(&iter);
 	dev = nfc_device_iter_next(&iter);
 
 	while (dev) {
-		if (dev->genl_data.poll_req_pid == n->pid) {
+		if (dev->genl_data.poll_req_portid == n->portid) {
 			nfc_stop_poll(dev);
-			dev->genl_data.poll_req_pid = 0;
+			dev->genl_data.poll_req_portid = 0;
 		}
 		dev = nfc_device_iter_next(&iter);
 	}
@@ -667,7 +667,7 @@ out:
 
 void nfc_genl_data_init(struct nfc_genl_data *genl_data)
 {
-	genl_data->poll_req_pid = 0;
+	genl_data->poll_req_portid = 0;
 	mutex_init(&genl_data->genl_data_mutex);
 }
 

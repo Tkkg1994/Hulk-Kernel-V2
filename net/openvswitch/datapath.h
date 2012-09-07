@@ -105,7 +105,7 @@ struct dp_upcall_info {
 	u8 cmd;
 	const struct sw_flow_key *key;
 	const struct nlattr *userdata;
-	u32 pid;
+	u32 portid;
 };
 
 extern struct notifier_block ovs_dp_device_notifier;

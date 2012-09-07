@@ -623,7 +623,7 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh,
 	}
 
 	c.seq = nlh->nlmsg_seq;
-	c.pid = nlh->nlmsg_pid;
+	c.portid = nlh->nlmsg_pid;
 	c.event = nlh->nlmsg_type;
 
 	km_state_notify(x, &c);
@@ -696,7 +696,7 @@ static int xfrm_del_sa(struct sk_buff *skb, struct nlmsghdr *nlh,
 		goto out;
 
 	c.seq = nlh->nlmsg_seq;
-	c.pid = nlh->nlmsg_pid;
+	c.portid = nlh->nlmsg_pid;
 	c.event = nlh->nlmsg_type;
 	km_state_notify(x, &c);
 
@@ -828,7 +828,7 @@ static int dump_one_state(struct xfrm_state *x, int count, void *ptr)
 	struct nlmsghdr *nlh;
 	int err;
 
-	nlh = nlmsg_put(skb, NETLINK_CB(in_skb).pid, sp->nlmsg_seq,
+	nlh = nlmsg_put(skb, NETLINK_CB(in_skb).portid, sp->nlmsg_seq,
 			XFRM_MSG_NEWSA, sizeof(*p), sp->nlmsg_flags);
 	if (nlh == NULL)
 		return -EMSGSIZE;
@@ -911,7 +911,7 @@ static inline size_t xfrm_spdinfo_msgsize(void)
 }
 
 static int build_spdinfo(struct sk_buff *skb, struct net *net,
-			 u32 pid, u32 seq, u32 flags)
+			 u32 portid, u32 seq, u32 flags)
 {
 	struct xfrmk_spdinfo si;
 	struct xfrmu_spdinfo spc;
@@ -919,7 +919,7 @@ static int build_spdinfo(struct sk_buff *skb, struct net *net,
 	struct nlmsghdr *nlh;
 	u32 *f;
 
-	nlh = nlmsg_put(skb, pid, seq, XFRM_MSG_NEWSPDINFO, sizeof(u32), 0);
+	nlh = nlmsg_put(skb, portid, seq, XFRM_MSG_NEWSPDINFO, sizeof(u32), 0);
 	if (nlh == NULL) /* shouldn't really happen ... */
 		return -EMSGSIZE;
 
@@ -951,17 +951,17 @@ static int xfrm_get_spdinfo(struct sk_buff *skb, struct nlmsghdr *nlh,
 	struct net *net = sock_net(skb->sk);
 	struct sk_buff *r_skb;
 	u32 *flags = nlmsg_data(nlh);
-	u32 spid = NETLINK_CB(skb).pid;
+	u32 sportid = NETLINK_CB(skb).portid;
 	u32 seq = nlh->nlmsg_seq;
 
 	r_skb = nlmsg_new(xfrm_spdinfo_msgsize(), GFP_ATOMIC);
 	if (r_skb == NULL)
 		return -ENOMEM;
 
-	if (build_spdinfo(r_skb, net, spid, seq, *flags) < 0)
+	if (build_spdinfo(r_skb, net, sportid, seq, *flags) < 0)
 		BUG();
 
-	return nlmsg_unicast(net->xfrm.nlsk, r_skb, spid);
+	return nlmsg_unicast(net->xfrm.nlsk, r_skb, sportid);
 }
 
 static inline size_t xfrm_sadinfo_msgsize(void)
@@ -972,14 +972,14 @@ static inline size_t xfrm_sadinfo_msgsize(void)
 }
 
 static int build_sadinfo(struct sk_buff *skb, struct net *net,
-			 u32 pid, u32 seq, u32 flags)
+			 u32 portid, u32 seq, u32 flags)
 {
 	struct xfrmk_sadinfo si;
 	struct xfrmu_sadhinfo sh;
 	struct nlmsghdr *nlh;
 	u32 *f;
 
-	nlh = nlmsg_put(skb, pid, seq, XFRM_MSG_NEWSADINFO, sizeof(u32), 0);
+	nlh = nlmsg_put(skb, portid, seq, XFRM_MSG_NEWSADINFO, sizeof(u32), 0);
 	if (nlh == NULL) /* shouldn't really happen ... */
 		return -EMSGSIZE;
 
@@ -1006,17 +1006,17 @@ static int xfrm_get_sadinfo(struct sk_buff *skb, struct nlmsghdr *nlh,
 	struct net *net = sock_net(skb->sk);
 	struct sk_buff *r_skb;
 	u32 *flags = nlmsg_data(nlh);
-	u32 spid = NETLINK_CB(skb).pid;
+	u32 sportid = NETLINK_CB(skb).portid;
 	u32 seq = nlh->nlmsg_seq;
 
 	r_skb = nlmsg_new(xfrm_sadinfo_msgsize(), GFP_ATOMIC);
 	if (r_skb == NULL)
 		return -ENOMEM;
 
-	if (build_sadinfo(r_skb, net, spid, seq, *flags) < 0)
+	if (build_sadinfo(r_skb, net, sportid, seq, *flags) < 0)
 		BUG();
 
-	return nlmsg_unicast(net->xfrm.nlsk, r_skb, spid);
+	return nlmsg_unicast(net->xfrm.nlsk, r_skb, sportid);
 }
 
 static int xfrm_get_sa(struct sk_buff *skb, struct nlmsghdr *nlh,
@@ -1036,7 +1036,7 @@ static int xfrm_get_sa(struct sk_buff *skb, struct nlmsghdr *nlh,
 	if (IS_ERR(resp_skb)) {
 		err = PTR_ERR(resp_skb);
 	} else {
-		err = nlmsg_unicast(net->xfrm.nlsk, resp_skb, NETLINK_CB(skb).pid);
+		err = nlmsg_unicast(net->xfrm.nlsk, resp_skb, NETLINK_CB(skb).portid);
 	}
 	xfrm_state_put(x);
 out_noput:
@@ -1117,7 +1117,7 @@ static int xfrm_alloc_userspi(struct sk_buff *skb, struct nlmsghdr *nlh,
 		goto out;
 	}
 
-	err = nlmsg_unicast(net->xfrm.nlsk, resp_skb, NETLINK_CB(skb).pid);
+	err = nlmsg_unicast(net->xfrm.nlsk, resp_skb, NETLINK_CB(skb).portid);
 
 out:
 	xfrm_state_put(x);
@@ -1405,7 +1405,7 @@ static int xfrm_add_policy(struct sk_buff *skb, struct nlmsghdr *nlh,
 
 	c.event = nlh->nlmsg_type;
 	c.seq = nlh->nlmsg_seq;
-	c.pid = nlh->nlmsg_pid;
+	c.portid = nlh->nlmsg_pid;
 	km_policy_notify(xp, p->dir, &c);
 
 	xfrm_pol_put(xp);
@@ -1491,7 +1491,7 @@ static int dump_one_policy(struct xfrm_policy *xp, int dir, int count, void *ptr
 	struct sk_buff *skb = sp->out_skb;
 	struct nlmsghdr *nlh;
 
-	nlh = nlmsg_put(skb, NETLINK_CB(in_skb).pid, sp->nlmsg_seq,
+	nlh = nlmsg_put(skb, NETLINK_CB(in_skb).portid, sp->nlmsg_seq,
 			XFRM_MSG_NEWPOLICY, sizeof(*p), sp->nlmsg_flags);
 	if (nlh == NULL)
 		return -EMSGSIZE;
@@ -1631,7 +1631,7 @@ static int xfrm_get_policy(struct sk_buff *skb, struct nlmsghdr *nlh,
 			err = PTR_ERR(resp_skb);
 		} else {
 			err = nlmsg_unicast(net->xfrm.nlsk, resp_skb,
-					    NETLINK_CB(skb).pid);
+					    NETLINK_CB(skb).portid);
 		}
 	} else {
 		kuid_t loginuid = audit_get_loginuid(current);
@@ -1648,7 +1648,7 @@ static int xfrm_get_policy(struct sk_buff *skb, struct nlmsghdr *nlh,
 		c.data.byid = p->index;
 		c.event = nlh->nlmsg_type;
 		c.seq = nlh->nlmsg_seq;
-		c.pid = nlh->nlmsg_pid;
+		c.portid = nlh->nlmsg_pid;
 		km_policy_notify(xp, p->dir, &c);
 	}
 
@@ -1678,7 +1678,7 @@ static int xfrm_flush_sa(struct sk_buff *skb, struct nlmsghdr *nlh,
 	c.data.proto = p->proto;
 	c.event = nlh->nlmsg_type;
 	c.seq = nlh->nlmsg_seq;
-	c.pid = nlh->nlmsg_pid;
+	c.portid = nlh->nlmsg_pid;
 	c.net = net;
 	km_state_notify(NULL, &c);
 
@@ -1704,7 +1704,7 @@ static int build_aevent(struct sk_buff *skb, struct xfrm_state *x, const struct 
 	struct xfrm_aevent_id *id;
 	struct nlmsghdr *nlh;
 
-	nlh = nlmsg_put(skb, c->pid, c->seq, XFRM_MSG_NEWAE, sizeof(*id), 0);
+	nlh = nlmsg_put(skb, c->portid, c->seq, XFRM_MSG_NEWAE, sizeof(*id), 0);
 	if (nlh == NULL)
 		return -EMSGSIZE;
 
@@ -1776,11 +1776,11 @@ static int xfrm_get_ae(struct sk_buff *skb, struct nlmsghdr *nlh,
 	spin_lock_bh(&x->lock);
 	c.data.aevent = p->flags;
 	c.seq = nlh->nlmsg_seq;
-	c.pid = nlh->nlmsg_pid;
+	c.portid = nlh->nlmsg_pid;
 
 	if (build_aevent(r_skb, x, &c) < 0)
 		BUG();
-	err = nlmsg_unicast(net->xfrm.nlsk, r_skb, NETLINK_CB(skb).pid);
+	err = nlmsg_unicast(net->xfrm.nlsk, r_skb, NETLINK_CB(skb).portid);
 	spin_unlock_bh(&x->lock);
 	xfrm_state_put(x);
 	return err;
@@ -1826,7 +1826,7 @@ static int xfrm_new_ae(struct sk_buff *skb, struct nlmsghdr *nlh,
 
 	c.event = nlh->nlmsg_type;
 	c.seq = nlh->nlmsg_seq;
-	c.pid = nlh->nlmsg_pid;
+	c.portid = nlh->nlmsg_pid;
 	c.data.aevent = XFRM_AE_CU;
 	km_state_notify(x, &c);
 	err = 0;
@@ -1861,7 +1861,7 @@ static int xfrm_flush_policy(struct sk_buff *skb, struct nlmsghdr *nlh,
 	c.data.type = type;
 	c.event = nlh->nlmsg_type;
 	c.seq = nlh->nlmsg_seq;
-	c.pid = nlh->nlmsg_pid;
+	c.portid = nlh->nlmsg_pid;
 	c.net = net;
 	km_policy_notify(NULL, 0, &c);
 	return 0;
@@ -2364,7 +2364,7 @@ static int build_expire(struct sk_buff *skb, struct xfrm_state *x, const struct 
 	struct xfrm_user_expire *ue;
 	struct nlmsghdr *nlh;
 
-	nlh = nlmsg_put(skb, c->pid, 0, XFRM_MSG_EXPIRE, sizeof(*ue), 0);
+	nlh = nlmsg_put(skb, c->portid, 0, XFRM_MSG_EXPIRE, sizeof(*ue), 0);
 	if (nlh == NULL)
 		return -EMSGSIZE;
 
@@ -2425,7 +2425,7 @@ static int xfrm_notify_sa_flush(const struct km_event *c)
 	if (skb == NULL)
 		return -ENOMEM;
 
-	nlh = nlmsg_put(skb, c->pid, c->seq, XFRM_MSG_FLUSHSA, sizeof(*p), 0);
+	nlh = nlmsg_put(skb, c->portid, c->seq, XFRM_MSG_FLUSHSA, sizeof(*p), 0);
 	if (nlh == NULL) {
 		kfree_skb(skb);
 		return -EMSGSIZE;
@@ -2493,7 +2493,7 @@ static int xfrm_notify_sa(struct xfrm_state *x, const struct km_event *c)
 	if (skb == NULL)
 		return -ENOMEM;
 
-	nlh = nlmsg_put(skb, c->pid, c->seq, c->event, headlen, 0);
+	nlh = nlmsg_put(skb, c->portid, c->seq, c->event, headlen, 0);
 	if (nlh == NULL)
 		goto nla_put_failure;
 
@@ -2693,7 +2693,7 @@ static int build_polexpire(struct sk_buff *skb, struct xfrm_policy *xp,
 	struct nlmsghdr *nlh;
 	int hard = c->data.hard;
 
-	nlh = nlmsg_put(skb, c->pid, 0, XFRM_MSG_POLEXPIRE, sizeof(*upe), 0);
+	nlh = nlmsg_put(skb, c->portid, 0, XFRM_MSG_POLEXPIRE, sizeof(*upe), 0);
 	if (nlh == NULL)
 		return -EMSGSIZE;
 
@@ -2755,7 +2755,7 @@ static int xfrm_notify_policy(struct xfrm_policy *xp, int dir, const struct km_e
 	if (skb == NULL)
 		return -ENOMEM;
 
-	nlh = nlmsg_put(skb, c->pid, c->seq, c->event, headlen, 0);
+	nlh = nlmsg_put(skb, c->portid, c->seq, c->event, headlen, 0);
 	if (nlh == NULL)
 		goto nlmsg_failure;
 
@@ -2807,7 +2807,7 @@ static int xfrm_notify_policy_flush(const struct km_event *c)
 	if (skb == NULL)
 		return -ENOMEM;
 
-	nlh = nlmsg_put(skb, c->pid, c->seq, XFRM_MSG_FLUSHPOLICY, 0, 0);
+	nlh = nlmsg_put(skb, c->portid, c->seq, XFRM_MSG_FLUSHPOLICY, 0, 0);
 	if (nlh == NULL)
 		goto nlmsg_failure;
 	if (copy_to_user_policy_type(c->data.type, skb) < 0)

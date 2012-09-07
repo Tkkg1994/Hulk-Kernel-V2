@@ -92,11 +92,11 @@ static int	audit_failure = AUDIT_FAIL_PRINTK;
 
 /*
  * If audit records are to be written to the netlink socket, audit_pid
- * contains the pid of the auditd process and audit_nlk_pid contains
- * the pid to use to send netlink messages to that process.
+ * contains the pid of the auditd process and audit_nlk_portid contains
+ * the portid to use to send netlink messages to that process.
  */
 int		audit_pid;
-static int	audit_nlk_pid;
+static int	audit_nlk_portid;
 
 /* If audit_rate_limit is non-zero, limit the rate of sending audit records
  * to that number per second.  This prevents DoS attacks, but results in
@@ -405,7 +405,7 @@ static void kauditd_send_skb(struct sk_buff *skb)
 	int err;
 	/* take a reference in case we can't send it and we want to hold it */
 	skb_get(skb);
-	err = netlink_unicast(audit_sock, skb, audit_nlk_pid, 0);
+	err = netlink_unicast(audit_sock, skb, audit_nlk_portid, 0);
 	if (err < 0) {
 		BUG_ON(err != -ECONNREFUSED); /* Shouldn't happen */
 		printk(KERN_ERR "audit: *NO* daemon at audit_pid=%d\n", audit_pid);
@@ -691,7 +691,7 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		status_set.backlog_limit = audit_backlog_limit;
 		status_set.lost		 = atomic_read(&audit_lost);
 		status_set.backlog	 = skb_queue_len(&audit_skb_queue);
-		audit_send_reply(NETLINK_CB(skb).pid, seq, AUDIT_GET, 0, 0,
+		audit_send_reply(NETLINK_CB(skb).portid, seq, AUDIT_GET, 0, 0,
 				 &status_set, sizeof(status_set));
 		break;
 	case AUDIT_SET:
@@ -719,7 +719,7 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 							sessionid, sid, 1);
 
 			audit_pid = new_pid;
-			audit_nlk_pid = NETLINK_CB(skb).pid;
+			audit_nlk_portid = NETLINK_CB(skb).portid;
 		}
 		if (status_get->mask & AUDIT_STATUS_RATE_LIMIT) {
 			err = audit_set_rate_limit(status_get->rate_limit,
@@ -781,7 +781,7 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		}
 		/* fallthrough */
 	case AUDIT_LIST:
-		err = audit_receive_filter(msg_type, NETLINK_CB(skb).pid,
+		err = audit_receive_filter(msg_type, NETLINK_CB(skb).portid,
 					   seq, data, nlmsg_len(nlh),
 					   loginuid, sessionid, sid);
 		break;
@@ -800,7 +800,7 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		}
 		/* fallthrough */
 	case AUDIT_LIST_RULES:
-		err = audit_receive_filter(msg_type, NETLINK_CB(skb).pid,
+		err = audit_receive_filter(msg_type, NETLINK_CB(skb).portid,
 					   seq, data, nlmsg_len(nlh),
 					   loginuid, sessionid, sid);
 		break;
@@ -871,7 +871,7 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 			memcpy(sig_data->ctx, ctx, len);
 			security_release_secctx(ctx, len);
 		}
-		audit_send_reply(NETLINK_CB(skb).pid, seq, AUDIT_SIGNAL_INFO,
+		audit_send_reply(NETLINK_CB(skb).portid, seq, AUDIT_SIGNAL_INFO,
 				0, 0, sig_data, sizeof(*sig_data) + len);
 		kfree(sig_data);
 		break;
@@ -883,7 +883,7 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		s.enabled = tsk->signal->audit_tty != 0;
 		spin_unlock_irq(&tsk->sighand->siglock);
 
-		audit_send_reply(NETLINK_CB(skb).pid, seq,
+		audit_send_reply(NETLINK_CB(skb).portid, seq,
 				 AUDIT_TTY_GET, 0, 0, &s, sizeof(s));
 		break;
 	}

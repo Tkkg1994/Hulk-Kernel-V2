@@ -1164,7 +1164,7 @@ static int team_nl_cmd_noop(struct sk_buff *skb, struct genl_info *info)
 	if (!msg)
 		return -ENOMEM;
 
-	hdr = genlmsg_put(msg, info->snd_pid, info->snd_seq,
+	hdr = genlmsg_put(msg, info->snd_portid, info->snd_seq,
 			  &team_nl_family, 0, TEAM_CMD_NOOP);
 	if (IS_ERR(hdr)) {
 		err = PTR_ERR(hdr);
@@ -1173,7 +1173,7 @@ static int team_nl_cmd_noop(struct sk_buff *skb, struct genl_info *info)
 
 	genlmsg_end(msg, hdr);
 
-	return genlmsg_unicast(genl_info_net(info), msg, info->snd_pid);
+	return genlmsg_unicast(genl_info_net(info), msg, info->snd_portid);
 
 err_msg_put:
 	nlmsg_free(msg);
@@ -1230,7 +1230,7 @@ static int team_nl_send_generic(struct genl_info *info, struct team *team,
 	if (err < 0)
 		goto err_fill;
 
-	err = genlmsg_unicast(genl_info_net(info), skb, info->snd_pid);
+	err = genlmsg_unicast(genl_info_net(info), skb, info->snd_portid);
 	return err;
 
 err_fill:
@@ -1239,14 +1239,14 @@ err_fill:
 }
 
 static int team_nl_fill_options_get(struct sk_buff *skb,
-				    u32 pid, u32 seq, int flags,
+				    u32 portid, u32 seq, int flags,
 				    struct team *team, bool fillall)
 {
 	struct nlattr *option_list;
 	void *hdr;
 	struct team_option *option;
 
-	hdr = genlmsg_put(skb, pid, seq, &team_nl_family, flags,
+	hdr = genlmsg_put(skb, portid, seq, &team_nl_family, flags,
 			  TEAM_CMD_OPTIONS_GET);
 	if (IS_ERR(hdr))
 		return PTR_ERR(hdr);
@@ -1303,7 +1303,7 @@ static int team_nl_fill_options_get_all(struct sk_buff *skb,
 					struct genl_info *info, int flags,
 					struct team *team)
 {
-	return team_nl_fill_options_get(skb, info->snd_pid,
+	return team_nl_fill_options_get(skb, info->snd_portid,
 					info->snd_seq, NLM_F_ACK,
 					team, true);
 }
@@ -1410,7 +1410,7 @@ team_put:
 }
 
 static int team_nl_fill_port_list_get(struct sk_buff *skb,
-				      u32 pid, u32 seq, int flags,
+				      u32 portid, u32 seq, int flags,
 				      struct team *team,
 				      bool fillall)
 {
@@ -1418,7 +1418,7 @@ static int team_nl_fill_port_list_get(struct sk_buff *skb,
 	void *hdr;
 	struct team_port *port;
 
-	hdr = genlmsg_put(skb, pid, seq, &team_nl_family, flags,
+	hdr = genlmsg_put(skb, portid, seq, &team_nl_family, flags,
 			  TEAM_CMD_PORT_LIST_GET);
 	if (IS_ERR(hdr))
 		return PTR_ERR(hdr);
@@ -1463,7 +1463,7 @@ static int team_nl_fill_port_list_get_all(struct sk_buff *skb,
 					  struct genl_info *info, int flags,
 					  struct team *team)
 {
-	return team_nl_fill_port_list_get(skb, info->snd_pid,
+	return team_nl_fill_port_list_get(skb, info->snd_portid,
 					  info->snd_seq, NLM_F_ACK,
 					  team, true);
 }

@@ -120,13 +120,13 @@ rtattr_failure:
 }
 
 static int sk_diag_fill(struct sock *sk, struct sk_buff *skb, struct unix_diag_req *req,
-		u32 pid, u32 seq, u32 flags, int sk_ino)
+		u32 portid, u32 seq, u32 flags, int sk_ino)
 {
 	unsigned char *b = skb_tail_pointer(skb);
 	struct nlmsghdr *nlh;
 	struct unix_diag_msg *rep;
 
-	nlh = NLMSG_PUT(skb, pid, seq, SOCK_DIAG_BY_FAMILY, sizeof(*rep));
+	nlh = NLMSG_PUT(skb, portid, seq, SOCK_DIAG_BY_FAMILY, sizeof(*rep));
 	nlh->nlmsg_flags = flags;
 
 	rep = NLMSG_DATA(nlh);
@@ -171,7 +171,7 @@ nlmsg_failure:
 }
 
 static int sk_diag_dump(struct sock *sk, struct sk_buff *skb, struct unix_diag_req *req,
-		u32 pid, u32 seq, u32 flags)
+		u32 portid, u32 seq, u32 flags)
 {
 	int sk_ino;
 
@@ -182,7 +182,7 @@ static int sk_diag_dump(struct sock *sk, struct sk_buff *skb, struct unix_diag_r
 	if (!sk_ino)
 		return 0;
 
-	return sk_diag_fill(sk, skb, req, pid, seq, flags, sk_ino);
+	return sk_diag_fill(sk, skb, req, portid, seq, flags, sk_ino);
 }
 
 static int unix_diag_dump(struct sk_buff *skb, struct netlink_callback *cb)
@@ -208,7 +208,7 @@ static int unix_diag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 			if (!(req->udiag_states & (1 << sk->sk_state)))
 				goto next;
 			if (sk_diag_dump(sk, skb, req,
-					 NETLINK_CB(cb->skb).pid,
+					 NETLINK_CB(cb->skb).portid,
 					 cb->nlh->nlmsg_seq,
 					 NLM_F_MULTI) < 0)
 				goto done;
@@ -273,7 +273,7 @@ again:
 	if (!rep)
 		goto out;
 
-	err = sk_diag_fill(sk, rep, req, NETLINK_CB(in_skb).pid,
+	err = sk_diag_fill(sk, rep, req, NETLINK_CB(in_skb).portid,
 			   nlh->nlmsg_seq, 0, req->udiag_ino);
 	if (err < 0) {
 		kfree_skb(rep);
@@ -283,7 +283,7 @@ again:
 
 		goto again;
 	}
-	err = netlink_unicast(sock_diag_nlsk, rep, NETLINK_CB(in_skb).pid,
+	err = netlink_unicast(sock_diag_nlsk, rep, NETLINK_CB(in_skb).portid,
 			      MSG_DONTWAIT);
 	if (err > 0)
 		err = 0;

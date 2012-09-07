@@ -502,7 +502,7 @@ EXPORT_SYMBOL(genl_unregister_family);
 /**
  * genlmsg_put - Add generic netlink header to netlink message
  * @skb: socket buffer holding the message
- * @pid: netlink pid the message is addressed to
+ * @portid: netlink portid the message is addressed to
  * @seq: sequence number (usually the one of the sender)
  * @family: generic netlink family
  * @flags netlink message flags
@@ -510,13 +510,13 @@ EXPORT_SYMBOL(genl_unregister_family);
  *
  * Returns pointer to user specific header
  */
-void *genlmsg_put(struct sk_buff *skb, u32 pid, u32 seq,
+void *genlmsg_put(struct sk_buff *skb, u32 portid, u32 seq,
 				struct genl_family *family, int flags, u8 cmd)
 {
 	struct nlmsghdr *nlh;
 	struct genlmsghdr *hdr;
 
-	nlh = nlmsg_put(skb, pid, seq, family->id, GENL_HDRLEN +
+	nlh = nlmsg_put(skb, portid, seq, family->id, GENL_HDRLEN +
 			family->hdrsize, flags);
 	if (nlh == NULL)
 		return NULL;
@@ -586,7 +586,7 @@ static int genl_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	}
 
 	info.snd_seq = nlh->nlmsg_seq;
-	info.snd_pid = NETLINK_CB(skb).pid;
+	info.snd_portid = NETLINK_CB(skb).portid;
 	info.nlhdr = nlh;
 	info.genlhdr = nlmsg_data(nlh);
 	info.userhdr = nlmsg_data(nlh) + GENL_HDRLEN;
@@ -627,12 +627,12 @@ static struct genl_family genl_ctrl = {
 	.netnsok = true,
 };
 
-static int ctrl_fill_info(struct genl_family *family, u32 pid, u32 seq,
+static int ctrl_fill_info(struct genl_family *family, u32 portid, u32 seq,
 			  u32 flags, struct sk_buff *skb, u8 cmd)
 {
 	void *hdr;
 
-	hdr = genlmsg_put(skb, pid, seq, &genl_ctrl, flags, cmd);
+	hdr = genlmsg_put(skb, portid, seq, &genl_ctrl, flags, cmd);
 	if (hdr == NULL)
 		return -1;
 
@@ -699,7 +699,7 @@ nla_put_failure:
 	return -EMSGSIZE;
 }
 
-static int ctrl_fill_mcgrp_info(struct genl_multicast_group *grp, u32 pid,
+static int ctrl_fill_mcgrp_info(struct genl_multicast_group *grp, u32 portid,
 				u32 seq, u32 flags, struct sk_buff *skb,
 				u8 cmd)
 {
@@ -707,7 +707,7 @@ static int ctrl_fill_mcgrp_info(struct genl_multicast_group *grp, u32 pid,
 	struct nlattr *nla_grps;
 	struct nlattr *nest;
 
-	hdr = genlmsg_put(skb, pid, seq, &genl_ctrl, flags, cmd);
+	hdr = genlmsg_put(skb, portid, seq, &genl_ctrl, flags, cmd);
 	if (hdr == NULL)
 		return -1;
 
@@ -752,7 +752,7 @@ static int ctrl_dumpfamily(struct sk_buff *skb, struct netlink_callback *cb)
 				continue;
 			if (++n < fams_to_skip)
 				continue;
-			if (ctrl_fill_info(rt, NETLINK_CB(cb->skb).pid,
+			if (ctrl_fill_info(rt, NETLINK_CB(cb->skb).portid,
 					   cb->nlh->nlmsg_seq, NLM_F_MULTI,
 					   skb, CTRL_CMD_NEWFAMILY) < 0)
 				goto errout;
@@ -769,7 +769,7 @@ errout:
 }
 
 static struct sk_buff *ctrl_build_family_msg(struct genl_family *family,
-					     u32 pid, int seq, u8 cmd)
+					     u32 portid, int seq, u8 cmd)
 {
 	struct sk_buff *skb;
 	int err;
@@ -778,7 +778,7 @@ static struct sk_buff *ctrl_build_family_msg(struct genl_family *family,
 	if (skb == NULL)
 		return ERR_PTR(-ENOBUFS);
 
-	err = ctrl_fill_info(family, pid, seq, 0, skb, cmd);
+	err = ctrl_fill_info(family, portid, seq, 0, skb, cmd);
 	if (err < 0) {
 		nlmsg_free(skb);
 		return ERR_PTR(err);
@@ -788,7 +788,7 @@ static struct sk_buff *ctrl_build_family_msg(struct genl_family *family,
 }
 
 static struct sk_buff *ctrl_build_mcgrp_msg(struct genl_multicast_group *grp,
-					    u32 pid, int seq, u8 cmd)
+					    u32 portid, int seq, u8 cmd)
 {
 	struct sk_buff *skb;
 	int err;
@@ -797,7 +797,7 @@ static struct sk_buff *ctrl_build_mcgrp_msg(struct genl_multicast_group *grp,
 	if (skb == NULL)
 		return ERR_PTR(-ENOBUFS);
 
-	err = ctrl_fill_mcgrp_info(grp, pid, seq, 0, skb, cmd);
+	err = ctrl_fill_mcgrp_info(grp, portid, seq, 0, skb, cmd);
 	if (err < 0) {
 		nlmsg_free(skb);
 		return ERR_PTR(err);
@@ -849,7 +849,7 @@ static int ctrl_getfamily(struct sk_buff *skb, struct genl_info *info)
 		return -ENOENT;
 	}
 
-	msg = ctrl_build_family_msg(res, info->snd_pid, info->snd_seq,
+	msg = ctrl_build_family_msg(res, info->snd_portid, info->snd_seq,
 				    CTRL_CMD_NEWFAMILY);
 	if (IS_ERR(msg))
 		return PTR_ERR(msg);
@@ -967,7 +967,7 @@ problem:
 
 subsys_initcall(genl_init);
 
-static int genlmsg_mcast(struct sk_buff *skb, u32 pid, unsigned long group,
+static int genlmsg_mcast(struct sk_buff *skb, u32 portid, unsigned long group,
 			 gfp_t flags)
 {
 	struct sk_buff *tmp;
@@ -982,7 +982,7 @@ static int genlmsg_mcast(struct sk_buff *skb, u32 pid, unsigned long group,
 				goto error;
 			}
 			err = nlmsg_multicast(prev->genl_sock, tmp,
-					      pid, group, flags);
+					      portid, group, flags);
 			if (err)
 				goto error;
 		}
@@ -990,20 +990,20 @@ static int genlmsg_mcast(struct sk_buff *skb, u32 pid, unsigned long group,
 		prev = net;
 	}
 
-	return nlmsg_multicast(prev->genl_sock, skb, pid, group, flags);
+	return nlmsg_multicast(prev->genl_sock, skb, portid, group, flags);
  error:
 	kfree_skb(skb);
 	return err;
 }
 
-int genlmsg_multicast_allns(struct sk_buff *skb, u32 pid, unsigned int group,
+int genlmsg_multicast_allns(struct sk_buff *skb, u32 portid, unsigned int group,
 			    gfp_t flags)
 {
-	return genlmsg_mcast(skb, pid, group, flags);
+	return genlmsg_mcast(skb, portid, group, flags);
 }
 EXPORT_SYMBOL(genlmsg_multicast_allns);
 
-void genl_notify(struct sk_buff *skb, struct net *net, u32 pid, u32 group,
+void genl_notify(struct sk_buff *skb, struct net *net, u32 portid, u32 group,
 		 struct nlmsghdr *nlh, gfp_t flags)
 {
 	struct sock *sk = net->genl_sock;
@@ -1012,6 +1012,6 @@ void genl_notify(struct sk_buff *skb, struct net *net, u32 pid, u32 group,
 	if (nlh)
 		report = nlmsg_report(nlh);
 
-	nlmsg_notify(sk, skb, pid, group, report, flags);
+	nlmsg_notify(sk, skb, portid, group, report, flags);
 }
 EXPORT_SYMBOL(genl_notify);

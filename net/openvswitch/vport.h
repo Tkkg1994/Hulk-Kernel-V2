@@ -70,7 +70,7 @@ struct vport_err_stats {
  * @port_no: Index into @dp's @ports array.
  * @dp: Datapath to which this port belongs.
  * @node: Element in @dp's @port_list.
- * @upcall_pid: The Netlink port to use for packets received on this port that
+ * @upcall_portid: The Netlink port to use for packets received on this port that
  * miss the flow table.
  * @hash_node: Element in @dev_table hash table in vport.c.
  * @ops: Class structure.
@@ -83,7 +83,7 @@ struct vport {
 	u16 port_no;
 	struct datapath	*dp;
 	struct list_head node;
-	u32 upcall_pid;
+	u32 upcall_portid;
 
 	struct hlist_node hash_node;
 	const struct vport_ops *ops;
@@ -112,7 +112,7 @@ struct vport_parms {
 	/* For ovs_vport_alloc(). */
 	struct datapath *dp;
 	u16 port_no;
-	u32 upcall_pid;
+	u32 upcall_portid;
 };
 
 /**

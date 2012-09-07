@@ -121,7 +121,7 @@ struct vport *ovs_vport_alloc(int priv_size, const struct vport_ops *ops,
 
 	vport->dp = parms->dp;
 	vport->port_no = parms->port_no;
-	vport->upcall_pid = parms->upcall_pid;
+	vport->upcall_portid = parms->upcall_portid;
 	vport->ops = ops;
 
 	vport->percpu_stats = alloc_percpu(struct vport_percpu_stats);
