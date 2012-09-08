@@ -161,7 +161,7 @@ static int __init mcapi_init(void)
 					    &cfg);
 #elif defined MC_NETLINK_COMPAT
 	mod_ctx->sk = netlink_kernel_create(&init_net, MC_DAEMON_NETLINK,
-					    THIS_MODULE, &cfg);
+					    &cfg);
 #else
 	/* start kernel thread */
 	mod_ctx->sk = netlink_kernel_create(&init_net, MC_DAEMON_NETLINK, 0,
