@@ -1075,5 +1075,6 @@ config CRYPTO_USER_API_SKCIPHER
 	  key cipher algorithms.
 
 source "drivers/crypto/Kconfig"
+source crypto/asymmetric_keys/Kconfig
 
 endif	# if CRYPTO
