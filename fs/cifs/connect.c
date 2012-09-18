@@ -1702,6 +1702,10 @@ cifs_parse_mount_options(const char *mountdata, const char *devname,
 			if (string == NULL)
 				goto out_nomem;
 
+			/*
+			 * FIXME: since we now cork/uncork the socket while
+			 * 	  sending, should we deprecate this option?
+			 */
 			if (strnicmp(string, "TCP_NODELAY", 11) == 0)
 				vol->sockopt_tcp_nodelay = 1;
 			break;
