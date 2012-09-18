@@ -3,7 +3,7 @@
 # SDIO Basic feature
 #####################
 
-DHDCFLAGS = -Wall -Wstrict-prototypes -Dlinux -DLINUX -DBCMDRIVER             \
+DHDCFLAGS = -Wall -Wstrict-prototypes -Dlinux -DLINUX -DBCMDRIVER	      \
         -DBCMDONGLEHOST -DUNRELEASEDCHIP -DBCMDMA32 -DBCMFILEIMAGE            \
         -DDHDTHREAD -DBDC -DOOB_INTR_ONLY                                     \
         -DDHD_BCMEVENTS -DSHOW_EVENTS -DBCMDBG                                \
@@ -62,7 +62,8 @@ DHDCFLAGS += -DDISABLE_11H_SOFTAP
 DHDCFLAGS += -DSUPPORT_PM2_ONLY
 DHDCFLAGS += -DSUPPORT_DEEP_SLEEP
 DHDCFLAGS += -DSUPPORT_AMPDU_MPDU_CMD
-DHDCFLAGS += -DBLOCK_IPV6_PACKET -DPASS_IPV4_SUSPEND
+DHDCFLAGS += -DBLOCK_IPV6_PACKET
+DHDCFLAGS += -DPASS_IPV4_SUSPEND
 
 # For special PNO Event keep wake lock for 10sec
 DHDCFLAGS += -DCUSTOM_PNO_EVENT_LOCK_xTIME=10
