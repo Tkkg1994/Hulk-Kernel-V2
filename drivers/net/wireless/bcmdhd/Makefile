@@ -3,7 +3,7 @@
 # SDIO Basic feature
 #####################
 
-DHDCFLAGS += -Wall -Wstrict-prototypes -Dlinux -DLINUX -DBCMDRIVER             \
+DHDCFLAGS += -Wall -Wstrict-prototypes -Dlinux -DLINUX -DBCMDRIVER            \
         -DBCMDONGLEHOST -DUNRELEASEDCHIP -DBCMDMA32 -DBCMFILEIMAGE            \
         -DDHDTHREAD -DBDC -DOOB_INTR_ONLY                                     \
         -DDHD_BCMEVENTS -DSHOW_EVENTS -DBCMDBG                                \
@@ -63,7 +63,7 @@ DHDCFLAGS += -DSUPPORT_PM2_ONLY
 # DHDCFLAGS += -DSUPPORT_DEEP_SLEEP
 DHDCFLAGS += -DSUPPORT_AMPDU_MPDU_CMD
 DHDCFLAGS += -DBLOCK_IPV6_PACKET 
-# DHDCFLAGS += -DPASS_IPV4_SUSPEND
+DHDCFLAGS += -DPASS_IPV4_SUSPEND
 DHDCFLAGS += -DSOFTAP_SEND_HANGEVT
 
 # For special PNO Event keep wake lock for 10sec
@@ -111,7 +111,9 @@ DHDCFLAGS += -DWAIT_DEQUEUE
 DHDCFLAGS += -DCONFIG_CONTROL_PM
 
 # Use Android wake lock mechanism
-# DHDCFLAGS += -DCONFIG_HAS_WAKELOCK
+ifeq ($(CONFIG_HAS_WAKELOCK),)
+DHDCFLAGS += -DCONFIG_HAS_WAKELOCK
+endif
 
 # idle count
 DHDCFLAGS += -DDHD_USE_IDLECOUNT
