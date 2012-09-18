@@ -2523,6 +2523,9 @@ static int
 cifs_retry_async_readv(struct cifs_readdata *rdata)
 {
 	int rc;
+	struct TCP_Server_Info *server;
+
+	server = tlink_tcon(rdata->cfile->tlink)->ses->server;
 
 	do {
 		if (rdata->cfile->invalidHandle) {
@@ -2530,7 +2533,7 @@ cifs_retry_async_readv(struct cifs_readdata *rdata)
 			if (rc != 0)
 				continue;
 		}
-		rc = cifs_async_readv(rdata);
+		rc = server->ops->async_readv(rdata);
 	} while (rc == -EAGAIN);
 
 	return rc;
@@ -2681,6 +2684,9 @@ cifs_iovec_read(struct file *file, const struct iovec *iov,
 	cifs_sb = CIFS_SB(file->f_path.dentry->d_sb);
 	open_file = file->private_data;
 	tcon = tlink_tcon(open_file->tlink);
+
+	if (!tcon->ses->server->ops->async_readv)
+		return -ENOSYS;
 
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_RWPIDFORWARD)
 		pid = open_file->pid;
