@@ -295,7 +295,7 @@ int cifs_get_file_info_unix(struct file *filp)
 	struct cifs_tcon *tcon = tlink_tcon(cfile->tlink);
 
 	xid = get_xid();
-	rc = CIFSSMBUnixQFileInfo(xid, tcon, cfile->netfid, &find_data);
+	rc = CIFSSMBUnixQFileInfo(xid, tcon, cfile->fid.netfid, &find_data);
 	if (!rc) {
 		cifs_unix_basic_to_fattr(&fattr, &find_data, cifs_sb);
 	} else if (rc == -EREMOTE) {
@@ -568,7 +568,7 @@ int cifs_get_file_info(struct file *filp)
 	struct cifs_tcon *tcon = tlink_tcon(cfile->tlink);
 
 	xid = get_xid();
-	rc = CIFSSMBQFileInfo(xid, tcon, cfile->netfid, &find_data);
+	rc = CIFSSMBQFileInfo(xid, tcon, cfile->fid.netfid, &find_data);
 	switch (rc) {
 	case 0:
 		cifs_all_info_to_fattr(&fattr, &find_data, cifs_sb, false);
@@ -935,7 +935,7 @@ cifs_set_file_info(struct inode *inode, struct iattr *attrs, unsigned int xid,
 	 */
 	open_file = find_writable_file(cifsInode, true);
 	if (open_file) {
-		netfid = open_file->netfid;
+		netfid = open_file->fid.netfid;
 		netpid = open_file->pid;
 		pTcon = tlink_tcon(open_file->tlink);
 		goto set_via_filehandle;
@@ -1898,7 +1898,7 @@ cifs_set_file_size(struct inode *inode, struct iattr *attrs,
 	 */
 	open_file = find_writable_file(cifsInode, true);
 	if (open_file) {
-		__u16 nfid = open_file->netfid;
+		__u16 nfid = open_file->fid.netfid;
 		__u32 npid = open_file->pid;
 		pTcon = tlink_tcon(open_file->tlink);
 		rc = CIFSSMBSetFileSize(xid, pTcon, attrs->ia_size, nfid,
@@ -2072,7 +2072,7 @@ cifs_setattr_unix(struct dentry *direntry, struct iattr *attrs)
 	args->device = 0;
 	open_file = find_writable_file(cifsInode, true);
 	if (open_file) {
-		u16 nfid = open_file->netfid;
+		u16 nfid = open_file->fid.netfid;
 		u32 npid = open_file->pid;
 		pTcon = tlink_tcon(open_file->tlink);
 		rc = CIFSSMBUnixSetFileInfo(xid, pTcon, args, nfid, npid);
