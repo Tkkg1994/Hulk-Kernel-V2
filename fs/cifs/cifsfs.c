@@ -88,10 +88,6 @@ extern mempool_t *cifs_mid_poolp;
 
 struct workqueue_struct	*cifsiod_wq;
 
-#ifdef CONFIG_HIGHMEM
-DEFINE_MUTEX(cifs_kmap_mutex);
-#endif
-
 /*
  * Bumps refcount for cifs super block.
  * Note that it should be only called if a referece to VFS super block is
