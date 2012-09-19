@@ -290,8 +290,6 @@ cifs_new_fileinfo(struct cifs_fid *fid, struct file *file,
 	return cfile;
 }
 
-static void cifs_del_lock_waiters(struct cifsLockInfo *lock);
-
 struct cifsFileInfo *
 cifsFileInfo_get(struct cifsFileInfo *cifs_file)
 {
@@ -700,7 +698,7 @@ cifs_lock_init(__u64 offset, __u64 length, __u8 type)
 	return lock;
 }
 
-static void
+void
 cifs_del_lock_waiters(struct cifsLockInfo *lock)
 {
 	struct cifsLockInfo *li, *tmp;
@@ -1233,7 +1231,7 @@ cifs_getlk(struct file *file, struct file_lock *flock, __u32 type,
 	return 0;
 }
 
-static void
+void
 cifs_move_llist(struct list_head *source, struct list_head *dest)
 {
 	struct list_head *li, *tmp;
@@ -1241,7 +1239,7 @@ cifs_move_llist(struct list_head *source, struct list_head *dest)
 		list_move(li, dest);
 }
 
-static void
+void
 cifs_free_llist(struct list_head *llist)
 {
 	struct cifsLockInfo *li, *tmp;
