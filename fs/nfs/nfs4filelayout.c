@@ -452,7 +452,7 @@ static void filelayout_commit_release(void *calldata)
 	struct nfs_commit_data *data = calldata;
 
 	data->completion_ops->completion(data);
-	put_lseg(data->lseg);
+	pnfs_put_lseg(data->lseg);
 	nfs_put_client(data->ds_clp);
 	nfs_commitdata_release(data);
 }
@@ -930,7 +930,7 @@ filelayout_pg_init_write(struct nfs_pageio_descriptor *pgio,
 	nfs_init_cinfo(&cinfo, pgio->pg_inode, pgio->pg_dreq);
 	status = filelayout_alloc_commit_info(pgio->pg_lseg, &cinfo, GFP_NOFS);
 	if (status < 0) {
-		put_lseg(pgio->pg_lseg);
+		pnfs_put_lseg(pgio->pg_lseg);
 		pgio->pg_lseg = NULL;
 		goto out_mds;
 	}
@@ -984,7 +984,7 @@ filelayout_clear_request_commit(struct nfs_page *req,
 out:
 	nfs_request_remove_commit_list(req, cinfo);
 	spin_unlock(cinfo->lock);
-	put_lseg(freeme);
+	pnfs_put_lseg(freeme);
 }
 
 static struct list_head *
@@ -1017,7 +1017,7 @@ filelayout_choose_commit_list(struct nfs_page *req,
 		 * off due to a rewrite, in which case it will be done in
 		 * filelayout_clear_request_commit
 		 */
-		buckets[i].wlseg = get_lseg(lseg);
+		buckets[i].wlseg = pnfs_get_lseg(lseg);
 	}
 	set_bit(PG_COMMIT_TO_DS, &req->wb_flags);
 	cinfo->ds->nwritten++;
@@ -1127,7 +1127,7 @@ filelayout_scan_ds_commit_list(struct pnfs_commit_bucket *bucket,
 		if (list_empty(src))
 			bucket->wlseg = NULL;
 		else
-			get_lseg(bucket->clseg);
+			pnfs_get_lseg(bucket->clseg);
 	}
 	return ret;
 }
@@ -1158,12 +1158,12 @@ static void filelayout_recover_commit_reqs(struct list_head *dst,
 
 	/* NOTE cinfo->lock is NOT held, relying on fact that this is
 	 * only called on single thread per dreq.
-	 * Can't take the lock because need to do put_lseg
+	 * Can't take the lock because need to do pnfs_put_lseg
 	 */
 	for (i = 0, b = cinfo->ds->buckets; i < cinfo->ds->nbuckets; i++, b++) {
 		if (transfer_commit_list(&b->written, dst, cinfo, 0)) {
 			BUG_ON(!list_empty(&b->written));
-			put_lseg(b->wlseg);
+			pnfs_put_lseg(b->wlseg);
 			b->wlseg = NULL;
 		}
 	}
@@ -1199,7 +1199,7 @@ alloc_ds_commits(struct nfs_commit_info *cinfo, struct list_head *list)
 		if (list_empty(&bucket->committing))
 			continue;
 		nfs_retry_commit(&bucket->committing, bucket->clseg, cinfo);
-		put_lseg(bucket->clseg);
+		pnfs_put_lseg(bucket->clseg);
 		bucket->clseg = NULL;
 	}
 	/* Caller will clean up entries put on list */
