@@ -247,6 +247,7 @@ cifs_new_fileinfo(struct cifs_fid *fid, struct file *file,
 	struct cifsInodeInfo *cinode = CIFS_I(inode);
 	struct cifsFileInfo *cfile;
 	struct cifs_fid_locks *fdlocks;
+	struct cifs_tcon *tcon = tlink_tcon(tlink);
 
 	cfile = kzalloc(sizeof(struct cifsFileInfo), GFP_KERNEL);
 	if (cfile == NULL)
@@ -274,12 +275,17 @@ cifs_new_fileinfo(struct cifs_fid *fid, struct file *file,
 	cfile->tlink = cifs_get_tlink(tlink);
 	INIT_WORK(&cfile->oplock_break, cifs_oplock_break);
 	mutex_init(&cfile->fh_mutex);
-	tlink_tcon(tlink)->ses->server->ops->set_fid(cfile, fid, oplock);
 
 	cifs_sb_active(inode->i_sb);
 
 	spin_lock(&cifs_file_list_lock);
-	list_add(&cfile->tlist, &(tlink_tcon(tlink)->openFileList));
+	if (fid->pending_open->oplock != CIFS_OPLOCK_NO_CHANGE)
+		oplock = fid->pending_open->oplock;
+	list_del(&fid->pending_open->olist);
+
+	tlink_tcon(tlink)->ses->server->ops->set_fid(cfile, fid, oplock);
+
+	list_add(&cfile->tlist, &tcon->openFileList);
 	/* if readable file instance put first in list*/
 	if (file->f_mode & FMODE_READ)
 		list_add(&cfile->flist, &cinode->openFileList);
@@ -309,16 +315,25 @@ void cifsFileInfo_put(struct cifsFileInfo *cifs_file)
 {
 	struct inode *inode = cifs_file->dentry->d_inode;
 	struct cifs_tcon *tcon = tlink_tcon(cifs_file->tlink);
+	struct TCP_Server_Info *server = tcon->ses->server;
 	struct cifsInodeInfo *cifsi = CIFS_I(inode);
 	struct super_block *sb = inode->i_sb;
 	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
 	struct cifsLockInfo *li, *tmp;
+	struct cifs_fid fid;
+	struct cifs_pending_open open;
 
 	spin_lock(&cifs_file_list_lock);
 	if (--cifs_file->count > 0) {
 		spin_unlock(&cifs_file_list_lock);
 		return;
 	}
+
+	if (server->ops->get_lease_key)
+		server->ops->get_lease_key(inode, &fid);
+
+	/* store open in pending opens to make sure we don't miss lease break */
+	cifs_add_pending_open_locked(&fid, cifs_file->tlink, &open);
 
 	/* remove it from the lists */
 	list_del(&cifs_file->flist);
@@ -351,6 +366,8 @@ void cifsFileInfo_put(struct cifsFileInfo *cifs_file)
 		free_xid(xid);
 	}
 
+	cifs_del_pending_open(&open);
+
 	/*
 	 * Delete any outstanding lock records. We'll lose them when the file
 	 * is closed anyway.
@@ -372,6 +389,7 @@ void cifsFileInfo_put(struct cifsFileInfo *cifs_file)
 }
 
 int cifs_open(struct inode *inode, struct file *file)
+
 {
 	int rc = -EACCES;
 	unsigned int xid;
@@ -384,6 +402,7 @@ int cifs_open(struct inode *inode, struct file *file)
 	char *full_path = NULL;
 	bool posix_open_ok = false;
 	struct cifs_fid fid;
+	struct cifs_pending_open open;
 
 	xid = get_xid();
 
@@ -405,7 +424,7 @@ int cifs_open(struct inode *inode, struct file *file)
 	cFYI(1, "inode = 0x%p file flags are 0x%x for %s",
 		 inode, file->f_flags, full_path);
 
-	if (tcon->ses->server->oplocks)
+	if (server->oplocks)
 		oplock = REQ_OPLOCK;
 	else
 		oplock = 0;
@@ -438,20 +457,28 @@ int cifs_open(struct inode *inode, struct file *file)
 		 */
 	}
 
+	if (server->ops->get_lease_key)
+		server->ops->get_lease_key(inode, &fid);
+
+	cifs_add_pending_open(&fid, tlink, &open);
+
 	if (!posix_open_ok) {
 		if (server->ops->get_lease_key)
 			server->ops->get_lease_key(inode, &fid);
 
 		rc = cifs_nt_open(full_path, inode, cifs_sb, tcon,
 				  file->f_flags, &oplock, &fid, xid);
-		if (rc)
+		if (rc) {
+			cifs_del_pending_open(&open);
 			goto out;
+		}
 	}
 
 	cfile = cifs_new_fileinfo(&fid, file, tlink, oplock);
 	if (cfile == NULL) {
 		if (server->ops->close)
 			server->ops->close(xid, tcon, &fid);
+		cifs_del_pending_open(&open);
 		rc = -ENOMEM;
 		goto out;
 	}
