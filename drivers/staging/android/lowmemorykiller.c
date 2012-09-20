@@ -162,6 +162,22 @@ static struct task_struct *pick_first_task(void);
 static struct task_struct *pick_last_task(void);
 #endif
 
+static int test_task_flag(struct task_struct *p, int flag)
+{
+	struct task_struct *t = p;
+
+	do {
+		task_lock(t);
+		if (test_tsk_thread_flag(t, flag)) {
+			task_unlock(t);
+			return 1;
+		}
+		task_unlock(t);
+	} while_each_thread(p, t);
+
+	return 0;
+}
+
 static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 {
 	struct task_struct *tsk;
@@ -260,17 +276,17 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		if (tsk->flags & PF_KTHREAD)
 			continue;
 
+		if (time_before_eq(jiffies, lowmem_deathpending_timeout)) {
+			if (test_task_flag(tsk, TIF_MEMDIE)) {
+				read_unlock(&tasklist_lock);
+				return 0;
+			}
+		}
+
 		p = find_lock_task_mm(tsk);
 		if (!p)
 			continue;
 
-		if (test_tsk_thread_flag(p, TIF_MEMDIE) &&
-			time_before_eq(jiffies, lowmem_deathpending_timeout)) {
-				task_unlock(p);
-				read_unlock(&tasklist_lock);
-				return 0;
-		}
-		
 		oom_score_adj = p->signal->oom_score_adj;
 		if (oom_score_adj < min_score_adj) {
 			task_unlock(p);
