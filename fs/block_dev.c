@@ -599,7 +599,7 @@ static struct block_device *bd_acquire(struct inode *inode)
 		if (!inode->i_bdev) {
 			/*
 			 * We take an additional reference to bd_inode,
-			 * and it's released in end_writeback() of inode.
+			 * and it's released in clear_inode() of inode.
 			 * So, we can access it via ->i_mapping always
 			 * without igrab().
 			 */
@@ -1568,39 +1568,6 @@ static ssize_t blkdev_aio_read(struct kiocb *iocb, const struct iovec *iov,
 	return generic_file_aio_read(iocb, iov, nr_segs, pos);
 }
 
-static ssize_t blkdev_splice_read(struct file *file, loff_t *ppos,
-				  struct pipe_inode_info *pipe, size_t len,
-				  unsigned int flags)
-{
-	ssize_t ret;
-	struct block_device *bdev = I_BDEV(file->f_mapping->host);
-
-	percpu_down_read(&bdev->bd_block_size_semaphore);
-
-	ret = generic_file_splice_read(file, ppos, pipe, len, flags);
-
-	percpu_up_read(&bdev->bd_block_size_semaphore);
-
-	return ret;
-}
-
-static ssize_t blkdev_splice_write(struct pipe_inode_info *pipe,
-				   struct file *file, loff_t *ppos, size_t len,
-				   unsigned int flags)
-{
-	ssize_t ret;
-	struct block_device *bdev = I_BDEV(file->f_mapping->host);
-
-	percpu_down_read(&bdev->bd_block_size_semaphore);
-
-	ret = generic_file_splice_write(pipe, file, ppos, len, flags);
-
-	percpu_up_read(&bdev->bd_block_size_semaphore);
-
-	return ret;
-}
-
-
 /*
  * Try to release a page associated with block device when the system
  * is under memory pressure.
@@ -1639,8 +1606,8 @@ const struct file_operations def_blk_fops = {
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= compat_blkdev_ioctl,
 #endif
-	.splice_read	= blkdev_splice_read,
-	.splice_write	= blkdev_splice_write,
+	.splice_read	= generic_file_splice_read,
+	.splice_write	= generic_file_splice_write,
 };
 
 int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
@@ -1753,4 +1720,3 @@ void iterate_bdevs(void (*func)(struct block_device *, void *), void *arg)
 	spin_unlock(&inode_sb_list_lock);
 	iput(old_inode);
 }
-

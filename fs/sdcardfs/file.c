@@ -143,7 +143,6 @@ static int sdcardfs_mmap(struct file *file, struct vm_area_struct *vma)
 	bool willwrite;
 	struct file *lower_file;
 	const struct vm_operations_struct *saved_vm_ops = NULL;
-
 	/* this might be deferred to mmap's writepage */
 	willwrite = ((vma->vm_flags | VM_SHARED | VM_WRITE) == vma->vm_flags);
 
@@ -191,7 +190,9 @@ static int sdcardfs_mmap(struct file *file, struct vm_area_struct *vma)
 	 */
 	file_accessed(file);
 	vma->vm_ops = &sdcardfs_vm_ops;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
 	vma->vm_flags |= VM_CAN_NONLINEAR;
+#endif
 
 	file->f_mapping->a_ops = &sdcardfs_aops; /* set our aops */
 	if (!SDCARDFS_F(file)->lower_vm_ops) /* save for our ->fault */

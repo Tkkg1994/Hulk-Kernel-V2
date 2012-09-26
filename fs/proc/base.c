@@ -882,7 +882,7 @@ static const struct file_operations proc_environ_operations = {
 static ssize_t oom_adj_read(struct file *file, char __user *buf, size_t count,
 			    loff_t *ppos)
 {
-	struct task_struct *task = get_proc_task(file->f_path.dentry->d_inode);
+	struct task_struct *task = get_proc_task(file_inode(file));
 	char buffer[PROC_NUMBUF];
 	int oom_adj = OOM_ADJUST_MIN;
 	size_t len;
@@ -929,7 +929,7 @@ static ssize_t oom_adj_write(struct file *file, const char __user *buf,
 		goto out;
 	}
 
-	task = get_proc_task(file->f_path.dentry->d_inode);
+	task = get_proc_task(file_inode(file));
 	if (!task) {
 		err = -ESRCH;
 		goto out;
@@ -969,9 +969,11 @@ static ssize_t oom_adj_write(struct file *file, const char __user *buf,
 		  current->comm, task_pid_nr(current), task_pid_nr(task),
 		  task_pid_nr(task));
 
-	task->signal->oom_score_adj = oom_adj;
 #ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
 	delete_from_adj_tree(task);
+#endif
+	task->signal->oom_score_adj = oom_adj;
+#ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
 	add_2_adj_tree(task);
 #endif
 	trace_oom_score_adj_update(task);
@@ -983,6 +985,35 @@ err_task_lock:
 out:
 	return err < 0 ? err : count;
 }
+
+static int oom_adjust_permission(struct inode *inode, int mask)
+{
+	uid_t uid;
+	struct task_struct *p;
+
+	p = get_proc_task(inode);
+	if(p) {
+		uid = task_uid(p);
+		put_task_struct(p);
+	}
+
+	/*
+	 * System Server (uid == 1000) is granted access to oom_adj of all 
+	 * android applications (uid > 10000) as and services (uid >= 1000)
+	 */
+	if (p && (current_fsuid() == 1000) && (uid >= 1000)) {
+		if (inode->i_mode >> 6 & mask) {
+			return 0;
+		}
+	}
+
+	/* Fall back to default. */
+	return generic_permission(inode, mask);
+}
+
+static const struct inode_operations proc_oom_adj_inode_operations = {
+	.permission	= oom_adjust_permission,
+};
 
 static const struct file_operations proc_oom_adj_operations = {
 	.read		= oom_adj_read,
@@ -1051,38 +1082,9 @@ out:
 }
 #endif
 
-static int oom_adjust_permission(struct inode *inode, int mask)
-{
-	uid_t uid;
-	struct task_struct *p;
-
-	p = get_proc_task(inode);
-	if(p) {
-		uid = task_uid(p);
-		put_task_struct(p);
-	}
-
-	/*
-	 * System Server (uid == 1000) is granted access to oom_adj of all 
-	 * android applications (uid > 10000) as and services (uid >= 1000)
-	 */
-	if (p && (current_fsuid() == 1000) && (uid >= 1000)) {
-		if (inode->i_mode >> 6 & mask) {
-			return 0;
-		}
-	}
-
-	/* Fall back to default. */
-	return generic_permission(inode, mask);
-}
-
-static const struct inode_operations proc_oom_adjust_inode_operations = {
-	.permission	= oom_adjust_permission,
-};
-
 static const struct file_operations proc_oom_adjust_operations = {
-	.read		= oom_adjust_read,
-	.write		= oom_adjust_write,
+	.read		= oom_adj_read,
+	.write		= oom_adj_write,
 	.llseek		= generic_file_llseek,
 };
 
@@ -1162,11 +1164,14 @@ static ssize_t oom_score_adj_write(struct file *file, const char __user *buf,
 		goto err_sighand;
 	}
 
-	task->signal->oom_score_adj = oom_score_adj;
 #ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
 	delete_from_adj_tree(task);
+#endif
+	task->signal->oom_score_adj = (short)oom_score_adj;
+#ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
 	add_2_adj_tree(task);
 #endif
+
 	if (has_capability_noaudit(current, CAP_SYS_RESOURCE))
 		task->signal->oom_score_adj_min = oom_score_adj;
 	trace_oom_score_adj_update(task);
@@ -2607,7 +2612,7 @@ static const struct pid_entry tgid_base_stuff[] = {
 #endif
 	INF("oom_score",  S_IRUGO, proc_oom_score),
 	REG("oom_adj",    S_IRUGO|S_IWUSR, proc_oom_adj_operations),
-	REG("oom_score_adj", S_IRUGO|S_IWUSR, proc_oom_score_adj_operations),
+	ANDROID("oom_adj", S_IRUGO|S_IWUSR, oom_adj),
 #ifdef CONFIG_SAMP_HOTNESS
 	REG("hotness_adj", S_IWUGO, proc_hotness_adjust_operations),
 #endif
