@@ -2313,7 +2313,7 @@ int orderly_poweroff(bool force)
 		goto out;
 	}
 
-	ret = call_usermodehelper_fns(argv[0], argv, envp, UMH_NO_WAIT,
+	ret = call_usermodehelper_fns(argv[0], argv, envp, UMH_WAIT_EXEC,
 				      NULL, argv_cleanup, NULL);
 out:
 	if (likely(!ret))
