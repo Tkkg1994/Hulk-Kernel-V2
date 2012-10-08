@@ -3626,7 +3626,6 @@ int zone_reclaim(struct zone *zone, gfp_t gfp_mask, unsigned int order)
 /*
  * page_evictable - test whether a page is evictable
  * @page: the page to test
- * @vma: the VMA in which the page is or will be mapped, may be NULL
  *
  * Test whether page is evictable--i.e., should be placed on active/inactive
  * lists vs unevictable list.
