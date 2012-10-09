@@ -239,6 +239,7 @@ struct power_supply {
 	struct wake_lock work_wake_lock;
 #ifdef CONFIG_THERMAL
 	struct thermal_zone_device *tzd;
+	struct thermal_cooling_device *tcd;
 #endif
 
 #ifdef CONFIG_LEDS_TRIGGERS
