@@ -37,6 +37,7 @@
 #include <linux/notifier.h>
 #include <linux/suspend.h>
 #include <linux/rwsem.h>
+#include <linux/ptrace.h>
 #include <asm/uaccess.h>
 
 #include <trace/events/module.h>
@@ -214,6 +215,8 @@ static int ____call_usermodehelper(void *data)
 	retval = kernel_execve(sub_info->path,
 			       (const char *const *)sub_info->argv,
 			       (const char *const *)sub_info->envp);
+	if (!retval)
+		return 0;
 
 	/* Exec failed? */
 fail:
