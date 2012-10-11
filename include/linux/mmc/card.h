@@ -263,6 +263,16 @@ struct mmc_part {
 #define MMC_BLK_DATA_AREA_GP	(1<<2)
 };
 
+#define BKOPS_NUM_OF_SEVERITY_LEVELS	3
+struct mmc_bkops_stats {
+	spinlock_t		lock;
+	bool			enabled;
+	unsigned int		hpi;    /* hpi issued   */
+	unsigned int		suspend;/* card sleed issued */
+	bool			print_stats;
+	unsigned int bkops_level[BKOPS_NUM_OF_SEVERITY_LEVELS];
+};
+
 /**
  * struct mmc_bkops_info - BKOPS data
  * @dw:	Idle time bkops delayed work
@@ -286,6 +296,7 @@ struct mmc_bkops_info {
 	unsigned int		delay_ms;
 	unsigned int		min_sectors_to_queue_delayed_work;
 	unsigned int		size_percentage_to_queue_delayed_work;
+	struct mmc_bkops_stats  bkops_stats;    /* BKOPS statistics */
 /*
  * A default time for checking the need for non urgent BKOPS once mmcqd
  * is idle.
