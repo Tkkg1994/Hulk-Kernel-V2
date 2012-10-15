@@ -21,6 +21,7 @@
 #include <linux/ftrace_event.h>
 #include <linux/init.h>
 #include <linux/kallsyms.h>
+#include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/sysfs.h>
 #include <linux/kernel.h>
@@ -2652,18 +2653,17 @@ static inline void kmemleak_load_module(const struct module *mod,
 #endif
 
 #ifdef CONFIG_MODULE_SIG
-static int module_sig_check(struct load_info *info,
-			    const void *mod, unsigned long *_len)
+static int module_sig_check(struct load_info *info)
 {
 	int err = -ENOKEY;
-	unsigned long markerlen = sizeof(MODULE_SIG_STRING) - 1;
-	unsigned long len = *_len;
+	const unsigned long markerlen = sizeof(MODULE_SIG_STRING) - 1;
+	const void *mod = info->hdr;
 
-	if (len > markerlen &&
-	    memcmp(mod + len - markerlen, MODULE_SIG_STRING, markerlen) == 0) {
+	if (info->len > markerlen &&
+	    memcmp(mod + info->len - markerlen, MODULE_SIG_STRING, markerlen) == 0) {
 		/* We truncate the module to discard the signature */
-		*_len -= markerlen;
-		err = mod_verify_sig(mod, _len);
+		info->len -= markerlen;
+		err = mod_verify_sig(mod, &info->len);
 	}
 
 	if (!err) {
@@ -2681,51 +2681,78 @@ static int module_sig_check(struct load_info *info,
 	return err;
 }
 #else /* !CONFIG_MODULE_SIG */
-static int module_sig_check(struct load_info *info,
-			    void *mod, unsigned long *len)
+static int module_sig_check(struct load_info *info)
 {
 	return 0;
 }
 #endif /* !CONFIG_MODULE_SIG */
 
-/* Sets info->hdr, info->len and info->sig_ok. */
-static int copy_and_check(struct load_info *info,
-			  const void __user *umod, unsigned long len,
-			  const char __user *uargs)
+/* Sanity checks against invalid binaries, wrong arch, weird elf version. */
+static int elf_header_check(struct load_info *info)
 {
-	int err;
-	Elf_Ehdr *hdr;
+	if (info->len < sizeof(*(info->hdr)))
+		return -ENOEXEC;
 
-	if (len < sizeof(*hdr))
+	if (memcmp(info->hdr->e_ident, ELFMAG, SELFMAG) != 0
+	    || info->hdr->e_type != ET_REL
+	    || !elf_check_arch(info->hdr)
+	    || info->hdr->e_shentsize != sizeof(Elf_Shdr))
+		return -ENOEXEC;
+
+	if (info->hdr->e_shoff >= info->len
+	    || (info->hdr->e_shnum * sizeof(Elf_Shdr) >
+		info->len - info->hdr->e_shoff))
+		return -ENOEXEC;
+
+	return 0;
+}
+
+/* Sets info->hdr and info->len. */
+static int copy_module_from_user(const void __user *umod, unsigned long len,
+				  struct load_info *info)
+{
+	info->len = len;
+	if (info->len < sizeof(*(info->hdr)))
 		return -ENOEXEC;
 
 	/* Suck in entire file: we'll want most of it. */
-	if ((hdr = vmalloc(len)) == NULL)
+	info->hdr = vmalloc(info->len);
+	if (!info->hdr)
 		return -ENOMEM;
 
-	if (copy_from_user(hdr, umod, len) != 0) {
-		err = -EFAULT;
-		goto free_hdr;
+	if (copy_from_user(info->hdr, umod, info->len) != 0) {
+		vfree(info->hdr);
+		return -EFAULT;
 	}
 
-	err = module_sig_check(info, hdr, &len);
+	return 0;
+}
+
+/* Sets info->hdr and info->len. */
+static int copy_module_from_fd(int fd, struct load_info *info)
+{
+	struct file *file;
+	int err;
+	struct kstat stat;
+	loff_t pos;
+	ssize_t bytes = 0;
+
+	file = fget(fd);
+	if (!file)
+		return -ENOEXEC;
+
+	err = vfs_getattr(file->f_vfsmnt, file->f_dentry, &stat);
 	if (err)
-		goto free_hdr;
+		goto out;
 
-	/* Sanity checks against insmoding binaries or wrong arch,
-	   weird elf version */
-	if (memcmp(hdr->e_ident, ELFMAG, SELFMAG) != 0
-	    || hdr->e_type != ET_REL
-	    || !elf_check_arch(hdr)
-	    || hdr->e_shentsize != sizeof(Elf_Shdr)) {
-		err = -ENOEXEC;
-		goto free_hdr;
+	if (stat.size > INT_MAX) {
+		err = -EFBIG;
+		goto out;
 	}
-
-	if (hdr->e_shoff >= len ||
-	    hdr->e_shnum * sizeof(Elf_Shdr) > len - hdr->e_shoff) {
-		err = -ENOEXEC;
-		goto free_hdr;
+	info->hdr = vmalloc(stat.size);
+	if (!info->hdr) {
+		err = -ENOMEM;
+		goto out;
 	}
 
 #ifdef TIMA_LKM_AUTH_ENABLED
@@ -2738,12 +2765,23 @@ static int copy_and_check(struct load_info *info,
 	}
 #endif
 
-	info->hdr = hdr;
-	info->len = len;
-	return 0;
+	pos = 0;
+	while (pos < stat.size) {
+		bytes = kernel_read(file, pos, (char *)(info->hdr) + pos,
+				    stat.size - pos);
+		if (bytes < 0) {
+			vfree(info->hdr);
+			err = bytes;
+			goto out;
+		}
+		if (bytes == 0)
+			break;
+		pos += bytes;
+	}
+	info->len = pos;
 
-free_hdr:
-	vfree(hdr);
+out:
+	fput(file);
 	return err;
 }
 
@@ -3182,33 +3220,123 @@ static bool finished_loading(const char *name)
 	return ret;
 }
 
+/* Call module constructors. */
+static void do_mod_ctors(struct module *mod)
+{
+#ifdef CONFIG_CONSTRUCTORS
+	unsigned long i;
+
+	for (i = 0; i < mod->num_ctors; i++)
+		mod->ctors[i]();
+#endif
+}
+
+/* This is where the real work happens */
+static int do_init_module(struct module *mod)
+{
+	int ret = 0;
+
+	blocking_notifier_call_chain(&module_notify_list,
+			MODULE_STATE_COMING, mod);
+
+	/* Set RO and NX regions for core */
+	set_section_ro_nx(mod->module_core,
+				mod->core_text_size,
+				mod->core_ro_size,
+				mod->core_size);
+
+	/* Set RO and NX regions for init */
+	set_section_ro_nx(mod->module_init,
+				mod->init_text_size,
+				mod->init_ro_size,
+				mod->init_size);
+
+	do_mod_ctors(mod);
+	/* Start the module */
+	if (mod->init != NULL)
+		ret = do_one_initcall(mod->init);
+	if (ret < 0) {
+		/* Init routine failed: abort.  Try to protect us from
+                   buggy refcounters. */
+		mod->state = MODULE_STATE_GOING;
+		synchronize_sched();
+		module_put(mod);
+		blocking_notifier_call_chain(&module_notify_list,
+					     MODULE_STATE_GOING, mod);
+		free_module(mod);
+		wake_up_all(&module_wq);
+		return ret;
+	}
+	if (ret > 0) {
+		printk(KERN_WARNING
+"%s: '%s'->init suspiciously returned %d, it should follow 0/-E convention\n"
+"%s: loading module anyway...\n",
+		       __func__, mod->name, ret,
+		       __func__);
+		dump_stack();
+	}
+
+	/* Now it's a first class citizen! */
+	mod->state = MODULE_STATE_LIVE;
+	blocking_notifier_call_chain(&module_notify_list,
+				     MODULE_STATE_LIVE, mod);
+
+	/* We need to finish all async code before the module init sequence is done */
+	async_synchronize_full();
+
+	mutex_lock(&module_mutex);
+	/* Drop initial reference. */
+	module_put(mod);
+	trim_init_extable(mod);
+#ifdef CONFIG_KALLSYMS
+	mod->num_symtab = mod->core_num_syms;
+	mod->symtab = mod->core_symtab;
+	mod->strtab = mod->core_strtab;
+#endif
+	unset_module_init_ro_nx(mod);
+	module_free(mod, mod->module_init);
+	mod->module_init = NULL;
+	mod->init_size = 0;
+	mod->init_ro_size = 0;
+	mod->init_text_size = 0;
+	mutex_unlock(&module_mutex);
+	wake_up_all(&module_wq);
+
+	return 0;
+}
+
+static int may_init_module(void)
+{
+	if (!capable(CAP_SYS_MODULE) || modules_disabled)
+		return -EPERM;
+
+	return 0;
+}
+
 /* Allocate and load the module: note that size of section 0 is always
    zero, and we rely on this for optional sections. */
-static struct module *load_module(void __user *umod,
-				  unsigned long len,
-				  const char __user *uargs)
+static int load_module(struct load_info *info, const char __user *uargs)
 {
-	struct load_info info = { NULL, };
 	struct module *mod, *old;
 	long err;
 
-	pr_debug("load_module: umod=%p, len=%lu, uargs=%p\n",
-	       umod, len, uargs);
-
-	/* Copy in the blobs from userspace, check they are vaguely sane. */
-	err = copy_and_check(&info, umod, len, uargs);
+	err = module_sig_check(info);
 	if (err)
-		return ERR_PTR(err);
+		goto free_copy;
+
+	err = elf_header_check(info);
+	if (err)
+		goto free_copy;
 
 	/* Figure out module layout, and allocate all the memory. */
-	mod = layout_and_allocate(&info);
+	mod = layout_and_allocate(info);
 	if (IS_ERR(mod)) {
 		err = PTR_ERR(mod);
 		goto free_copy;
 	}
 
 #ifdef CONFIG_MODULE_SIG
-	mod->sig_ok = info.sig_ok;
+	mod->sig_ok = info->sig_ok;
 	if (!mod->sig_ok)
 		add_taint_module(mod, TAINT_FORCED_MODULE);
 #endif
@@ -3220,25 +3348,25 @@ static struct module *load_module(void __user *umod,
 
 	/* Now we've got everything in the final locations, we can
 	 * find optional sections. */
-	find_module_sections(mod, &info);
+	find_module_sections(mod, info);
 
 	err = check_module_license_and_versions(mod);
 	if (err)
 		goto free_unload;
 
 	/* Set up MODINFO_ATTR fields */
-	setup_modinfo(mod, &info);
+	setup_modinfo(mod, info);
 
 	/* Fix up syms, so that st_value is a pointer to location. */
-	err = simplify_symbols(mod, &info);
+	err = simplify_symbols(mod, info);
 	if (err < 0)
 		goto free_modinfo;
 
-	err = apply_relocations(mod, &info);
+	err = apply_relocations(mod, info);
 	if (err < 0)
 		goto free_modinfo;
 
-	err = post_relocation(mod, &info);
+	err = post_relocation(mod, info);
 	if (err < 0)
 		goto free_modinfo;
 
@@ -3278,7 +3406,7 @@ again:
 	}
 
 	/* This has to be done once we're sure module name is unique. */
-	dynamic_debug_setup(info.debug, info.num_debug);
+	dynamic_debug_setup(info->debug, info->num_debug);
 
 	/* Ftrace init must be called in the MODULE_STATE_UNFORMED state */
 	ftrace_module_init(mod);
@@ -3288,7 +3416,7 @@ again:
 	if (err < 0)
 		goto ddebug;
 
-	module_bug_finalize(info.hdr, info.sechdrs, mod);
+	module_bug_finalize(info->hdr, info->sechdrs, mod);
 	list_add_rcu(&mod->list, &modules);
 	mutex_unlock(&module_mutex);
 
@@ -3299,16 +3427,17 @@ again:
 		goto unlink;
 
 	/* Link in to syfs. */
-	err = mod_sysfs_setup(mod, &info, mod->kp, mod->num_kp);
+	err = mod_sysfs_setup(mod, info, mod->kp, mod->num_kp);
 	if (err < 0)
 		goto unlink;
 
 	/* Get rid of temporary copy. */
-	free_copy(&info);
+	free_copy(info);
 
 	/* Done! */
 	trace_module_load(mod);
-	return mod;
+
+	return do_init_module(mod);
 
  unlink:
 	mutex_lock(&module_mutex);
@@ -3317,7 +3446,7 @@ again:
 	module_bug_cleanup(mod);
 	wake_up_all(&module_wq);
  ddebug:
-	dynamic_debug_remove(info.debug);
+	dynamic_debug_remove(info->debug);
  unlock:
 	mutex_unlock(&module_mutex);
 	synchronize_sched();
@@ -3329,21 +3458,10 @@ again:
  free_unload:
 	module_unload_free(mod);
  free_module:
-	module_deallocate(mod, &info);
+	module_deallocate(mod, info);
  free_copy:
-	free_copy(&info);
-	return ERR_PTR(err);
-}
-
-/* Call module constructors. */
-static void do_mod_ctors(struct module *mod)
-{
-#ifdef CONFIG_CONSTRUCTORS
-	unsigned long i;
-
-	for (i = 0; i < mod->num_ctors; i++)
-		mod->ctors[i]();
-#endif
+	free_copy(info);
+	return err;
 }
 #ifdef	TIMA_LKM_SET_PAGE_ATTRIB
 void tima_mod_send_smc_instruction(unsigned int    *vatext,unsigned int    *vadata,unsigned int text_count,unsigned int data_count)
@@ -3413,93 +3531,47 @@ void tima_mod_page_change_access(struct module *mod)
 }
 
 #endif
-/* This is where the real work happens */
+
 SYSCALL_DEFINE3(init_module, void __user *, umod,
 		unsigned long, len, const char __user *, uargs)
 {
-	struct module *mod;
-	int ret = 0;
+	int err;
+	struct load_info info = { };
 
-	/* Must have permission */
-	if (!capable(CAP_SYS_MODULE) || modules_disabled)
-		return -EPERM;
+	err = may_init_module();
+	if (err)
+		return err;
 
-	/* Do all the hard work */
-	mod = load_module(umod, len, uargs);
-	if (IS_ERR(mod))
-		return PTR_ERR(mod);
-
-	blocking_notifier_call_chain(&module_notify_list,
-			MODULE_STATE_COMING, mod);
+	pr_debug("init_module: umod=%p, len=%lu, uargs=%p\n",
+	       umod, len, uargs);
 
 #ifdef	TIMA_LKM_SET_PAGE_ATTRIB
     tima_mod_page_change_access(mod);
 #endif
 
-	/* Set RO and NX regions for core */
-	set_section_ro_nx(mod->module_core,
-				mod->core_text_size,
-				mod->core_ro_size,
-				mod->core_size);
+	err = copy_module_from_user(umod, len, &info);
+	if (err)
+		return err;
 
-	/* Set RO and NX regions for init */
-	set_section_ro_nx(mod->module_init,
-				mod->init_text_size,
-				mod->init_ro_size,
-				mod->init_size);
+	return load_module(&info, uargs);
+}
 
-	do_mod_ctors(mod);
-	/* Start the module */
-	if (mod->init != NULL)
-		ret = do_one_initcall(mod->init);
-	if (ret < 0) {
-		/* Init routine failed: abort.  Try to protect us from
-                   buggy refcounters. */
-		mod->state = MODULE_STATE_GOING;
-		synchronize_sched();
-		module_put(mod);
-		blocking_notifier_call_chain(&module_notify_list,
-					     MODULE_STATE_GOING, mod);
-		free_module(mod);
-		wake_up_all(&module_wq);
-		return ret;
-	}
-	if (ret > 0) {
-		printk(KERN_WARNING
-"%s: '%s'->init suspiciously returned %d, it should follow 0/-E convention\n"
-"%s: loading module anyway...\n",
-		       __func__, mod->name, ret,
-		       __func__);
-		dump_stack();
-	}
+SYSCALL_DEFINE2(finit_module, int, fd, const char __user *, uargs)
+{
+	int err;
+	struct load_info info = { };
 
-	/* Now it's a first class citizen! */
-	mod->state = MODULE_STATE_LIVE;
-	blocking_notifier_call_chain(&module_notify_list,
-				     MODULE_STATE_LIVE, mod);
+	err = may_init_module();
+	if (err)
+		return err;
 
-	/* We need to finish all async code before the module init sequence is done */
-	async_synchronize_full();
+	pr_debug("finit_module: fd=%d, uargs=%p\n", fd, uargs);
 
-	mutex_lock(&module_mutex);
-	/* Drop initial reference. */
-	module_put(mod);
-	trim_init_extable(mod);
-#ifdef CONFIG_KALLSYMS
-	mod->num_symtab = mod->core_num_syms;
-	mod->symtab = mod->core_symtab;
-	mod->strtab = mod->core_strtab;
-#endif
-	unset_module_init_ro_nx(mod);
-	module_free(mod, mod->module_init);
-	mod->module_init = NULL;
-	mod->init_size = 0;
-	mod->init_ro_size = 0;
-	mod->init_text_size = 0;
-	mutex_unlock(&module_mutex);
-	wake_up_all(&module_wq);
+	err = copy_module_from_fd(fd, &info);
+	if (err)
+		return err;
 
-	return 0;
+	return load_module(&info, uargs);
 }
 
 static inline int within(unsigned long addr, void *start, unsigned long size)
