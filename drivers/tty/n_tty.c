@@ -156,10 +156,8 @@ static void n_tty_set_room(struct tty_struct *tty)
 	}
 }
 
-static void put_tty_queue_nolock(unsigned char c, struct tty_struct *tty)
+static void put_tty_queue_nolock(unsigned char c, struct n_tty_data *ldata)
 {
-	struct n_tty_data *ldata = tty->disc_data;
-
 	if (ldata->read_cnt < N_TTY_BUF_SIZE) {
 		ldata->read_buf[ldata->read_head] = c;
 		ldata->read_head = (ldata->read_head + 1) & (N_TTY_BUF_SIZE-1);
@@ -170,23 +168,22 @@ static void put_tty_queue_nolock(unsigned char c, struct tty_struct *tty)
 /**
  *	put_tty_queue		-	add character to tty
  *	@c: character
- *	@tty: tty device
+ *	@ldata: n_tty data
  *
  *	Add a character to the tty read_buf queue. This is done under the
  *	read_lock to serialize character addition and also to protect us
  *	against parallel reads or flushes
  */
 
-static void put_tty_queue(unsigned char c, struct tty_struct *tty)
+static void put_tty_queue(unsigned char c, struct n_tty_data *ldata)
 {
-	struct n_tty_data *ldata = tty->disc_data;
 	unsigned long flags;
 	/*
 	 *	The problem of stomping on the buffers ends here.
 	 *	Why didn't anyone see this one coming? --AJK
 	*/
 	spin_lock_irqsave(&ldata->read_lock, flags);
-	put_tty_queue_nolock(c, tty);
+	put_tty_queue_nolock(c, ldata);
 	spin_unlock_irqrestore(&ldata->read_lock, flags);
 }
 
@@ -702,16 +699,15 @@ static void process_echoes(struct tty_struct *tty)
 /**
  *	add_echo_byte	-	add a byte to the echo buffer
  *	@c: unicode byte to echo
- *	@tty: terminal device
+ *	@ldata: n_tty data
  *
  *	Add a character or operation byte to the echo buffer.
  *
  *	Should be called under the echo lock to protect the echo buffer.
  */
 
-static void add_echo_byte(unsigned char c, struct tty_struct *tty)
+static void add_echo_byte(unsigned char c, struct n_tty_data *ldata)
 {
-	struct n_tty_data *ldata = tty->disc_data;
 	int	new_byte_pos;
 
 	if (ldata->echo_cnt == N_TTY_BUF_SIZE) {
@@ -749,28 +745,24 @@ static void add_echo_byte(unsigned char c, struct tty_struct *tty)
 
 /**
  *	echo_move_back_col	-	add operation to move back a column
- *	@tty: terminal device
+ *	@ldata: n_tty data
  *
  *	Add an operation to the echo buffer to move back one column.
  *
  *	Locking: echo_lock to protect the echo buffer
  */
 
-static void echo_move_back_col(struct tty_struct *tty)
+static void echo_move_back_col(struct n_tty_data *ldata)
 {
-	struct n_tty_data *ldata = tty->disc_data;
-
 	mutex_lock(&ldata->echo_lock);
-
-	add_echo_byte(ECHO_OP_START, tty);
-	add_echo_byte(ECHO_OP_MOVE_BACK_COL, tty);
-
+	add_echo_byte(ECHO_OP_START, ldata);
+	add_echo_byte(ECHO_OP_MOVE_BACK_COL, ldata);
 	mutex_unlock(&ldata->echo_lock);
 }
 
 /**
  *	echo_set_canon_col	-	add operation to set the canon column
- *	@tty: terminal device
+ *	@ldata: n_tty data
  *
  *	Add an operation to the echo buffer to set the canon column
  *	to the current column.
@@ -778,15 +770,11 @@ static void echo_move_back_col(struct tty_struct *tty)
  *	Locking: echo_lock to protect the echo buffer
  */
 
-static void echo_set_canon_col(struct tty_struct *tty)
+static void echo_set_canon_col(struct n_tty_data *ldata)
 {
-	struct n_tty_data *ldata = tty->disc_data;
-
 	mutex_lock(&ldata->echo_lock);
-
-	add_echo_byte(ECHO_OP_START, tty);
-	add_echo_byte(ECHO_OP_SET_CANON_COL, tty);
-
+	add_echo_byte(ECHO_OP_START, ldata);
+	add_echo_byte(ECHO_OP_SET_CANON_COL, ldata);
 	mutex_unlock(&ldata->echo_lock);
 }
 
@@ -794,7 +782,7 @@ static void echo_set_canon_col(struct tty_struct *tty)
  *	echo_erase_tab	-	add operation to erase a tab
  *	@num_chars: number of character columns already used
  *	@after_tab: true if num_chars starts after a previous tab
- *	@tty: terminal device
+ *	@ldata: n_tty data
  *
  *	Add an operation to the echo buffer to erase a tab.
  *
@@ -808,14 +796,12 @@ static void echo_set_canon_col(struct tty_struct *tty)
  */
 
 static void echo_erase_tab(unsigned int num_chars, int after_tab,
-			   struct tty_struct *tty)
+			   struct n_tty_data *ldata)
 {
-	struct n_tty_data *ldata = tty->disc_data;
-
 	mutex_lock(&ldata->echo_lock);
 
-	add_echo_byte(ECHO_OP_START, tty);
-	add_echo_byte(ECHO_OP_ERASE_TAB, tty);
+	add_echo_byte(ECHO_OP_START, ldata);
+	add_echo_byte(ECHO_OP_ERASE_TAB, ldata);
 
 	/* We only need to know this modulo 8 (tab spacing) */
 	num_chars &= 7;
@@ -824,7 +810,7 @@ static void echo_erase_tab(unsigned int num_chars, int after_tab,
 	if (after_tab)
 		num_chars |= 0x80;
 
-	add_echo_byte(num_chars, tty);
+	add_echo_byte(num_chars, ldata);
 
 	mutex_unlock(&ldata->echo_lock);
 }
@@ -842,19 +828,15 @@ static void echo_erase_tab(unsigned int num_chars, int after_tab,
  *	Locking: echo_lock to protect the echo buffer
  */
 
-static void echo_char_raw(unsigned char c, struct tty_struct *tty)
+static void echo_char_raw(unsigned char c, struct n_tty_data *ldata)
 {
-	struct n_tty_data *ldata = tty->disc_data;
-
 	mutex_lock(&ldata->echo_lock);
-
 	if (c == ECHO_OP_START) {
-		add_echo_byte(ECHO_OP_START, tty);
-		add_echo_byte(ECHO_OP_START, tty);
+		add_echo_byte(ECHO_OP_START, ldata);
+		add_echo_byte(ECHO_OP_START, ldata);
 	} else {
-		add_echo_byte(c, tty);
+		add_echo_byte(c, ldata);
 	}
-
 	mutex_unlock(&ldata->echo_lock);
 }
 
@@ -879,12 +861,12 @@ static void echo_char(unsigned char c, struct tty_struct *tty)
 	mutex_lock(&ldata->echo_lock);
 
 	if (c == ECHO_OP_START) {
-		add_echo_byte(ECHO_OP_START, tty);
-		add_echo_byte(ECHO_OP_START, tty);
+		add_echo_byte(ECHO_OP_START, ldata);
+		add_echo_byte(ECHO_OP_START, ldata);
 	} else {
 		if (L_ECHOCTL(tty) && iscntrl(c) && c != '\t')
-			add_echo_byte(ECHO_OP_START, tty);
-		add_echo_byte(c, tty);
+			add_echo_byte(ECHO_OP_START, ldata);
+		add_echo_byte(c, ldata);
 	}
 
 	mutex_unlock(&ldata->echo_lock);
@@ -892,14 +874,13 @@ static void echo_char(unsigned char c, struct tty_struct *tty)
 
 /**
  *	finish_erasing		-	complete erase
- *	@tty: tty doing the erase
+ *	@ldata: n_tty data
  */
 
-static inline void finish_erasing(struct tty_struct *tty)
+static inline void finish_erasing(struct n_tty_data *ldata)
 {
-	struct n_tty_data *ldata = tty->disc_data;
 	if (ldata->erasing) {
-		echo_char_raw('/', tty);
+		echo_char_raw('/', ldata);
 		ldata->erasing = 0;
 	}
 }
@@ -947,11 +928,11 @@ static void eraser(unsigned char c, struct tty_struct *tty)
 					  (N_TTY_BUF_SIZE - 1));
 			ldata->read_head = ldata->canon_head;
 			spin_unlock_irqrestore(&ldata->read_lock, flags);
-			finish_erasing(tty);
+			finish_erasing(ldata);
 			echo_char(KILL_CHAR(tty), tty);
 			/* Add a newline if ECHOK is on and ECHOKE is off. */
 			if (L_ECHOK(tty))
-				echo_char_raw('\n', tty);
+				echo_char_raw('\n', ldata);
 			return;
 		}
 		kill_type = KILL;
@@ -987,15 +968,16 @@ static void eraser(unsigned char c, struct tty_struct *tty)
 		if (L_ECHO(tty)) {
 			if (L_ECHOPRT(tty)) {
 				if (!ldata->erasing) {
-					echo_char_raw('\\', tty);
+					echo_char_raw('\\', ldata);
 					ldata->erasing = 1;
 				}
 				/* if cnt > 1, output a multi-byte character */
 				echo_char(c, tty);
 				while (--cnt > 0) {
 					head = (head+1) & (N_TTY_BUF_SIZE-1);
-					echo_char_raw(ldata->read_buf[head], tty);
-					echo_move_back_col(tty);
+					echo_char_raw(ldata->read_buf[head],
+							ldata);
+					echo_move_back_col(ldata);
 				}
 			} else if (kill_type == ERASE && !L_ECHOE(tty)) {
 				echo_char(ERASE_CHAR(tty), tty);
@@ -1024,17 +1006,17 @@ static void eraser(unsigned char c, struct tty_struct *tty)
 						num_chars++;
 					}
 				}
-				echo_erase_tab(num_chars, after_tab, tty);
+				echo_erase_tab(num_chars, after_tab, ldata);
 			} else {
 				if (iscntrl(c) && L_ECHOCTL(tty)) {
-					echo_char_raw('\b', tty);
-					echo_char_raw(' ', tty);
-					echo_char_raw('\b', tty);
+					echo_char_raw('\b', ldata);
+					echo_char_raw(' ', ldata);
+					echo_char_raw('\b', ldata);
 				}
 				if (!iscntrl(c) || L_ECHOCTL(tty)) {
-					echo_char_raw('\b', tty);
-					echo_char_raw(' ', tty);
-					echo_char_raw('\b', tty);
+					echo_char_raw('\b', ldata);
+					echo_char_raw(' ', ldata);
+					echo_char_raw('\b', ldata);
 				}
 			}
 		}
@@ -1042,7 +1024,7 @@ static void eraser(unsigned char c, struct tty_struct *tty)
 			break;
 	}
 	if (ldata->read_head == ldata->canon_head && L_ECHO(tty))
-		finish_erasing(tty);
+		finish_erasing(ldata);
 }
 
 /**
@@ -1081,6 +1063,8 @@ static inline void isig(int sig, struct tty_struct *tty, int flush)
 
 static inline void n_tty_receive_break(struct tty_struct *tty)
 {
+	struct n_tty_data *ldata = tty->disc_data;
+
 	if (I_IGNBRK(tty))
 		return;
 	if (I_BRKINT(tty)) {
@@ -1088,10 +1072,10 @@ static inline void n_tty_receive_break(struct tty_struct *tty)
 		return;
 	}
 	if (I_PARMRK(tty)) {
-		put_tty_queue('\377', tty);
-		put_tty_queue('\0', tty);
+		put_tty_queue('\377', ldata);
+		put_tty_queue('\0', ldata);
 	}
-	put_tty_queue('\0', tty);
+	put_tty_queue('\0', ldata);
 	wake_up_interruptible(&tty->read_wait);
 }
 
@@ -1135,16 +1119,18 @@ static inline void n_tty_receive_overrun(struct tty_struct *tty)
 static inline void n_tty_receive_parity_error(struct tty_struct *tty,
 					      unsigned char c)
 {
+	struct n_tty_data *ldata = tty->disc_data;
+
 	if (I_IGNPAR(tty))
 		return;
 	if (I_PARMRK(tty)) {
-		put_tty_queue('\377', tty);
-		put_tty_queue('\0', tty);
-		put_tty_queue(c, tty);
+		put_tty_queue('\377', ldata);
+		put_tty_queue('\0', ldata);
+		put_tty_queue(c, ldata);
 	} else	if (I_INPCK(tty))
-		put_tty_queue('\0', tty);
+		put_tty_queue('\0', ldata);
 	else
-		put_tty_queue(c, tty);
+		put_tty_queue(c, ldata);
 	wake_up_interruptible(&tty->read_wait);
 }
 
@@ -1165,7 +1151,7 @@ static inline void n_tty_receive_char(struct tty_struct *tty, unsigned char c)
 	int parmrk;
 
 	if (ldata->raw) {
-		put_tty_queue(c, tty);
+		put_tty_queue(c, ldata);
 		return;
 	}
 
@@ -1175,7 +1161,7 @@ static inline void n_tty_receive_char(struct tty_struct *tty, unsigned char c)
 		c = tolower(c);
 
 	if (L_EXTPROC(tty)) {
-		put_tty_queue(c, tty);
+		put_tty_queue(c, ldata);
 		return;
 	}
 
@@ -1213,16 +1199,16 @@ static inline void n_tty_receive_char(struct tty_struct *tty, unsigned char c)
 			return;
 		}
 		if (L_ECHO(tty)) {
-			finish_erasing(tty);
+			finish_erasing(ldata);
 			/* Record the column of first canon char. */
 			if (ldata->canon_head == ldata->read_head)
-				echo_set_canon_col(tty);
+				echo_set_canon_col(ldata);
 			echo_char(c, tty);
 			process_echoes(tty);
 		}
 		if (parmrk)
-			put_tty_queue(c, tty);
-		put_tty_queue(c, tty);
+			put_tty_queue(c, ldata);
+		put_tty_queue(c, ldata);
 		return;
 	}
 
@@ -1288,10 +1274,10 @@ send_signal:
 		if (c == LNEXT_CHAR(tty) && L_IEXTEN(tty)) {
 			ldata->lnext = 1;
 			if (L_ECHO(tty)) {
-				finish_erasing(tty);
+				finish_erasing(ldata);
 				if (L_ECHOCTL(tty)) {
-					echo_char_raw('^', tty);
-					echo_char_raw('\b', tty);
+					echo_char_raw('^', ldata);
+					echo_char_raw('\b', ldata);
 					process_echoes(tty);
 				}
 			}
@@ -1301,9 +1287,9 @@ send_signal:
 		    L_IEXTEN(tty)) {
 			unsigned long tail = ldata->canon_head;
 
-			finish_erasing(tty);
+			finish_erasing(ldata);
 			echo_char(c, tty);
-			echo_char_raw('\n', tty);
+			echo_char_raw('\n', ldata);
 			while (tail != ldata->read_head) {
 				echo_char(ldata->read_buf[tail], tty);
 				tail = (tail+1) & (N_TTY_BUF_SIZE-1);
@@ -1318,7 +1304,7 @@ send_signal:
 				return;
 			}
 			if (L_ECHO(tty) || L_ECHONL(tty)) {
-				echo_char_raw('\n', tty);
+				echo_char_raw('\n', ldata);
 				process_echoes(tty);
 			}
 			goto handle_newline;
@@ -1346,7 +1332,7 @@ send_signal:
 			if (L_ECHO(tty)) {
 				/* Record the column of first canon char. */
 				if (ldata->canon_head == ldata->read_head)
-					echo_set_canon_col(tty);
+					echo_set_canon_col(ldata);
 				echo_char(c, tty);
 				process_echoes(tty);
 			}
@@ -1355,12 +1341,12 @@ send_signal:
 			 * EOL_CHAR and EOL2_CHAR?
 			 */
 			if (parmrk)
-				put_tty_queue(c, tty);
+				put_tty_queue(c, ldata);
 
 handle_newline:
 			spin_lock_irqsave(&ldata->read_lock, flags);
 			set_bit(ldata->read_head, ldata->read_flags);
-			put_tty_queue_nolock(c, tty);
+			put_tty_queue_nolock(c, ldata);
 			ldata->canon_head = ldata->read_head;
 			ldata->canon_data++;
 			spin_unlock_irqrestore(&ldata->read_lock, flags);
@@ -1379,22 +1365,22 @@ handle_newline:
 		return;
 	}
 	if (L_ECHO(tty)) {
-		finish_erasing(tty);
+		finish_erasing(ldata);
 		if (c == '\n')
-			echo_char_raw('\n', tty);
+			echo_char_raw('\n', ldata);
 		else {
 			/* Record the column of first canon char. */
 			if (ldata->canon_head == ldata->read_head)
-				echo_set_canon_col(tty);
+				echo_set_canon_col(ldata);
 			echo_char(c, tty);
 		}
 		process_echoes(tty);
 	}
 
 	if (parmrk)
-		put_tty_queue(c, tty);
+		put_tty_queue(c, ldata);
 
-	put_tty_queue(c, tty);
+	put_tty_queue(c, ldata);
 }
 
 
@@ -2152,9 +2138,8 @@ static unsigned int n_tty_poll(struct tty_struct *tty, struct file *file,
 	return mask;
 }
 
-static unsigned long inq_canon(struct tty_struct *tty)
+static unsigned long inq_canon(struct n_tty_data *ldata)
 {
-	struct n_tty_data *ldata = tty->disc_data;
 	int nr, head, tail;
 
 	if (!ldata->canon_data)
@@ -2185,7 +2170,7 @@ static int n_tty_ioctl(struct tty_struct *tty, struct file *file,
 		/* FIXME: Locking */
 		retval = ldata->read_cnt;
 		if (L_ICANON(tty))
-			retval = inq_canon(tty);
+			retval = inq_canon(ldata);
 		return put_user(retval, (unsigned int __user *) arg);
 	default:
 		return n_tty_ioctl_helper(tty, file, cmd, arg);
