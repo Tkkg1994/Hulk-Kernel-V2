@@ -594,10 +594,10 @@ int devpts_pty_new(struct inode *ptmx_inode, struct tty_struct *tty)
 	return ret;
 }
 
-struct tty_struct *devpts_get_tty(struct inode *pts_inode, int number)
+void *devpts_get_priv(struct inode *pts_inode)
 {
 	struct dentry *dentry;
-	struct tty_struct *tty;
+	void *priv = NULL;
 
 	BUG_ON(pts_inode->i_rdev == MKDEV(TTYAUX_MAJOR, PTMX_MINOR));
 
@@ -606,13 +606,12 @@ struct tty_struct *devpts_get_tty(struct inode *pts_inode, int number)
 	if (!dentry)
 		return NULL;
 
-	tty = NULL;
 	if (pts_inode->i_sb->s_magic == DEVPTS_SUPER_MAGIC)
-		tty = (struct tty_struct *)pts_inode->i_private;
+		priv = pts_inode->i_private;
 
 	dput(dentry);
 
-	return tty;
+	return priv;
 }
 
 void devpts_pty_kill(struct tty_struct *tty)
