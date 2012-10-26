@@ -556,6 +556,7 @@ static int fuse_readpage(struct file *file, struct page *page)
 	req->out.argpages = 1;
 	req->num_pages = 1;
 	req->pages[0] = page;
+	req->page_descs[0].length = count;
 	num_read = fuse_send_read(req, file, pos, count, NULL);
 	err = req->out.h.error;
 	fuse_put_request(fc, req);
@@ -710,6 +711,7 @@ static int fuse_readpages_fill(void *_data, struct page *page)
 
 	page_cache_get(page);
 	req->pages[req->num_pages] = page;
+	req->page_descs[req->num_pages].length = PAGE_SIZE;
 	req->num_pages++;
 	data->nr_pages--;
 	return 0;
@@ -905,6 +907,7 @@ static ssize_t fuse_fill_write_pages(struct fuse_req *req,
 
 		err = 0;
 		req->pages[req->num_pages] = page;
+		req->page_descs[req->num_pages].length = tmp;
 		req->num_pages++;
 
 		iov_iter_advance(ii, tmp);
@@ -1085,6 +1088,15 @@ static void fuse_release_user_pages(struct fuse_req *req, int write)
 	}
 }
 
+static inline void fuse_page_descs_length_init(struct fuse_req *req)
+{
+	int i;
+
+	for (i = 0; i < req->num_pages; i++)
+		req->page_descs[i].length = PAGE_SIZE -
+			req->page_descs[i].offset;
+}
+
 static int fuse_get_user_pages(struct fuse_req *req, const char __user *buf,
 			       size_t *nbytesp, int write)
 {
@@ -1112,6 +1124,7 @@ static int fuse_get_user_pages(struct fuse_req *req, const char __user *buf,
 
 	req->num_pages = npages;
 	req->page_descs[0].offset = offset;
+	fuse_page_descs_length_init(req);
 
 	if (write)
 		req->in.argpages = 1;
@@ -1119,6 +1132,11 @@ static int fuse_get_user_pages(struct fuse_req *req, const char __user *buf,
 		req->out.argpages = 1;
 
 	nbytes = (req->num_pages << PAGE_SHIFT) - req->page_descs[0].offset;
+
+	if (*nbytesp < nbytes)
+		req->page_descs[req->num_pages - 1].length -=
+			nbytes - *nbytesp;
+
 	*nbytesp = min(*nbytesp, nbytes);
 
 	return 0;
@@ -1356,6 +1374,7 @@ static int fuse_writepage_locked(struct page *page)
 	req->num_pages = 1;
 	req->pages[0] = tmp_page;
 	req->page_descs[0].offset = 0;
+	req->page_descs[0].length = PAGE_SIZE;
 	req->end = fuse_writepage_end;
 	req->inode = inode;
 
@@ -1944,6 +1963,7 @@ long fuse_do_ioctl(struct file *file, unsigned int cmd, unsigned long arg,
 	}
 	memcpy(req->pages, pages, sizeof(req->pages[0]) * num_pages);
 	req->num_pages = num_pages;
+	fuse_page_descs_length_init(req);
 
 	/* okay, let's send it to the client */
 	req->in.h.opcode = FUSE_IOCTL;
