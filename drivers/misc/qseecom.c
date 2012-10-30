@@ -46,7 +46,9 @@
 #define QSEECOM_DEV			"qseecom"
 #define QSEOS_VERSION_13		0x13
 #define QSEOS_VERSION_14		0x14
-#define QSEOS_CHECK_VERSION_CMD		0x00001803;
+#define QSEEE_VERSION_00		0x400000
+
+#define QSEOS_CHECK_VERSION_CMD		0x00001803
 
 #define QSEECOM_MAX_SG_ENTRY	10
 
@@ -65,6 +67,9 @@ enum qseecom_qceos_cmd_id {
 	QSEOS_LISTENER_DATA_RSP_COMMAND,
 	QSEOS_LOAD_EXTERNAL_ELF_COMMAND,
 	QSEOS_UNLOAD_EXTERNAL_ELF_COMMAND,
+	QSEOS_GET_APP_STATE_COMMAND,
+	QSEOS_LOAD_SERV_IMAGE_COMMAND,
+	QSEOS_UNLOAD_SERV_IMAGE_COMMAND,
 	QSEOS_CMD_MAX     = 0xEFFFFFFF
 };
 
@@ -95,6 +100,17 @@ __packed struct qseecom_load_app_ireq {
 __packed struct qseecom_unload_app_ireq {
 	uint32_t qsee_cmd_id;
 	uint32_t  app_id;
+};
+
+__packed struct qseecom_load_lib_image_ireq {
+	uint32_t qsee_cmd_id;
+	uint32_t mdt_len;
+	uint32_t img_len;
+	uint32_t phy_addr;
+};
+
+__packed struct qseecom_unload_lib_image_ireq {
+	uint32_t qsee_cmd_id;
 };
 
 __packed struct qseecom_register_listener_ireq {
@@ -199,8 +215,10 @@ struct qseecom_control {
 	int               send_resp_flag;
 
 	uint32_t          qseos_version;
+	uint32_t          qsee_version;
 	struct device *pdev;
 	struct cdev cdev;
+	bool  commonlib_loaded;
 };
 
 struct qseecom_client_handle {
@@ -1527,10 +1545,92 @@ static int __qseecom_load_fw(struct qseecom_dev_handle *data, char *appname)
 	return ret;
 }
 
+static int qseecom_load_commonlib_image(void)
+{
+	int32_t ret = 0;
+	uint32_t fw_size = 0;
+	struct qseecom_load_app_ireq load_req = {0, 0, 0, 0};
+	struct qseecom_command_scm_resp resp;
+	u8 *img_data = NULL;
+
+	if (__qseecom_get_fw_size("commonlib", &fw_size))
+		return -EIO;
+
+	img_data = kzalloc(fw_size, GFP_KERNEL);
+	if (!img_data) {
+		pr_err("Mem allocation for lib image data failed\n");
+		return -ENOMEM;
+	}
+	ret = __qseecom_get_fw_data("commonlib", img_data, &load_req);
+	if (ret) {
+		kzfree(img_data);
+		return -EIO;
+	}
+	/* Populate the remaining parameters */
+	load_req.qsee_cmd_id = QSEOS_LOAD_SERV_IMAGE_COMMAND;
+	/* SCM_CALL to load the image */
+	ret = scm_call(SCM_SVC_TZSCHEDULER, 1, &load_req,
+				sizeof(struct qseecom_load_lib_image_ireq),
+							&resp, sizeof(resp));
+	kzfree(img_data);
+	if (ret) {
+		pr_err("scm_call to load failed : ret %d\n", ret);
+		ret = -EIO;
+	} else {
+		switch (resp.result) {
+		case QSEOS_RESULT_SUCCESS:
+			break;
+		case QSEOS_RESULT_FAILURE:
+			pr_err("scm call failed w/response result%d\n",
+						resp.result);
+			ret = -EINVAL;
+			break;
+		default:
+			pr_err("scm call return unknown response %d\n",
+						resp.result);
+			ret = -EINVAL;
+			break;
+		}
+	}
+	return ret;
+}
+
+static int qseecom_unload_commonlib_image(void)
+{
+	int ret = -EINVAL;
+	struct qseecom_unload_lib_image_ireq unload_req = {0};
+	struct qseecom_command_scm_resp resp;
+
+	/* Populate the remaining parameters */
+	unload_req.qsee_cmd_id = QSEOS_UNLOAD_SERV_IMAGE_COMMAND;
+	/* SCM_CALL to load the image */
+	ret = scm_call(SCM_SVC_TZSCHEDULER, 1,	&unload_req,
+			sizeof(struct qseecom_unload_lib_image_ireq),
+						&resp, sizeof(resp));
+	if (ret) {
+		pr_err("scm_call to unload lib failed : ret %d\n", ret);
+		ret = -EIO;
+	} else {
+		switch (resp.result) {
+		case QSEOS_RESULT_SUCCESS:
+			break;
+		case QSEOS_RESULT_FAILURE:
+			pr_err("scm fail resp.result QSEOS_RESULT FAILURE\n");
+			break;
+		default:
+			pr_err("scm call return unknown response %d\n",
+					resp.result);
+			ret = -EINVAL;
+			break;
+		}
+	}
+	return ret;
+}
+
 int qseecom_start_app(struct qseecom_handle **handle,
 						char *app_name, uint32_t size)
 {
-	int32_t ret;
+	int32_t ret = 0;
 	unsigned long flags = 0;
 	struct qseecom_dev_handle *data = NULL;
 	struct qseecom_check_app_ireq app_ireq;
@@ -1544,6 +1644,19 @@ int qseecom_start_app(struct qseecom_handle **handle,
 		pr_err("This functionality is UNSUPPORTED in version 1.3\n");
 		return -EINVAL;
 	}
+
+	if (qseecom.qsee_version > QSEEE_VERSION_00) {
+		mutex_lock(&app_access_lock);
+		if (qseecom.commonlib_loaded == false) {
+			ret = qseecom_load_commonlib_image();
+			if (ret == 0)
+				qseecom.commonlib_loaded = true;
+		}
+		mutex_unlock(&app_access_lock);
+	}
+
+	if (ret)
+		return -EIO;
 
 	*handle = kzalloc(sizeof(struct qseecom_handle), GFP_KERNEL);
 	if (!(*handle)) {
@@ -2199,7 +2312,15 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 	case QSEECOM_IOCTL_LOAD_APP_REQ: {
 		mutex_lock(&app_access_lock);
 		atomic_inc(&data->ioctl_count);
-		ret = qseecom_load_app(data, argp);
+		if (qseecom.qsee_version > QSEEE_VERSION_00) {
+			if (qseecom.commonlib_loaded == false) {
+				ret = qseecom_load_commonlib_image();
+				if (ret == 0)
+					qseecom.commonlib_loaded = true;
+			}
+		}
+		if (ret == 0)
+			ret = qseecom_load_app(data, argp);
 		atomic_dec(&data->ioctl_count);
 		mutex_unlock(&app_access_lock);
 		if (ret)
@@ -2548,14 +2669,24 @@ static int __devinit qseecom_probe(struct platform_device *pdev)
 		pr_err("Failed to retrieve QSEE version information %d\n", rc);
 		goto exit_del_cdev;
 	}
-	if (qsee_not_legacy)
+	if (qsee_not_legacy) {
+		uint32_t feature = 10;
+
+		qseecom.qsee_version = QSEEE_VERSION_00;
+		rc = scm_call(6, 3, &feature, sizeof(feature),
+			&qseecom.qsee_version, sizeof(qseecom.qsee_version));
+		if (rc) {
+			pr_err("Failed to get QSEE version info %d\n", rc);
+			goto err;
+		}
 		qseecom.qseos_version = QSEOS_VERSION_14;
-	else {
+	} else {
 		qseecom.qseos_version = QSEOS_VERSION_13;
+		qseecom.qsee_version = 0;
 		pil = NULL;
 		pil_ref_cnt = 0;
 	}
-
+	qseecom.commonlib_loaded = false;
 	qseecom.pdev = class_dev;
 	/* Create ION msm client */
 	qseecom.ion_clnt = msm_ion_client_create(-1, "qseecom-kernel");
