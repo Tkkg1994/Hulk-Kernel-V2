@@ -762,17 +762,12 @@ static int efi_pstore_write(enum pstore_type_id type,
 		unsigned int part, size_t size, struct pstore_info *psi)
 {
 	char name[DUMP_NAME_LEN];
-	char stub_name[DUMP_NAME_LEN];
 	efi_char16_t efi_name[DUMP_NAME_LEN];
 	efi_guid_t vendor = LINUX_EFI_CRASH_GUID;
 	struct efivars *efivars = psi->data;
-	struct efivar_entry *entry, *found = NULL;
 	int i, ret = 0;
 	efi_status_t status = EFI_NOT_FOUND;
 	unsigned long flags;
-
-	sprintf(stub_name, "dump-type%u-%u-", type, part);
-	sprintf(name, "%s%lu", stub_name, get_seconds());
 
 	spin_lock_irqsave(&efivars->lock, flags);
 
@@ -793,35 +788,8 @@ static int efi_pstore_write(enum pstore_type_id type,
 		}
 	}
 
-	for (i = 0; i < DUMP_NAME_LEN; i++)
-		efi_name[i] = stub_name[i];
-
-	/*
-	 * Clean up any entries with the same name
-	 */
-
-	list_for_each_entry(entry, &efivars->list, list) {
-		get_var_data_locked(efivars, &entry->var);
-
-		if (efi_guidcmp(entry->var.VendorGuid, vendor))
-			continue;
-		if (utf16_strncmp(entry->var.VariableName, efi_name,
-				  utf16_strlen(efi_name)))
-			continue;
-		/* Needs to be a prefix */
-		if (entry->var.VariableName[utf16_strlen(efi_name)] == 0)
-			continue;
-
-		/* found */
-		found = entry;
-		efivars->ops->set_variable(entry->var.VariableName,
-					   &entry->var.VendorGuid,
-					   PSTORE_EFI_ATTRIBUTES,
-					   0, NULL);
-	}
-
-	if (found)
-		list_del(&found->list);
+	sprintf(name, "dump-type%u-%u-%lu", type, part,
+		get_seconds());
 
 	for (i = 0; i < DUMP_NAME_LEN; i++)
 		efi_name[i] = name[i];
@@ -830,9 +798,6 @@ static int efi_pstore_write(enum pstore_type_id type,
 				   size, psi->buf);
 
 	spin_unlock_irqrestore(&efivars->lock, flags);
-
-	if (found)
-		efivar_unregister(found);
 
 	if (reason == KMSG_DUMP_OOPS)
 		schedule_work(&efivar_work);
