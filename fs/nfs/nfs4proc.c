@@ -466,25 +466,28 @@ void nfs4_check_drain_bc_complete(struct nfs4_session *ses)
 
 static void nfs41_sequence_free_slot(struct nfs4_sequence_res *res)
 {
+	struct nfs4_session *session;
 	struct nfs4_slot_table *tbl;
 
-	tbl = &res->sr_session->fc_slot_table;
 	if (!res->sr_slot) {
 		/* just wake up the next guy waiting since
 		 * we may have not consumed a slot after all */
 		dprintk("%s: No slot\n", __func__);
 		return;
 	}
+	tbl = res->sr_slot->table;
+	session = tbl->session;
 
 	spin_lock(&tbl->slot_tbl_lock);
 	nfs4_free_slot(tbl, res->sr_slot - tbl->slots);
-	nfs4_check_drain_fc_complete(res->sr_session);
+	nfs4_check_drain_fc_complete(session);
 	spin_unlock(&tbl->slot_tbl_lock);
 	res->sr_slot = NULL;
 }
 
 static int nfs41_sequence_done(struct rpc_task *task, struct nfs4_sequence_res *res)
 {
+	struct nfs4_session *session;
 	struct nfs4_slot *slot;
 	unsigned long timestamp;
 	struct nfs_client *clp;
@@ -503,6 +506,7 @@ static int nfs41_sequence_done(struct rpc_task *task, struct nfs4_sequence_res *
 		goto out;
 
 	slot = res->sr_slot;
+	session = slot->table->session;
 
 	/* Check the SEQUENCE operation status */
 	switch (res->sr_status) {
@@ -510,7 +514,7 @@ static int nfs41_sequence_done(struct rpc_task *task, struct nfs4_sequence_res *
 		/* Update the slot's sequence and clientid lease timer */
 		++slot->seq_nr;
 		timestamp = slot->renewal_time;
-		clp = res->sr_session->clp;
+		clp = session->clp;
 		do_renew_lease(clp, timestamp);
 		/* Check sequence flags */
 		if (res->sr_status_flags != 0)
@@ -523,7 +527,7 @@ static int nfs41_sequence_done(struct rpc_task *task, struct nfs4_sequence_res *
 		 */
 		dprintk("%s: slot=%td seq=%d: Operation in progress\n",
 			__func__,
-			slot - res->sr_session->fc_slot_table.slots,
+			slot - session->fc_slot_table.slots,
 			slot->seq_nr);
 		goto out_retry;
 	default:
@@ -545,7 +549,7 @@ out_retry:
 static int nfs4_sequence_done(struct rpc_task *task,
 			       struct nfs4_sequence_res *res)
 {
-	if (res->sr_session == NULL)
+	if (res->sr_slot == NULL)
 		return 1;
 	return nfs41_sequence_done(task, res);
 }
@@ -590,7 +594,6 @@ static void nfs41_init_sequence(struct nfs4_sequence_args *args,
 	args->sa_cache_this = 0;
 	if (cache_reply)
 		args->sa_cache_this = 1;
-	res->sr_session = NULL;
 	res->sr_slot = NULL;
 }
 
@@ -645,7 +648,6 @@ int nfs41_setup_sequence(struct nfs4_session *session,
 
 	dprintk("<-- %s slotid=%d seqid=%d\n", __func__, slotid, slot->seq_nr);
 
-	res->sr_session = session;
 	res->sr_slot = slot;
 	res->sr_status_flags = 0;
 	/*
@@ -5680,9 +5682,18 @@ int nfs4_proc_get_lease_time(struct nfs_client *clp, struct nfs_fsinfo *fsinfo)
 	return status;
 }
 
-struct nfs4_slot *nfs4_alloc_slots(u32 max_slots, gfp_t gfp_flags)
+struct nfs4_slot *nfs4_alloc_slots(struct nfs4_slot_table *table,
+		u32 max_slots, gfp_t gfp_flags)
 {
-	return kmalloc_array(max_slots, sizeof(struct nfs4_slot), gfp_flags);
+	struct nfs4_slot *tbl;
+	u32 i;
+
+	tbl = kmalloc_array(max_slots, sizeof(*tbl), gfp_flags);
+	if (tbl != NULL) {
+		for (i = 0; i < max_slots; i++)
+			tbl[i].table = table;
+	}
+	return tbl;
 }
 
 static void nfs4_add_and_init_slots(struct nfs4_slot_table *tbl,
@@ -5720,7 +5731,7 @@ static int nfs4_realloc_slot_table(struct nfs4_slot_table *tbl, u32 max_reqs,
 
 	/* Does the newly negotiated max_reqs match the existing slot table? */
 	if (max_reqs != tbl->max_slots) {
-		new = nfs4_alloc_slots(max_reqs, GFP_NOFS);
+		new = nfs4_alloc_slots(tbl, max_reqs, GFP_NOFS);
 		if (!new)
 			goto out;
 	}
@@ -5759,11 +5770,13 @@ static int nfs4_setup_session_slot_tables(struct nfs4_session *ses)
 	dprintk("--> %s\n", __func__);
 	/* Fore channel */
 	tbl = &ses->fc_slot_table;
+	tbl->session = ses;
 	status = nfs4_realloc_slot_table(tbl, ses->fc_attrs.max_reqs, 1);
 	if (status) /* -ENOMEM */
 		return status;
 	/* Back channel */
 	tbl = &ses->bc_slot_table;
+	tbl->session = ses;
 	status = nfs4_realloc_slot_table(tbl, ses->bc_attrs.max_reqs, 0);
 	if (status && tbl->slots == NULL)
 		/* Fore and back channel share a connection so get
