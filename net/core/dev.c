@@ -203,6 +203,8 @@ static struct list_head offload_base __read_mostly;
 DEFINE_RWLOCK(dev_base_lock);
 EXPORT_SYMBOL(dev_base_lock);
 
+DEFINE_SEQLOCK(devnet_rename_seq);
+
 static inline void dev_base_seq_inc(struct net *net)
 {
 	while (++net->dev_base_seq == 0);
@@ -1087,21 +1089,30 @@ int dev_change_name(struct net_device *dev, const char *newname)
 	if (dev->flags & IFF_UP)
 		return -EBUSY;
 
-	if (strncmp(newname, dev->name, IFNAMSIZ) == 0)
+	write_seqlock(&devnet_rename_seq);
+
+	if (strncmp(newname, dev->name, IFNAMSIZ) == 0) {
+		write_sequnlock(&devnet_rename_seq);
 		return 0;
+	}
 
 	memcpy(oldname, dev->name, IFNAMSIZ);
 
 	err = dev_get_valid_name(net, dev, newname);
-	if (err < 0)
+	if (err < 0) {
+		write_sequnlock(&devnet_rename_seq);
 		return err;
+	}
 
 rollback:
 	ret = device_rename(&dev->dev, dev->name);
 	if (ret) {
 		memcpy(dev->name, oldname, IFNAMSIZ);
+		write_sequnlock(&devnet_rename_seq);
 		return ret;
 	}
+
+	write_sequnlock(&devnet_rename_seq);
 
 	write_lock_bh(&dev_base_lock);
 	hlist_del_rcu(&dev->name_hlist);
@@ -1120,6 +1131,7 @@ rollback:
 		/* err >= 0 after dev_alloc_name() or stores the first errno */
 		if (err >= 0) {
 			err = ret;
+			write_seqlock(&devnet_rename_seq);
 			memcpy(dev->name, oldname, IFNAMSIZ);
 			goto rollback;
 		} else {
@@ -4141,6 +4153,7 @@ static int dev_ifname(struct net *net, struct ifreq __user *arg)
 {
 	struct net_device *dev;
 	struct ifreq ifr;
+	unsigned seq;
 
 	/*
 	 *	Fetch the caller's info block.
@@ -4149,6 +4162,8 @@ static int dev_ifname(struct net *net, struct ifreq __user *arg)
 	if (copy_from_user(&ifr, arg, sizeof(struct ifreq)))
 		return -EFAULT;
 
+retry:
+	seq = read_seqbegin(&devnet_rename_seq);
 	rcu_read_lock();
 	dev = dev_get_by_index_rcu(net, ifr.ifr_ifindex);
 	if (!dev) {
@@ -4158,6 +4173,8 @@ static int dev_ifname(struct net *net, struct ifreq __user *arg)
 
 	strcpy(ifr.ifr_name, dev->name);
 	rcu_read_unlock();
+	if (read_seqretry(&devnet_rename_seq, seq))
+		goto retry;
 
 	if (copy_to_user(arg, &ifr, sizeof(struct ifreq)))
 		return -EFAULT;
