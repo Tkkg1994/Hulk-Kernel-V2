@@ -1433,7 +1433,6 @@ DEFINE_PER_CPU(int, dirty_throttle_leaks) = 0;
 /**
  * balance_dirty_pages_ratelimited - balance dirty memory state
  * @mapping: address_space which was dirtied
- * @nr_pages_dirtied: number of pages which the caller has just dirtied
  *
  * Processes which are dirtying memory should call in here once for each page
  * which was newly dirtied.  The function will periodically check the system's
