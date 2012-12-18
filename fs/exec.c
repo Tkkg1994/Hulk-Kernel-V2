@@ -1420,11 +1420,6 @@ int search_binary_handler(struct linux_binprm *bprm)
 			read_unlock(&binfmt_lock);
 			bprm->recursion_depth = depth + 1;
 			retval = fn(bprm);
-			/*
-			 * Restore the depth counter to its starting value
-			 * in this call, so we don't have to rely on every
-			 * load_binary function to restore it on return.
-			 */
 			bprm->recursion_depth = depth;
 			if (retval >= 0) {
 				if (depth == 0) {
