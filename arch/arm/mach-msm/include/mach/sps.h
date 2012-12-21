@@ -77,11 +77,12 @@
 #define SPS_BAM_OPT_IRQ_WAKEUP      (1UL << 3)
 /* Ignore external block pipe reset */
 #define SPS_BAM_NO_EXT_P_RST        (1UL << 4)
+/* Don't enable local clock gating */
+#define SPS_BAM_NO_LOCAL_CLK_GATING (1UL << 5)
 /* Verify Low Memory status */
 #define SPS_BAM_ATMC_MEM            (1UL << 8)
 /* Hold memory for BAM DMUX */
 #define SPS_BAM_HOLD_MEM            (1UL << 9)
-
 
 /* BAM device management flags */
 
