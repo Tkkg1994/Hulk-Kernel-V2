@@ -1814,7 +1814,6 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh,
 
 	BUFFER_TRACE(bh, "entry");
 
-retry:
 	/*
 	 * It is safe to proceed here without the j_list_lock because the
 	 * buffers cannot be stolen by try_to_free_buffers as long as we are
@@ -1909,14 +1908,11 @@ retry:
 		 * for commit and try again.
 		 */
 		if (partial_page) {
-			tid_t tid = journal->j_committing_transaction->t_tid;
-
 			jbd2_journal_put_journal_head(jh);
 			spin_unlock(&journal->j_list_lock);
 			jbd_unlock_bh_state(bh);
 			write_unlock(&journal->j_state_lock);
-			jbd2_log_wait_commit(journal, tid);
-			goto retry;
+			return -EBUSY;
 		}
 		/*
 		 * OK, buffer won't be reachable after truncate. We just set
