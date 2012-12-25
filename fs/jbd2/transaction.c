@@ -1963,21 +1963,23 @@ zap_buffer_unlocked:
  * @page:    page to flush
  * @offset:  length of page to invalidate.
  *
- * Reap page buffers containing data after offset in page.
- *
+ * Reap page buffers containing data after offset in page. Can return -EBUSY
+ * if buffers are part of the committing transaction and the page is straddling
+ * i_size. Caller then has to wait for current commit and try again.
  */
-void jbd2_journal_invalidatepage(journal_t *journal,
-		      struct page *page,
-		      unsigned long offset)
+int jbd2_journal_invalidatepage(journal_t *journal,
+				struct page *page,
+				unsigned long offset)
 {
 	struct buffer_head *head, *bh, *next;
 	unsigned int curr_off = 0;
 	int may_free = 1;
+	int ret = 0;
 
 	if (!PageLocked(page))
 		BUG();
 	if (!page_has_buffers(page))
-		return;
+		return 0;
 
 	/* We will potentially be playing with lists other than just the
 	 * data lists (especially for journaled data mode), so be
@@ -1991,8 +1993,11 @@ void jbd2_journal_invalidatepage(journal_t *journal,
 		if (offset <= curr_off) {
 			/* This block is wholly outside the truncation point */
 			lock_buffer(bh);
-			may_free &= journal_unmap_buffer(journal, bh);
+			ret = journal_unmap_buffer(journal, bh);
 			unlock_buffer(bh);
+			if (ret < 0)
+				return ret;
+			may_free &= ret;
 		}
 		curr_off = next_off;
 		bh = next;
@@ -2003,6 +2008,7 @@ void jbd2_journal_invalidatepage(journal_t *journal,
 		if (may_free && try_to_free_buffers(page))
 			J_ASSERT(!page_has_buffers(page));
 	}
+	return 0;
 }
 
 /*

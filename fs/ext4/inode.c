@@ -4776,6 +4776,7 @@ int ext4_setattr(struct dentry *dentry, struct iattr *attr)
 			}
 		}
 
+<<<<<<< HEAD
 		i_size_write(inode, attr->ia_size);
 		/*
 		 * Blocks are going to be removed from the inode. Wait
@@ -4789,6 +4790,31 @@ int ext4_setattr(struct dentry *dentry, struct iattr *attr)
 				ext4_inode_resume_unlocked_dio(inode);
 			} else
 				ext4_wait_for_tail_page_commit(inode);
+=======
+	if (attr->ia_valid & ATTR_SIZE) {
+		if (attr->ia_size != inode->i_size) {
+			loff_t oldsize = inode->i_size;
+
+			i_size_write(inode, attr->ia_size);
+			/*
+			 * Blocks are going to be removed from the inode. Wait
+			 * for dio in flight.  Temporarily disable
+			 * dioread_nolock to prevent livelock.
+			 */
+			if (orphan) {
+				if (!ext4_should_journal_data(inode)) {
+					ext4_inode_block_unlocked_dio(inode);
+					inode_dio_wait(inode);
+					ext4_inode_resume_unlocked_dio(inode);
+				} else
+					ext4_wait_for_tail_page_commit(inode);
+			}
+			/*
+			 * Truncate pagecache after we've waited for commit
+			 * in data=journal mode to make pages freeable.
+			 */
+			truncate_pagecache(inode, oldsize, inode->i_size);
+>>>>>>> 53e8726... ext4: fix deadlock in journal_unmap_buffer()
 		}
 		/*
 		 * Truncate pagecache after we've waited for commit
