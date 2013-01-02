@@ -1565,7 +1565,7 @@ static int qseecom_load_commonlib_image(void)
 	struct qseecom_command_scm_resp resp;
 	u8 *img_data = NULL;
 
-	if (__qseecom_get_fw_size("commonlib", &fw_size))
+	if (__qseecom_get_fw_size("cmnlib", &fw_size))
 		return -EIO;
 
 	img_data = kzalloc(fw_size, GFP_KERNEL);
@@ -1573,7 +1573,7 @@ static int qseecom_load_commonlib_image(void)
 		pr_err("Mem allocation for lib image data failed\n");
 		return -ENOMEM;
 	}
-	ret = __qseecom_get_fw_data("commonlib", img_data, &load_req);
+	ret = __qseecom_get_fw_data("cmnlib", img_data, &load_req);
 	if (ret) {
 		kzfree(img_data);
 		return -EIO;
