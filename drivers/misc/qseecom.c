@@ -53,7 +53,7 @@
 
 #define QSEOS_CHECK_VERSION_CMD		0x00001803
 
-#define QSEECOM_MAX_SG_ENTRY	10
+#define QSEECOM_MAX_SG_ENTRY	512
 
 enum qseecom_command_scm_resp_type {
 	QSEOS_APP_ID = 0xEE01,
