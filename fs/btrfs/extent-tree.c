@@ -3618,6 +3618,7 @@ static int shrink_delalloc(struct btrfs_root *root, u64 to_reclaim,
 		return 0;
 	}
 
+<<<<<<< HEAD
 	max_reclaim = min(reserved, to_reclaim);
 	nr_pages = max_t(unsigned long, nr_pages,
 			 max_reclaim >> PAGE_CACHE_SHIFT);
@@ -3628,6 +3629,21 @@ static int shrink_delalloc(struct btrfs_root *root, u64 to_reclaim,
 		       root->fs_info->delalloc_bytes >> PAGE_CACHE_SHIFT);
 		try_to_writeback_inodes_sb_nr(root->fs_info->sb, nr_pages,
 						WB_REASON_FS_FREE_SPACE);
+=======
+	while (delalloc_bytes && loops < 3) {
+		max_reclaim = min(delalloc_bytes, to_reclaim);
+		nr_pages = max_reclaim >> PAGE_CACHE_SHIFT;
+		try_to_writeback_inodes_sb_nr(root->fs_info->sb,
+					      nr_pages,
+					      WB_REASON_FS_FREE_SPACE);
+
+		/*
+		 * We need to wait for the async pages to actually start before
+		 * we do anything.
+		 */
+		wait_event(root->fs_info->async_submit_wait,
+			   !atomic_read(&root->fs_info->async_delalloc_pages));
+>>>>>>> 10ee27a... vfs: re-implement writeback_inodes_sb(_nr)_if_idle() and rename them
 
 		spin_lock(&space_info->lock);
 		if (reserved > space_info->bytes_may_use)
