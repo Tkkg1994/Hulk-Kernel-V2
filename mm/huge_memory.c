@@ -1449,9 +1449,19 @@ int split_huge_page(struct page *page)
 	int ret = 1;
 
 	BUG_ON(!PageAnon(page));
-	anon_vma = page_lock_anon_vma_read(page);
+
+	/*
+	 * The caller does not necessarily hold an mmap_sem that would prevent
+	 * the anon_vma disappearing so we first we take a reference to it
+	 * and then lock the anon_vma for write. This is similar to
+	 * page_lock_anon_vma_read except the write lock is taken to serialise
+	 * against parallel split or collapse operations.
+	 */
+	anon_vma = page_get_anon_vma(page);
 	if (!anon_vma)
 		goto out;
+	anon_vma_lock_write(anon_vma);
+
 	ret = 0;
 	if (!PageCompound(page))
 		goto out_unlock;
@@ -1462,7 +1472,8 @@ int split_huge_page(struct page *page)
 
 	BUG_ON(PageCompound(page));
 out_unlock:
-	page_unlock_anon_vma_read(anon_vma);
+	anon_vma_unlock(anon_vma);
+	put_anon_vma(anon_vma);
 out:
 	return ret;
 }
