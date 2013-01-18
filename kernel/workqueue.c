@@ -1008,8 +1008,7 @@ static void pwq_activate_first_delayed(struct pool_workqueue *pwq)
  * CONTEXT:
  * spin_lock_irq(pool->lock).
  */
-static void pwq_dec_nr_in_flight(struct pool_workqueue *pwq, int color,
-				 bool delayed)
+static void pwq_dec_nr_in_flight(struct pool_workqueue *pwq, int color)
 {
 	/* ignore uncolored works */
 	if (color == WORK_NO_COLOR)
@@ -1017,13 +1016,11 @@ static void pwq_dec_nr_in_flight(struct pool_workqueue *pwq, int color,
 
 	pwq->nr_in_flight[color]--;
 
-	if (!delayed) {
-		pwq->nr_active--;
-		if (!list_empty(&pwq->delayed_works)) {
-			/* one down, submit a delayed one */
-			if (pwq->nr_active < pwq->max_active)
-				pwq_activate_first_delayed(pwq);
-		}
+	pwq->nr_active--;
+	if (!list_empty(&pwq->delayed_works)) {
+		/* one down, submit a delayed one */
+		if (pwq->nr_active < pwq->max_active)
+			pwq_activate_first_delayed(pwq);
 	}
 
 	/* is flush in progress and are we at the flushing tip? */
@@ -2206,7 +2203,7 @@ __acquires(&pool->lock)
 	worker->current_work = NULL;
 	worker->current_func = NULL;
 	worker->current_pwq = NULL;
-	pwq_dec_nr_in_flight(pwq, work_color, false);
+	pwq_dec_nr_in_flight(pwq, work_color);
 }
 
 /**
