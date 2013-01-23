@@ -216,7 +216,7 @@ SYSCALL_ALIAS(sys_ftruncate64, SyS_ftruncate64);
 
 int do_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 {
-	struct inode *inode = file->f_path.dentry->d_inode;
+	struct inode *inode = file_inode(file);
 	long ret;
 
 	if (offset < 0 || len <= 0)
@@ -403,7 +403,7 @@ SYSCALL_DEFINE1(fchdir, unsigned int, fd)
 	if (!file)
 		goto out;
 
-	inode = file->f_path.dentry->d_inode;
+	inode = file_inode(file);
 
 	error = -ENOTDIR;
 	if (!S_ISDIR(inode->i_mode))
@@ -659,7 +659,7 @@ static struct file *__dentry_open(struct dentry *dentry, struct vfsmount *mnt,
 	if (unlikely(f->f_flags & O_PATH))
 		f->f_mode = FMODE_PATH;
 
-	inode = dentry->d_inode;
+	inode = file_inode(f);
 	if (f->f_mode & FMODE_WRITE) {
 		error = __get_file_write_access(inode, mnt);
 		if (error)
