@@ -1438,8 +1438,7 @@ need_lookup:
 }
 
 /* Fast lookup failed, do it the slow way */
-static int lookup_slow(struct nameidata *nd, struct qstr *name,
-		       struct path *path)
+static int lookup_slow(struct nameidata *nd, struct path *path)
 {
 	struct dentry *dentry, *parent;
 	int err;
@@ -1448,7 +1447,7 @@ static int lookup_slow(struct nameidata *nd, struct qstr *name,
 	BUG_ON(nd->inode != parent->d_inode);
 
 	mutex_lock(&parent->d_inode->i_mutex);
-	dentry = __lookup_hash(name, parent, nd->flags);
+	dentry = __lookup_hash(&nd->last, parent, nd->flags);
 	mutex_unlock(&parent->d_inode->i_mutex);
 	if (IS_ERR(dentry))
 		return PTR_ERR(dentry);
@@ -1537,7 +1536,7 @@ static inline int walk_component(struct nameidata *nd, struct path *path,
 		if (err < 0)
 			goto out_err;
 
-		err = lookup_slow(nd, &nd->last, path);
+		err = lookup_slow(nd, path);
 		if (err < 0)
 			goto out_err;
 
