@@ -408,10 +408,16 @@ static const struct file_operations proc_reg_file_ops_no_compat = {
 
 struct inode *proc_get_inode(struct super_block *sb, struct proc_dir_entry *de)
 {
+<<<<<<< HEAD
 	struct inode *inode = new_inode_pseudo(sb);
 
 	if (inode) {
 		inode->i_ino = de->low_ino;
+=======
+	struct inode *inode = iget_locked(sb, de->low_ino);
+
+	if (inode && (inode->i_state & I_NEW)) {
+>>>>>>> d3d009c... saner proc_get_inode() calling conventions
 		inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 		PROC_I(inode)->pde = de;
 
@@ -441,7 +447,7 @@ struct inode *proc_get_inode(struct super_block *sb, struct proc_dir_entry *de)
 		}
 	}
 	return inode;
-}			
+}
 
 int proc_fill_super(struct super_block *s)
 {
@@ -458,7 +464,6 @@ int proc_fill_super(struct super_block *s)
 	root_inode = proc_get_inode(s, &proc_root);
 	if (!root_inode) {
 		printk(KERN_ERR "proc_fill_super: get root inode failed\n");
-		pde_put(&proc_root);
 		return -ENOMEM;
 	}
 
