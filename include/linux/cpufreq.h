@@ -196,6 +196,7 @@ int cpufreq_get_min(unsigned int cpu);
 
 struct cpufreq_governor {
 	char	name[CPUFREQ_NAME_LEN];
+	int	initialized;
 	int	(*governor)	(struct cpufreq_policy *policy,
 				 unsigned int event);
 	ssize_t	(*show_setspeed)	(struct cpufreq_policy *policy,
