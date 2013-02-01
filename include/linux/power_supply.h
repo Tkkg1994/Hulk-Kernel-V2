@@ -304,7 +304,7 @@ struct power_supply_info {
 	int use_for_apm;
 };
 #ifdef CONFIG_POWER_SUPPLY
-extern struct power_supply *power_supply_get_by_name(char *name);
+extern struct power_supply *power_supply_get_by_name(const char *name);
 extern void power_supply_changed(struct power_supply *psy);
 extern int power_supply_am_i_supplied(struct power_supply *psy);
 extern int power_supply_set_battery_charged(struct power_supply *psy);
