@@ -1,5 +1,6 @@
 #ifndef _LINUX_SOCKET_H
 #define _LINUX_SOCKET_H
+#include <asm/socket.h>			/* arch-dependent defines	*/
 
 /*
  * Desired design of maximum size and alignment (see RFC2553)
@@ -20,7 +21,6 @@ struct __kernel_sockaddr_storage {
 
 #ifdef __KERNEL__
 
-#include <asm/socket.h>			/* arch-dependent defines	*/
 #include <linux/sockios.h>		/* the SIOCxxx I/O controls	*/
 #include <linux/uio.h>			/* iovec support		*/
 #include <linux/types.h>		/* pid_t			*/
