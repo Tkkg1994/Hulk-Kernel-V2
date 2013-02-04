@@ -173,7 +173,7 @@ static void ip_map_request(struct cache_detail *cd,
 
 static int ip_map_upcall(struct cache_detail *cd, struct cache_head *h)
 {
-	return sunrpc_cache_pipe_upcall(cd, h, ip_map_request);
+	return sunrpc_cache_pipe_upcall(cd, h, cd->cache_request);
 }
 
 static struct ip_map *__ip_map_lookup(struct cache_detail *cd, char *class, struct in6_addr *addr);
@@ -491,7 +491,7 @@ static void unix_gid_request(struct cache_detail *cd,
 
 static int unix_gid_upcall(struct cache_detail *cd, struct cache_head *h)
 {
-	return sunrpc_cache_pipe_upcall(cd, h, unix_gid_request);
+	return sunrpc_cache_pipe_upcall(cd, h, cd->cache_request);
 }
 
 static struct unix_gid *unix_gid_lookup(struct cache_detail *cd, uid_t uid);
@@ -597,6 +597,7 @@ static struct cache_detail unix_gid_cache_template = {
 	.name		= "auth.unix.gid",
 	.cache_put	= unix_gid_put,
 	.cache_upcall	= unix_gid_upcall,
+	.cache_request	= unix_gid_request,
 	.cache_parse	= unix_gid_parse,
 	.cache_show	= unix_gid_show,
 	.match		= unix_gid_match,
@@ -892,6 +893,7 @@ static struct cache_detail ip_map_cache_template = {
 	.name		= "auth.unix.ip",
 	.cache_put	= ip_map_put,
 	.cache_upcall	= ip_map_upcall,
+	.cache_request	= ip_map_request,
 	.cache_parse	= ip_map_parse,
 	.cache_show	= ip_map_show,
 	.match		= ip_map_match,
