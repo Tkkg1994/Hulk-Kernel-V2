@@ -858,7 +858,7 @@ static int cpufreq_governor_bds(struct cpufreq_policy *policy,
 
 	switch (event) {
 	case CPUFREQ_GOV_START:
-		if ((!cpu_online(cpu)) || (!policy->cur))
+		if (!policy->cur)
 			return -EINVAL;
 
 		mutex_lock(&bds_mutex);

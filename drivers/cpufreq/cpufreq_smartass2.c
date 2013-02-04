@@ -680,7 +680,7 @@ static int cpufreq_governor_smartass(struct cpufreq_policy *new_policy,
 
 	switch (event) {
 	case CPUFREQ_GOV_START:
-		if ((!cpu_online(cpu)) || (!new_policy->cur))
+		if (!policy->cur)
 			return -EINVAL;
 
 		this_smartass->cur_policy = new_policy;

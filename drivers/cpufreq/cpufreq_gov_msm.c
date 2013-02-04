@@ -196,8 +196,6 @@ static int cpufreq_governor_msm(struct cpufreq_policy *policy,
 
 	switch (event) {
 	case CPUFREQ_GOV_START:
-		if (!cpu_online(cpu))
-			return -EINVAL;
 		BUG_ON(!policy->cur);
 		mutex_lock(&per_cpu(gov_mutex, cpu));
 		per_cpu(msm_gov_info, cpu).cpu = cpu;
