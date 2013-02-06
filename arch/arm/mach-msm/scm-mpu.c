@@ -73,7 +73,7 @@ static void mem_prot_region(u64 start, u64 size, bool lock)
 	request.lock = lock;
 	request.arg = 0;
 
-	ret = scm_call(SCM_SVC_MP, TZ_PROTECT_MEMORY,
+	ret = scm_call(SCM_SVC_CP, TZ_PROTECT_MEMORY,
 			&request, sizeof(request), &ret, sizeof(ret));
 
 	if (ret != 0)
