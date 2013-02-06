@@ -105,6 +105,7 @@ __packed struct qseecom_client_send_data_ireq {
 __packed struct qseecom_client_listener_data_irsp {
 	uint32_t qsee_cmd_id;
 	uint32_t listener_id;
+	uint32_t status;
 };
 
 /*
