@@ -236,7 +236,6 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 #if defined(CONFIG_RUNTIME_COMPCACHE) || defined(CONFIG_ZSWAP)
 	other_file -= total_swapcache_pages;
 #endif /* CONFIG_RUNTIME_COMPCACHE || CONFIG_ZSWAP */
-
 	if (lowmem_adj_size < array_size)
 		array_size = lowmem_adj_size;
 	if (lowmem_minfree_size < array_size)
@@ -290,6 +289,10 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		int hotness_adj = 0;
 #endif
 		if (tsk->flags & PF_KTHREAD)
+			continue;
+
+		/* if task no longer has any memory ignore it */
+		if (test_task_flag(tsk, TIF_MM_RELEASED))
 			continue;
 
 		if (time_before_eq(jiffies, lowmem_deathpending_timeout)) {
@@ -445,12 +448,14 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		send_sig(SIGKILL, selected, 0);
 		set_tsk_thread_flag(selected, TIF_MEMDIE);
 		rem -= selected_tasksize;
+		read_unlock(&tasklist_lock);
 		/* give the system time to free up the memory */
 		msleep_interruptible(20);
 #ifdef LMK_COUNT_READ
 		lmk_count++;
 #endif
-	}
+	} else
+		read_unlock(&tasklist_lock);
 #endif
 #ifdef CONFIG_SEC_DEBUG_LMK_MEMINFO
 	if (__ratelimit(&lmk_rs)) {
@@ -465,7 +470,6 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 #endif
 	lowmem_print(4, "lowmem_shrink %lu, %x, return %d\n",
 		     nr_to_scan, sc->gfp_mask, rem);
-	read_unlock(&tasklist_lock);
 	mutex_unlock(&scan_mutex);
 	return rem;
 }
