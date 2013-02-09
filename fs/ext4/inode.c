@@ -911,7 +911,6 @@ retry_journal:
 		ext4_journal_stop(handle);
 		goto retry_grab;
 	}
-
 	wait_on_page_writeback(page);
 
 	if (ext4_should_dioread_nolock(inode))
@@ -950,6 +949,7 @@ retry_journal:
 			if (inode->i_nlink)
 				ext4_orphan_del(NULL, inode);
 		}
+
 		if (ret == -ENOSPC &&
 		    ext4_should_retry_alloc(inode->i_sb, &retries))
 			goto retry_journal;
