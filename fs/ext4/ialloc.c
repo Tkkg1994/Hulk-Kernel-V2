@@ -638,7 +638,8 @@ static int find_group_other(struct super_block *sb, struct inode *parent,
  */
 struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
 			       umode_t mode, const struct qstr *qstr,
-			       __u32 goal, uid_t *owner, int nblocks)
+			       __u32 goal, uid_t *owner, int handle_type,
+			       unsigned int line_no, int nblocks)
 {
 	struct super_block *sb;
 	struct buffer_head *inode_bitmap_bh = NULL;
@@ -727,7 +728,8 @@ repeat_in_this_group:
 		}
 		if (!handle) {
 			BUG_ON(nblocks <= 0);
-			handle = ext4_journal_start_sb(dir->i_sb, nblocks);
+			handle = __ext4_journal_start_sb(dir->i_sb, line_no,
+							 handle_type, nblocks);
 			if (IS_ERR(handle)) {
 				err = PTR_ERR(handle);
 				goto fail;

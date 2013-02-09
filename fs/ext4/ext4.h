@@ -2008,12 +2008,16 @@ extern int ext4fs_dirhash(const char *name, int len, struct
 /* ialloc.c */
 extern struct inode *__ext4_new_inode(handle_t *, struct inode *, umode_t,
 				      const struct qstr *qstr, __u32 goal,
-				      uid_t *owner, int nblocks);
+				      uid_t *owner, int handle_type,
+				      unsigned int line_no, int nblocks);
 
 #define ext4_new_inode(handle, dir, mode, qstr, goal, owner) \
-	__ext4_new_inode((handle), (dir), (mode), (qstr), (goal), (owner), 0)
-#define ext4_new_inode_start_handle(dir, mode, qstr, goal, owner, nblocks) \
-	__ext4_new_inode(NULL, (dir), (mode), (qstr), (goal), (owner), (nblocks))
+	__ext4_new_inode((handle), (dir), (mode), (qstr), (goal), (owner), \
+			 0, 0, 0)
+#define ext4_new_inode_start_handle(dir, mode, qstr, goal, owner, \
+				    type, nblocks)		    \
+	__ext4_new_inode(NULL, (dir), (mode), (qstr), (goal), (owner), \
+			 (type), __LINE__, (nblocks))
 
 extern void ext4_free_inode(handle_t *, struct inode *);
 extern struct inode * ext4_orphan_get(struct super_block *, unsigned long);
