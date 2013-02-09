@@ -2378,12 +2378,10 @@ static int ext4_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	dquot_initialize(dir);
 
 	credits = (EXT4_DATA_TRANS_BLOCKS(dir->i_sb) +
-		   EXT4_INDEX_EXTRA_TRANS_BLOCKS + 3 +
-		   EXT4_MAXQUOTAS_INIT_BLOCKS(dir->i_sb));
-
+		   EXT4_INDEX_EXTRA_TRANS_BLOCKS + 3);
 retry:
 	inode = ext4_new_inode_start_handle(dir, mode, &dentry->d_name, 0,
-					    NULL, credits);
+					    NULL, EXT4_HT_DIR, credits);
 	handle = ext4_journal_current_handle();
 	err = PTR_ERR(inode);
 	if (!IS_ERR(inode)) {
@@ -2414,12 +2412,10 @@ static int ext4_mknod(struct inode *dir, struct dentry *dentry,
 	dquot_initialize(dir);
 
 	credits = (EXT4_DATA_TRANS_BLOCKS(dir->i_sb) +
-		   EXT4_INDEX_EXTRA_TRANS_BLOCKS + 3 +
-		   EXT4_MAXQUOTAS_INIT_BLOCKS(dir->i_sb));
-
+		   EXT4_INDEX_EXTRA_TRANS_BLOCKS + 3);
 retry:
 	inode = ext4_new_inode_start_handle(dir, mode, &dentry->d_name, 0,
-					    NULL, credits);
+					    NULL, EXT4_HT_DIR, credits);
 	handle = ext4_journal_current_handle();
 	err = PTR_ERR(inode);
 	if (!IS_ERR(inode)) {
@@ -2530,13 +2526,11 @@ static int ext4_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	dquot_initialize(dir);
 
 	credits = (EXT4_DATA_TRANS_BLOCKS(dir->i_sb) +
-		   EXT4_INDEX_EXTRA_TRANS_BLOCKS + 3 +
-		   EXT4_MAXQUOTAS_INIT_BLOCKS(dir->i_sb));
-
+		   EXT4_INDEX_EXTRA_TRANS_BLOCKS + 3);
 retry:
 	inode = ext4_new_inode_start_handle(dir, S_IFDIR | mode,
 					    &dentry->d_name,
-					    0, NULL, credits);
+					    0, NULL, EXT4_HT_DIR, credits);
 	handle = ext4_journal_current_handle();
 	err = PTR_ERR(inode);
 	if (IS_ERR(inode))
@@ -2935,7 +2929,8 @@ static int ext4_unlink(struct inode *dir, struct dentry *dentry)
 	if (le32_to_cpu(de->inode) != inode->i_ino)
 		goto end_unlink;
 
-	handle = ext4_journal_start(dir, EXT4_DELETE_TRANS_BLOCKS(dir->i_sb));
+	handle = ext4_journal_start(dir, EXT4_HT_DIR,
+				    EXT4_DATA_TRANS_BLOCKS(dir->i_sb));
 	if (IS_ERR(handle)) {
 		retval = PTR_ERR(handle);
 		handle = NULL;
@@ -3003,15 +2998,13 @@ static int ext4_symlink(struct inode *dir,
 		 * quota blocks, sb is already counted in previous macros).
 		 */
 		credits = EXT4_DATA_TRANS_BLOCKS(dir->i_sb) +
-			  EXT4_INDEX_EXTRA_TRANS_BLOCKS + 3 +
-			  EXT4_MAXQUOTAS_INIT_BLOCKS(dir->i_sb);
+			  EXT4_INDEX_EXTRA_TRANS_BLOCKS + 3;
 	}
 retry:
 	inode = ext4_new_inode_start_handle(dir, S_IFLNK|S_IRWXUGO,
 					    &dentry->d_name, 0, NULL,
-					    credits);
+					    EXT4_HT_DIR, credits);
 	handle = ext4_journal_current_handle();
-
 	err = PTR_ERR(inode);
 	if (IS_ERR(inode))
 		goto out_stop;
@@ -3041,7 +3034,7 @@ retry:
 		 * Now inode is being linked into dir (EXT4_DATA_TRANS_BLOCKS
 		 * + EXT4_INDEX_EXTRA_TRANS_BLOCKS), inode is also modified
 		 */
-		handle = ext4_journal_start(dir,
+		handle = ext4_journal_start(dir, EXT4_HT_DIR,
 				EXT4_DATA_TRANS_BLOCKS(dir->i_sb) +
 				EXT4_INDEX_EXTRA_TRANS_BLOCKS + 1);
 		if (IS_ERR(handle)) {
@@ -3091,8 +3084,9 @@ static int ext4_link(struct dentry *old_dentry,
 	dquot_initialize(dir);
 
 retry:
-	handle = ext4_journal_start(dir, EXT4_DATA_TRANS_BLOCKS(dir->i_sb) +
-					EXT4_INDEX_EXTRA_TRANS_BLOCKS);
+	handle = ext4_journal_start(dir, EXT4_HT_DIR,
+		(EXT4_DATA_TRANS_BLOCKS(dir->i_sb) +
+		 EXT4_INDEX_EXTRA_TRANS_BLOCKS));
 	if (IS_ERR(handle))
 		return PTR_ERR(handle);
 
@@ -3175,6 +3169,14 @@ static int ext4_rename(struct inode *old_dir, struct dentry *old_dentry,
 	 * in separate transaction */
 	if (new_dentry->d_inode)
 		dquot_initialize(new_dentry->d_inode);
+	handle = ext4_journal_start(old_dir, EXT4_HT_DIR,
+		(2 * EXT4_DATA_TRANS_BLOCKS(old_dir->i_sb) +
+		 EXT4_INDEX_EXTRA_TRANS_BLOCKS + 2));
+	if (IS_ERR(handle))
+		return PTR_ERR(handle);
+
+	if (IS_DIRSYNC(old_dir) || IS_DIRSYNC(new_dir))
+		ext4_handle_sync(handle);
 
 #ifdef CONFIG_SDCARD_FS_CI_SEARCH
 	old_bh = ext4_find_entry(old_dir, &old_dentry->d_name, &old_de, NULL, NULL);
