@@ -50,6 +50,7 @@
 #define QSEEE_VERSION_00		0x400000
 #define QSEE_VERSION_01			0x401000
 #define QSEE_VERSION_02			0x402000
+#define QSEE_VERSION_03			0x403000
 
 
 #define QSEOS_CHECK_VERSION_CMD		0x00001803
@@ -59,6 +60,13 @@
 enum qseecom_clk_definitions {
 	CLK_DFAB = 0,
 	CLK_SFPB,
+};
+
+enum qseecom_client_handle_type {
+	QSEECOM_CLIENT_APP = 0,
+	QSEECOM_LISTENER_SERVICE,
+	QSEECOM_SECURE_SERVICE,
+	QSEECOM_GENERIC,
 };
 
 static struct class *driver_class;
@@ -549,7 +557,8 @@ static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 			pr_err("qseecom_scm_call failed with err: %d\n", ret);
 			return ret;
 		}
-		if (resp->result == QSEOS_RESULT_FAILURE) {
+		if ((resp->result != QSEOS_RESULT_SUCCESS) &&
+			(resp->result != QSEOS_RESULT_INCOMPLETE)) {
 			pr_err("Response result %d not supported\n",
 							resp->result);
 			return -EINVAL;
@@ -951,6 +960,96 @@ static int __qseecom_send_cmd_legacy(struct qseecom_dev_handle *data,
 		}
 	}
 	return ret;
+}
+
+int __qseecom_process_rpmb_svc_cmd(struct qseecom_dev_handle *data_ptr,
+		struct qseecom_send_svc_cmd_req *req_ptr,
+		struct qseecom_client_send_service_ireq *send_svc_ireq_ptr)
+{
+	int ret = 0;
+	if ((req_ptr == NULL) || (send_svc_ireq_ptr == NULL)) {
+		pr_err("Error with pointer: req_ptr = %p, send_svc_ptr = %p\n",
+			req_ptr, send_svc_ireq_ptr);
+		return -EINVAL;
+	}
+	send_svc_ireq_ptr->qsee_cmd_id = req_ptr->cmd_id;
+	send_svc_ireq_ptr->key_type =
+	((struct qseecom_rpmb_provision_key *)req_ptr->cmd_req_buf)->key_type;
+	send_svc_ireq_ptr->req_len = req_ptr->cmd_req_len;
+	send_svc_ireq_ptr->rsp_ptr = (void *)(__qseecom_uvirt_to_kphys(data_ptr,
+					(uint32_t)req_ptr->resp_buf));
+	send_svc_ireq_ptr->rsp_len = req_ptr->resp_len;
+
+	pr_debug("CMD ID (%x), KEY_TYPE (%d)\n", send_svc_ireq_ptr->qsee_cmd_id,
+	((struct qseecom_rpmb_provision_key *)req_ptr->cmd_req_buf)->key_type);
+	return ret;
+}
+
+static int qseecom_send_service_cmd(struct qseecom_dev_handle *data,
+				void __user *argp)
+{
+	int ret = 0;
+	struct qseecom_client_send_service_ireq send_svc_ireq;
+	struct qseecom_command_scm_resp resp;
+	struct qseecom_send_svc_cmd_req req;
+	/*struct qseecom_command_scm_resp resp;*/
+
+	if (__copy_from_user(&req,
+				(void __user *)argp,
+				sizeof(req))) {
+		pr_err("copy_from_user failed\n");
+		return -EFAULT;
+	}
+
+	if (req.resp_buf == NULL) {
+		pr_err("cmd buffer or response buffer is null\n");
+		return -EINVAL;
+	}
+
+	data->type = QSEECOM_SECURE_SERVICE;
+
+	switch (req.cmd_id) {
+	case QSEE_RPMB_PROVISION_KEY_COMMAND:
+	case QSEE_RPMB_ERASE_COMMAND:
+		if (__qseecom_process_rpmb_svc_cmd(data, &req,
+				&send_svc_ireq))
+			return -EINVAL;
+		break;
+	default:
+		pr_err("Unsupported cmd_id %d\n", req.cmd_id);
+		return -EINVAL;
+	}
+
+	ret = scm_call(SCM_SVC_TZSCHEDULER, 1, (const void *) &send_svc_ireq,
+					sizeof(send_svc_ireq),
+					&resp, sizeof(resp));
+	if (ret) {
+		pr_err("qseecom_scm_call failed with err: %d\n", ret);
+		return ret;
+	}
+
+	switch (resp.result) {
+	case QSEOS_RESULT_SUCCESS:
+		break;
+	case QSEOS_RESULT_INCOMPLETE:
+		pr_err("qseos_result_incomplete\n");
+		ret = __qseecom_process_incomplete_cmd(data, &resp);
+		if (ret) {
+			pr_err("process_incomplete_cmd fail: err: %d\n",
+				ret);
+		}
+		break;
+	case QSEOS_RESULT_FAILURE:
+		pr_err("process_incomplete_cmd failed err: %d\n", ret);
+		break;
+	default:
+		pr_err("Response result %d not supported\n",
+				resp.result);
+		ret = -EINVAL;
+		break;
+	}
+	return ret;
+
 }
 
 static int __validate_send_cmd_inputs(struct qseecom_dev_handle *data,
@@ -2355,6 +2454,19 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 		mutex_unlock(&app_access_lock);
 		break;
 	}
+	case QSEECOM_IOCTL_SEND_CMD_SERVICE_REQ: {
+		if (qseecom.qsee_version < QSEE_VERSION_03) {
+			pr_err("SEND_CMD_SERVICE_REQ: Invalid qsee version %u\n",
+				qseecom.qsee_version);
+			return -EINVAL;
+		}
+		mutex_lock(&app_access_lock);
+		atomic_inc(&data->ioctl_count);
+		ret = qseecom_send_service_cmd(data, argp);
+		atomic_dec(&data->ioctl_count);
+		mutex_unlock(&app_access_lock);
+		break;
+	}
 	default:
 		return -EINVAL;
 	}
@@ -2420,12 +2532,14 @@ static int qseecom_release(struct inode *inode, struct file *file)
 			break;
 		case QSEECOM_UNAVAILABLE_CLIENT_APP:
 			break;
+
 		default:
 			pr_err("Unsupported clnt_handle_type %d",
 				data->type);
 			break;
 		}
 	}
+
 	if (data->client.fast_load_enabled == true)
 		qsee_disable_clock_vote(data, CLK_SFPB);
 	if (data->client.perf_enabled == true)
