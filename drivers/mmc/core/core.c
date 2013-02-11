@@ -425,9 +425,12 @@ void mmc_start_bkops(struct mmc_card *card, bool from_exception)
 		return;
 	}
 
+	mmc_rpm_hold(card->host, &card->dev);
 	/* In case of delayed bkops we might be in race with suspend. */
-	if (!mmc_try_claim_host(card->host))
+	if (!mmc_try_claim_host(card->host)) {
+		mmc_rpm_release(card->host, &card->dev);
 		return;
+	}
 
 	/*
 	 * Since the cancel_delayed_work can be changed while we are waiting
@@ -497,6 +500,7 @@ void mmc_start_bkops(struct mmc_card *card, bool from_exception)
 	mmc_card_set_doing_bkops(card);
 out:
 	mmc_release_host(card->host);
+	mmc_rpm_release(card->host, &card->dev);
 }
 EXPORT_SYMBOL(mmc_start_bkops);
 
@@ -2072,7 +2076,6 @@ void mmc_detect_change(struct mmc_host *host, unsigned long delay)
 #endif
 	host->detect_change = 1;
 
-	wake_lock(&host->detect_wake_lock);
 	mmc_schedule_delayed_work(&host->detect, delay);
 }
 
@@ -2790,8 +2793,9 @@ static void mmc_clk_scale_work(struct work_struct *work)
 	if (!host->card || !host->bus_ops ||
 			!host->bus_ops->change_bus_speed ||
 			!host->clk_scaling.enable || !host->ios.clock)
-		goto out;
+		return;
 
+	mmc_rpm_hold(host, &host->card->dev);
 	if (!mmc_try_claim_host(host)) {
 		/* retry after a timer tick */
 		queue_delayed_work(system_nrt_wq, &host->clk_scaling.work, 1);
@@ -2801,6 +2805,7 @@ static void mmc_clk_scale_work(struct work_struct *work)
 	mmc_clk_scaling(host, true);
 	mmc_release_host(host);
 out:
+	mmc_rpm_release(host, &host->card->dev);
 	return;
 }
 
@@ -3181,20 +3186,17 @@ void mmc_rescan(struct work_struct *work)
 
 	ST_LOG("<%s> %s insertion detected",__func__,host->class_dev.kobj.name);
 
+	mmc_rpm_hold(host, &host->class_dev);
 	mmc_claim_host(host);
 	if (!mmc_rescan_try_freq(host, host->f_min))
 		extend_wakelock = true;
 	mmc_release_host(host);
-
+	mmc_rpm_release(host, &host->class_dev);
  out:
 	if (extend_wakelock)
 		wake_lock_timeout(&host->detect_wake_lock, HZ / 2);
-	else
-		wake_unlock(&host->detect_wake_lock);
-	if (host->caps & MMC_CAP_NEEDS_POLL) {
-		wake_lock(&host->detect_wake_lock);
+	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
-	}
 }
 
 void mmc_start_host(struct mmc_host *host)
@@ -3212,8 +3214,8 @@ void mmc_stop_host(struct mmc_host *host)
 	spin_unlock_irqrestore(&host->lock, flags);
 #endif
 
-	if (cancel_delayed_work_sync(&host->detect))
-		wake_unlock(&host->detect_wake_lock);
+	cancel_delayed_work_sync(&host->detect);
+
 	mmc_flush_scheduled_work();
 
 	/* clear pm flags now and let card drivers set them as needed */
@@ -3433,15 +3435,6 @@ int mmc_suspend_host(struct mmc_host *host)
 	if (mmc_bus_needs_resume(host))
 		return 0;
 
-	if (cancel_delayed_work(&host->detect))
-		wake_unlock(&host->detect_wake_lock);
-
-	/* If there is pending detect work abort runtime suspend */
-	if (unlikely(work_busy(&host->detect.work)))
-		return -EAGAIN;
-	else
-		mmc_flush_scheduled_work();
-
 	mmc_bus_get(host);
 	if (host->bus_ops && !host->bus_dead) {
 		/*
@@ -3591,10 +3584,21 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 			spin_unlock_irqrestore(&host->lock, flags);
 			break;
 		}
+		spin_unlock_irqrestore(&host->lock, flags);
+
+		/* Wait for pending detect work to be completed */
+		if (!(host->caps & MMC_CAP_NEEDS_POLL))
+			flush_work(&host->detect.work);
+
+		spin_lock_irqsave(&host->lock, flags);
 		host->rescan_disable = 1;
 		spin_unlock_irqrestore(&host->lock, flags);
-		if (cancel_delayed_work_sync(&host->detect))
-			wake_unlock(&host->detect_wake_lock);
+		/*
+		 * In some cases, the detect work might be scheduled
+		 * just before rescan_disable is set to true.
+		 * Cancel such the scheduled works.
+		 */
+		cancel_delayed_work_sync(&host->detect);
 
 		if (!host->bus_ops || host->bus_ops->suspend)
 			break;
@@ -3629,6 +3633,10 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 		else
 #endif
 		mmc_detect_change(host, 0);
+		break;
+
+	default:
+		return -EINVAL;
 
 	}
 
@@ -3695,6 +3703,37 @@ bkops_out:
 	return err;
 }
 EXPORT_SYMBOL(mmc_bkops_enable);
+
+void mmc_rpm_hold(struct mmc_host *host, struct device *dev)
+{
+	int ret = 0;
+
+	if (!mmc_use_core_runtime_pm(host))
+		return;
+
+	ret = pm_runtime_get_sync(dev);
+	if (ret < 0) {
+		pr_err("%s: %s: %s: error resuming device: %d\n",
+		       dev_name(dev), mmc_hostname(host), __func__, ret);
+		if (pm_runtime_suspended(dev))
+			BUG_ON(1);
+	}
+}
+EXPORT_SYMBOL(mmc_rpm_hold);
+
+void mmc_rpm_release(struct mmc_host *host, struct device *dev)
+{
+	int ret = 0;
+
+	if (!mmc_use_core_runtime_pm(host))
+		return;
+
+	ret = pm_runtime_put_sync(dev);
+	if (ret < 0 && ret != -EBUSY)
+		pr_err("%s: %s: %s: put sync ret: %d\n",
+		       dev_name(dev), mmc_hostname(host), __func__, ret);
+}
+EXPORT_SYMBOL(mmc_rpm_release);
 
 /**
  * mmc_init_context_info() - init synchronization context

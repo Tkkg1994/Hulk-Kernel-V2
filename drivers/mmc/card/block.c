@@ -35,6 +35,7 @@
 #include <linux/capability.h>
 #include <linux/compat.h>
 #include <linux/sysfs.h>
+#include <linux/pm_runtime.h>
 
 #include <linux/mmc/ioctl.h>
 #include <linux/mmc/card.h>
@@ -2501,6 +2502,7 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	unsigned long flags;
 
 	if (req && !mq->mqrq_prev->req) {
+		mmc_rpm_hold(host, &card->dev);
 		/* claim host only for the first request */
 		mmc_claim_host(card->host);
 
@@ -2510,7 +2512,6 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		mmc_blk_set_blksize(md, card);
 	}
 #endif
-
 		if (card->ext_csd.bkops_en)
 			mmc_stop_bkops(card);
 	}
@@ -2568,6 +2569,8 @@ out:
 				!(mq->mqrq_cur->req->cmd_flags & REQ_URGENT))) {
 		/* release host only when there are no more requests */
 		mmc_release_host(card->host);
+		mmc_rpm_release(host, &card->dev);
+	}
 	return ret;
 }
 
