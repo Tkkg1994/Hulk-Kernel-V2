@@ -1483,11 +1483,11 @@ msmsdcc_data_err(struct msmsdcc_host *host, struct mmc_data *data,
 
 		/* In case of DATA CRC/timeout error, execute tuning again */
 #if defined(CONFIG_BCM4334) || defined(CONFIG_BCM4334_MODULE)
-		if (host->tuning_needed&&!host->tuning_in_progress&&(host->pdev_id!=4))
+		if (host->tuning_needed&&!host->tuning_in_progress&&(host->pdev->id!=4))
 #elif defined (CONFIG_BCM4335)||defined (CONFIG_BCM4335_MODULE)
-		if (host->tuning_needed&&!host->tuning_in_progress&&(host->pdev_id!=3))
+		if (host->tuning_needed&&!host->tuning_in_progress&&(host->pdev->id!=3))
 #else
-		if (host->tuning_needed&&!host->tuning_in_progress)
+		if (host->tuning_needed && !host->tuning_in_progress)
 #endif
 			host->tuning_done = false;
 
@@ -1699,7 +1699,7 @@ static void msmsdcc_sg_stop(struct msmsdcc_host *host)
 static inline void msmsdcc_clear_pio_irq_mask(struct msmsdcc_host *host)
 {
 	writel_relaxed(readl_relaxed(host->base + MMCIMASK0) & ~MCI_IRQ_PIO,
-		host->base + MMCIMASK0);
+			host->base + MMCIMASK0);
 	mb();
 }
 
@@ -1773,8 +1773,8 @@ msmsdcc_pio_irq(int irq, void *dev_id)
 
 	if (status & MCI_RXACTIVE && host->curr.xfer_remain < MCI_FIFOSIZE) {
 		writel_relaxed((readl_relaxed(host->base + MMCIMASK0) &
-				~MCI_IRQ_PIO) | MCI_RXDATAAVLBLMASK,
-				host->base + MMCIMASK0);
+					~MCI_IRQ_PIO) | MCI_RXDATAAVLBLMASK,
+					host->base + MMCIMASK0);
 		mb();
 	}
 
@@ -1849,11 +1849,11 @@ static void msmsdcc_do_cmdirq(struct msmsdcc_host *host, uint32_t status)
 		msmsdcc_dump_sdcc_state(host);
 
 #if defined(CONFIG_BCM4334) || defined(CONFIG_BCM4334_MODULE)
-		if( host->pdev_id == 4){
+		if( host->pdev->id == 4){
 			printk("%s: Skipped tuning.\n",mmc_hostname(host->mmc));
 		}
 #elif defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE)
-		if( host->pdev_id == 3){
+		if( host->pdev->id == 3){
 			printk("%s: Skipped tuning.\n",mmc_hostname(host->mmc));
 		}
 #else
@@ -2037,7 +2037,6 @@ msmsdcc_irq(int irq, void *dev_id)
 		 * Check for proper command response
 		 */
 		cmd = host->curr.cmd;
-
 		if ((status & (MCI_CMDSENT | MCI_CMDRESPEND | MCI_CMDCRCFAIL |
 			MCI_CMDTIMEOUT | MCI_PROGDONE |
 			MCI_AUTOCMD19TIMEOUT)) && host->curr.cmd) {
@@ -2307,7 +2306,7 @@ msmsdcc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	}
 
 	/*
-	 * Check if DLL retuning is required? if yes, perform it here before
+	 * Check if DLL retuning is required? If yes, perform it here before
 	 * starting new request.
 	 */
 	if (host->tuning_needed && !host->tuning_in_progress &&
@@ -2621,18 +2620,18 @@ static int msmsdcc_setup_vreg(struct msmsdcc_host *host, bool enable,
 #if defined(CONFIG_MACH_JF_ATT) || defined(CONFIG_MACH_JF_TMO) || defined(CONFIG_MACH_JF_EUR) || \
 	defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 		if (system_rev != BOARD_REV07) { /* TI Level Shifter */
-			if (system_rev < BOARD_REV08 && host->pdev_id == 4)
+			if (system_rev < BOARD_REV08 && host->pdev->id == 4)
 #else /* VZW/SPT/USCC */
 		if (system_rev != BOARD_REV08) { /* TI Level Shifter */
-			if (system_rev < BOARD_REV09 && host->pdev_id == 4)
+			if (system_rev < BOARD_REV09 && host->pdev->id == 4)
 #endif
 				/* Disable level shifter */
 				gpio_set_value(60, 0); /* TFLASH_LS_EN */
 #if defined(CONFIG_MACH_JF_ATT) || defined(CONFIG_MACH_JF_TMO) || defined(CONFIG_MACH_JF_EUR) || \
 	defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
-			else if (system_rev >= BOARD_REV08 && host->pdev_id == 2)
+			else if (system_rev >= BOARD_REV08 && host->pdev->id == 2)
 #else /* VZW/SPT/USCC/KOR */
-			else if (system_rev >= BOARD_REV09 && host->pdev_id == 2)
+			else if (system_rev >= BOARD_REV09 && host->pdev->id == 2)
 #endif
 #if defined(CONFIG_MACH_JF_DCM)
 				ice_gpiox_set(FPGA_GPIO_TFLASH_LS_EN, 0);
@@ -2668,17 +2667,17 @@ static int msmsdcc_setup_vreg(struct msmsdcc_host *host, bool enable,
 		mdelay(1);
 #if defined(CONFIG_MACH_JF_ATT) || defined(CONFIG_MACH_JF_TMO) || defined(CONFIG_MACH_JF_EUR) || \
 	defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
-		if (system_rev < BOARD_REV08 && host->pdev_id == 4)
+		if (system_rev < BOARD_REV08 && host->pdev->id == 4)
 #else /* VZW/SPT/USCC */
-		if (system_rev < BOARD_REV09 && host->pdev_id == 4)
+		if (system_rev < BOARD_REV09 && host->pdev->id == 4)
 #endif
 			/* Enable level shifter */
 			gpio_set_value(60, 1); /* TFLASH_LS_EN */
 #if defined(CONFIG_MACH_JF_ATT) || defined(CONFIG_MACH_JF_TMO) || defined(CONFIG_MACH_JF_EUR) || \
 	defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
-		else if (system_rev >= BOARD_REV08 && host->pdev_id == 2)
+		else if (system_rev >= BOARD_REV08 && host->pdev->id == 2)
 #else /* VZW/SPT/USCC/KOR */
-		else if (system_rev >= BOARD_REV09 && host->pdev_id == 2)
+		else if (system_rev >= BOARD_REV09 && host->pdev->id == 2)
 #endif
 #if defined(CONFIG_MACH_JF_DCM)
 			ice_gpiox_set(FPGA_GPIO_TFLASH_LS_EN, 1);
@@ -2693,10 +2692,10 @@ static int msmsdcc_setup_vreg(struct msmsdcc_host *host, bool enable,
 #if defined(CONFIG_MACH_JF_ATT) || defined(CONFIG_MACH_JF_TMO) || defined(CONFIG_MACH_JF_EUR) || \
 	defined(CONFIG_MACH_JACTIVE_ATT) || defined(CONFIG_MACH_JACTIVE_EUR)
 		if (system_rev == BOARD_REV07) { /* Toshiba Level Shifter */
-			if (system_rev < BOARD_REV08 && host->pdev_id == 4)
+			if (system_rev < BOARD_REV08 && host->pdev->id == 4)
 #else /* VZW/SPT/USCC */
 		if (system_rev == BOARD_REV08) { /* Toshiba Level Shifter */
-			if (system_rev < BOARD_REV09 && host->pdev_id == 4)
+			if (system_rev < BOARD_REV09 && host->pdev->id == 4)
 #endif
 				/* Disable level shifter */
 				gpio_set_value(60, 0); /* TFLASH_LS_EN */
@@ -3275,7 +3274,7 @@ static int msmsdcc_msm_bus_register(struct msmsdcc_host *host)
 		host->msm_bus_vote.max_bw_vote =
 				msmsdcc_msm_bus_get_vote_for_bw(host, UINT_MAX);
 #if defined(CONFIG_BCM4334) || defined(CONFIG_BCM4334_MODULE)
-		if (host->pdev_id == 4)
+		if (host->pdev->id == 4)
 			host->msm_bus_vote.is_max_bw_needed = 1;
 #endif
 	}
@@ -4367,13 +4366,11 @@ static int msmsdcc_execute_tuning(struct mmc_host *mmc, u32 opcode)
 /*	phase = 0; */
 	is_tuning_all_phases = !(host->mmc->card &&
 		(host->saved_tuning_phase != INVALID_TUNING_PHASE));
-
 retry:
 	if (is_tuning_all_phases)
 		phase = 0; /* start from phase 0 during init */
 	else
 		phase = (u8)host->saved_tuning_phase;
-
 	do {
 		struct mmc_command cmd = {0};
 		struct mmc_data data = {0};
@@ -4412,7 +4409,7 @@ retry:
 				mmc_hostname(mmc), __func__, phase);
 		} else if (!is_tuning_all_phases) {
 			pr_debug("%s: tuning failed at saved phase (%d), retrying\n",
-				mmc_hostname(mmc), (u32)phase);
+					mmc_hostname(mmc), (u32)phase);
 			is_tuning_all_phases = true;
 			goto retry;
 		}
@@ -4450,45 +4447,13 @@ kfree:
 out:
 	spin_lock_irqsave(&host->lock, flags);
 	host->tuning_in_progress = 0;
-	if (!rc || (host->pdev_id == 3))
+	if (!rc || (host->pdev->id == 3))
 		host->tuning_done = true;
 	spin_unlock_irqrestore(&host->lock, flags);
 exit:
 	pr_debug("%s: Exit %s\n", mmc_hostname(mmc), __func__);
 	return rc;
 }
-
-static int msmsdcc_notify_load(struct mmc_host *mmc, enum mmc_load state)
-{
-	int err = 0;
-	unsigned long rate;
-	struct msmsdcc_host *host = mmc_priv(mmc);
-
-	if (IS_ERR_OR_NULL(host->bus_clk))
-		goto out;
-
-	switch (state) {
-	case MMC_LOAD_HIGH:
-		rate = MSMSDCC_BUS_VOTE_MAX_RATE;
-		break;
-	case MMC_LOAD_LOW:
-		rate = MSMSDCC_BUS_VOTE_MIN_RATE;
-		break;
-	default:
-		err = -EINVAL;
-		goto out;
-	}
-
-	if (rate != host->bus_clk_rate) {
-		err = clk_set_rate(host->bus_clk, rate);
-		if (err)
-			pr_err("%s: %s: bus clk set rate %lu Hz err %d\n",
-					mmc_hostname(mmc), __func__, rate, err);
-		else
-			host->bus_clk_rate = rate;
-	}
-out:
-	return err;
 
 /*
  * Work around of the unavailability of a power_reset functionality in SD cards
@@ -4603,6 +4568,39 @@ unsigned int msmsdcc_get_xfer_remain(struct mmc_host *mmc)
 	return data_cnt;
 }
 
+static int msmsdcc_notify_load(struct mmc_host *mmc, enum mmc_load state)
+{
+	int err = 0;
+	unsigned long rate;
+	struct msmsdcc_host *host = mmc_priv(mmc);
+
+	if (IS_ERR_OR_NULL(host->bus_clk))
+		goto out;
+
+	switch (state) {
+	case MMC_LOAD_HIGH:
+		rate = MSMSDCC_BUS_VOTE_MAX_RATE;
+		break;
+	case MMC_LOAD_LOW:
+		rate = MSMSDCC_BUS_VOTE_MIN_RATE;
+		break;
+	default:
+		err = -EINVAL;
+		goto out;
+	}
+
+	if (rate != host->bus_clk_rate) {
+		err = clk_set_rate(host->bus_clk, rate);
+		if (err)
+			pr_err("%s: %s: bus clk set rate %lu Hz err %d\n",
+					mmc_hostname(mmc), __func__, rate, err);
+		else
+			host->bus_clk_rate = rate;
+	}
+out:
+	return err;
+}
+
 static const struct mmc_host_ops msmsdcc_ops = {
 	.enable		= msmsdcc_enable,
 	.disable	= msmsdcc_disable,
@@ -4614,10 +4612,10 @@ static const struct mmc_host_ops msmsdcc_ops = {
 	.enable_sdio_irq = msmsdcc_enable_sdio_irq,
 	.start_signal_voltage_switch = msmsdcc_switch_io_voltage,
 	.execute_tuning = msmsdcc_execute_tuning,
-	.notify_load = msmsdcc_notify_load,
-	.hw_reset = msmsdcc_hw_reset,
-	.stop_request = msmsdcc_stop_request,
+	.hw_reset	= msmsdcc_hw_reset,
+	.stop_request	= msmsdcc_stop_request,
 	.get_xfer_remain = msmsdcc_get_xfer_remain,
+	.notify_load	= msmsdcc_notify_load,
 };
 
 static void msmsdcc_enable_status_gpio(struct msmsdcc_host *host)
@@ -6284,6 +6282,7 @@ msmsdcc_probe(struct platform_device *pdev)
 
 	set_default_hw_caps(host);
 	host->saved_tuning_phase = INVALID_TUNING_PHASE;
+
 	/*
 	 * Set the register write delay according to min. clock frequency
 	 * supported and update later when the host->clk_rate changes.
@@ -6503,7 +6502,7 @@ msmsdcc_probe(struct platform_device *pdev)
 
 /* SYSFS about SD Card Detection by soonil.lim */
 #if defined(CONFIG_MACH_SERRANO)
-	if (t_flash_detect_dev == NULL && (host->pdev_id == 3)) {
+	if (t_flash_detect_dev == NULL && (host->pdev->id == 3)) {
 #else
 	if (t_flash_detect_dev == NULL && gpio_is_valid(plat->status_gpio)) {
 #endif
@@ -6909,7 +6908,7 @@ static inline void msmsdcc_gate_clock(struct msmsdcc_host *host)
 	struct mmc_host *mmc = host->mmc;
 	unsigned long flags;
 
-	if (host->pdev_id == 3) {
+	if (host->pdev->id == 3) {
 		printk(KERN_INFO "%s: msmsdcc_gate_clock due to mmc_card_keep_power\n", __func__);
 	}
 
@@ -6982,12 +6981,12 @@ msmsdcc_runtime_suspend(struct device *dev)
 	}
 
 #if defined(CONFIG_BCM4334) || defined(CONFIG_BCM4334_MODULE)
-	if (host->pdev_id == 4) {
+	if (host->pdev->id == 4) {
 		host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
 		printk(KERN_INFO "%s: Enter WIFI suspend\n", __func__);
 	}
 #elif defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE)
-	if (host->pdev_id == 3) {
+	if (host->pdev->id == 3) {
 		host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
 		printk(KERN_INFO "%s: Enter WIFI suspend\n", __func__);
 	}
@@ -7062,11 +7061,11 @@ msmsdcc_runtime_resume(struct device *dev)
 	if (host->plat->is_sdio_al_client)
 		goto out;
 #if defined(CONFIG_BCM4334) || defined(CONFIG_BCM4334_MODULE)
-	if (host->pdev_id == 4) {
+	if (host->pdev->id == 4) {
 		printk(KERN_INFO "%s: Enter WIFI resume\n", __func__);
 	}
 #elif defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE)
-	if (host->pdev_id == 3) {
+	if (host->pdev->id == 3) {
 		printk(KERN_INFO "%s: Enter WIFI resume\n", __func__);
 	}
 #endif
@@ -7077,11 +7076,11 @@ msmsdcc_runtime_resume(struct device *dev)
 				mmc_card_keep_power(mmc)) {
 			msmsdcc_ungate_clock(host);
 #if defined(CONFIG_BCM4334) || defined(CONFIG_BCM4334_MODULE)
-			if (host->pdev_id == 4) {
+			if (host->pdev->id == 4) {
 				printk(KERN_INFO "%s: To check whether skip the WIFI resume in mmc_card_keep_power\n", __func__);
 			}
 #elif defined(CONFIG_BCM4335) || defined(CONFIG_BCM4335_MODULE)
-			if (host->pdev_id == 3) {
+			if (host->pdev->id == 3) {
 				printk(KERN_INFO "%s: To check whether skip the WIFI resume in mmc_card_keep_power\n", __func__);
 			}
 #endif
