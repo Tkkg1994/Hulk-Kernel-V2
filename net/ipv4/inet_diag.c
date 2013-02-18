@@ -208,7 +208,7 @@ static int inet_csk_diag_fill(struct sock *sk,
 			      const struct nlmsghdr *unlh)
 {
 	return inet_sk_diag_fill(sk, inet_csk(sk),
-			skb, req, portid, seq, nlmsg_flags, unlh);
+			skb, req, user_ns, portid, seq, nlmsg_flags, unlh);
 }
 
 static int inet_twsk_diag_fill(struct inet_timewait_sock *tw,

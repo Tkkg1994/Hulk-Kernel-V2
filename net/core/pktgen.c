@@ -3781,7 +3781,38 @@ static void __exit pg_cleanup(void)
 		kfree(t);
 	}
 
+<<<<<<< HEAD
 	/* Un-register us from receiving netdevice events */
+=======
+	remove_proc_entry(PGCTRL, pn->proc_dir);
+	remove_proc_entry(PG_PROC_DIR, pn->net->proc_net);
+}
+
+static struct pernet_operations pg_net_ops = {
+	.init = pg_net_init,
+	.exit = pg_net_exit,
+	.id   = &pg_net_id,
+	.size = sizeof(struct pktgen_net),
+};
+
+static int __init pg_init(void)
+{
+	int ret = 0;
+
+	pr_info("%s", version);
+	ret = register_pernet_subsys(&pg_net_ops);
+	if (ret)
+		return ret;
+	ret = register_netdevice_notifier(&pktgen_notifier_block);
+	if (ret)
+		unregister_pernet_subsys(&pg_net_ops);
+
+	return ret;
+}
+
+static void __exit pg_cleanup(void)
+{
+>>>>>>> ece31ff... net: proc: change proc_net_remove to remove_proc_entry
 	unregister_netdevice_notifier(&pktgen_notifier_block);
 
 	/* Clean up proc file system */

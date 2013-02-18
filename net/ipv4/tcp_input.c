@@ -3030,38 +3030,6 @@ static void tcp_update_cwnd_in_recovery(struct sock *sk, int newly_acked_sacked,
 	tp->snd_cwnd = tcp_packets_in_flight(tp) + sndcnt;
 }
 
-static void tcp_enter_recovery(struct sock *sk, bool ece_ack)
-{
-	struct tcp_sock *tp = tcp_sk(sk);
-	int mib_idx;
-
-	if (tcp_is_reno(tp))
-		mib_idx = LINUX_MIB_TCPRENORECOVERY;
-	else
-		mib_idx = LINUX_MIB_TCPSACKRECOVERY;
-
-	NET_INC_STATS_BH(sock_net(sk), mib_idx);
-
-	tp->high_seq = tp->snd_nxt;
-	tp->prior_ssthresh = 0;
-	tp->undo_marker = tp->snd_una;
-	tp->undo_retrans = tp->retrans_out;
-
-	if (inet_csk(sk)->icsk_ca_state < TCP_CA_CWR) {
-		if (!ece_ack)
-			tp->prior_ssthresh = tcp_current_ssthresh(sk);
-		tp->snd_ssthresh = inet_csk(sk)->icsk_ca_ops->ssthresh(sk);
-		TCP_ECN_queue_cwr(tp);
-	}
-
-	tp->bytes_acked = 0;
-	tp->snd_cwnd_cnt = 0;
-	tp->prior_cwnd = tp->snd_cwnd;
-	tp->prr_delivered = 0;
-	tp->prr_out = 0;
-	tcp_set_ca_state(sk, TCP_CA_Recovery);
-}
-
 /* Process an event, which can update packets-in-flight not trivially.
  * Main goal of this function is to calculate new estimate for left_out,
  * taking into account both packets sitting in receiver's buffer and
@@ -3082,7 +3050,7 @@ static void tcp_fastretrans_alert(struct sock *sk, int pkts_acked,
 	int do_lost = is_dupack || ((flag & FLAG_DATA_SACKED) &&
 				    (tcp_fackets_out(tp) > tp->reordering));
 	int newly_acked_sacked = 0;
-	int fast_rexmit = 0;
+	int fast_rexmit = 0, mib_idx;
 
 	if (WARN_ON(!tp->packets_out && tp->sacked_out))
 		tp->sacked_out = 0;
@@ -3187,7 +3155,32 @@ static void tcp_fastretrans_alert(struct sock *sk, int pkts_acked,
 		}
 
 		/* Otherwise enter Recovery state */
-		tcp_enter_recovery(sk, (flag & FLAG_ECE));
+
+		if (tcp_is_reno(tp))
+			mib_idx = LINUX_MIB_TCPRENORECOVERY;
+		else
+			mib_idx = LINUX_MIB_TCPSACKRECOVERY;
+
+		NET_INC_STATS_BH(sock_net(sk), mib_idx);
+
+		tp->high_seq = tp->snd_nxt;
+		tp->prior_ssthresh = 0;
+		tp->undo_marker = tp->snd_una;
+		tp->undo_retrans = tp->retrans_out ? : -1;
+
+		if (icsk->icsk_ca_state < TCP_CA_CWR) {
+			if (!(flag & FLAG_ECE))
+				tp->prior_ssthresh = tcp_current_ssthresh(sk);
+			tp->snd_ssthresh = icsk->icsk_ca_ops->ssthresh(sk);
+			TCP_ECN_queue_cwr(tp);
+		}
+
+		tp->bytes_acked = 0;
+		tp->snd_cwnd_cnt = 0;
+		tp->prior_cwnd = tp->snd_cwnd;
+		tp->prr_delivered = 0;
+		tp->prr_out = 0;
+		tcp_set_ca_state(sk, TCP_CA_Recovery);
 		fast_rexmit = 1;
 	}
 
@@ -4502,98 +4495,6 @@ static inline int tcp_try_rmem_schedule(struct sock *sk, unsigned int size)
 	return 0;
 }
 
-/**
- * tcp_try_coalesce - try to merge skb to prior one
- * @sk: socket
- * @to: prior buffer
- * @from: buffer to add in queue
- * @fragstolen: pointer to boolean
- *
- * Before queueing skb @from after @to, try to merge them
- * to reduce overall memory use and queue lengths, if cost is small.
- * Packets in ofo or receive queues can stay a long time.
- * Better try to coalesce them right now to avoid future collapses.
- * Returns true if caller should free @from instead of queueing it
- */
-static bool tcp_try_coalesce(struct sock *sk,
-			     struct sk_buff *to,
-			     struct sk_buff *from,
-			     bool *fragstolen)
-{
-	int i, delta, len = from->len;
-
-	*fragstolen = false;
-	if (tcp_hdr(from)->fin || skb_cloned(to))
-		return false;
-	if (len <= skb_tailroom(to)) {
-		BUG_ON(skb_copy_bits(from, 0, skb_put(to, len), len));
-merge:
-		NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_TCPRCVCOALESCE);
-		TCP_SKB_CB(to)->end_seq = TCP_SKB_CB(from)->end_seq;
-		TCP_SKB_CB(to)->ack_seq = TCP_SKB_CB(from)->ack_seq;
-		return true;
-	}
-
-	if (skb_has_frag_list(to) || skb_has_frag_list(from))
-		return false;
-
-	if (skb_headlen(from) == 0 &&
-	    (skb_shinfo(to)->nr_frags +
-	     skb_shinfo(from)->nr_frags <= MAX_SKB_FRAGS)) {
-		WARN_ON_ONCE(from->head_frag);
-		delta = from->truesize - ksize(from->head) -
-			SKB_DATA_ALIGN(sizeof(struct sk_buff));
-
-		WARN_ON_ONCE(delta < len);
-copyfrags:
-		memcpy(skb_shinfo(to)->frags + skb_shinfo(to)->nr_frags,
-		       skb_shinfo(from)->frags,
-		       skb_shinfo(from)->nr_frags * sizeof(skb_frag_t));
-		skb_shinfo(to)->nr_frags += skb_shinfo(from)->nr_frags;
-
-		if (skb_cloned(from))
-			for (i = 0; i < skb_shinfo(from)->nr_frags; i++)
-				skb_frag_ref(from, i);
-		else
-			skb_shinfo(from)->nr_frags = 0;
-
-		to->truesize += delta;
-		atomic_add(delta, &sk->sk_rmem_alloc);
-		sk_mem_charge(sk, delta);
-		to->len += len;
-		to->data_len += len;
-		goto merge;
-	}
-	if (from->head_frag) {
-		struct page *page;
-		unsigned int offset;
-
-		if (skb_shinfo(to)->nr_frags + skb_shinfo(from)->nr_frags >= MAX_SKB_FRAGS)
-			return false;
-		page = virt_to_head_page(from->head);
-		offset = from->data - (unsigned char *)page_address(page);
-		skb_fill_page_desc(to, skb_shinfo(to)->nr_frags,
-				   page, offset, skb_headlen(from));
-
-		if (skb_cloned(from))
-			get_page(page);
-		else
-			*fragstolen = true;
-
-		delta = len; /* we dont know real truesize... */
-		goto copyfrags;
-	}
-	return false;
-}
-
-static void kfree_skb_partial(struct sk_buff *skb, bool head_stolen)
-{
-	if (head_stolen)
-		kmem_cache_free(skbuff_head_cache, skb);
-	else
-		__kfree_skb(skb);
-}
-
 static void tcp_data_queue_ofo(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
@@ -4632,13 +4533,23 @@ static void tcp_data_queue_ofo(struct sock *sk, struct sk_buff *skb)
 	end_seq = TCP_SKB_CB(skb)->end_seq;
 
 	if (seq == TCP_SKB_CB(skb1)->end_seq) {
-		bool fragstolen;
-
-		if (!tcp_try_coalesce(sk, skb1, skb, &fragstolen)) {
-			__skb_queue_after(&tp->out_of_order_queue, skb1, skb);
-		} else {
-			kfree_skb_partial(skb, fragstolen);
+		/* Packets in ofo can stay in queue a long time.
+		 * Better try to coalesce them right now
+		 * to avoid future tcp_collapse_ofo_queue(),
+		 * probably the most expensive function in tcp stack.
+		 */
+		if (skb->len <= skb_tailroom(skb1) && !tcp_hdr(skb)->fin) {
+			NET_INC_STATS_BH(sock_net(sk),
+					 LINUX_MIB_TCPRCVCOALESCE);
+			BUG_ON(skb_copy_bits(skb, 0,
+					     skb_put(skb1, skb->len),
+					     skb->len));
+			TCP_SKB_CB(skb1)->end_seq = end_seq;
+			TCP_SKB_CB(skb1)->ack_seq = TCP_SKB_CB(skb)->ack_seq;
+			__kfree_skb(skb);
 			skb = NULL;
+		} else {
+			__skb_queue_after(&tp->out_of_order_queue, skb1, skb);
 		}
 
 		if (!tp->rx_opt.num_sacks ||
@@ -4720,7 +4631,6 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 	const struct tcphdr *th = tcp_hdr(skb);
 	struct tcp_sock *tp = tcp_sk(sk);
 	int eaten = -1;
-	bool fragstolen = false;
 
 	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq)
 		goto drop;
@@ -4760,20 +4670,13 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 		}
 
 		if (eaten <= 0) {
-			struct sk_buff *tail;
 queue_and_out:
 			if (eaten < 0 &&
 			    tcp_try_rmem_schedule(sk, skb->truesize))
 				goto drop;
 
-			tail = skb_peek_tail(&sk->sk_receive_queue);
-			eaten = (tail &&
-				 tcp_try_coalesce(sk, tail, skb,
-						  &fragstolen)) ? 1 : 0;
-			if (eaten <= 0) {
-				skb_set_owner_r(skb, sk);
-				__skb_queue_tail(&sk->sk_receive_queue, skb);
-			}
+			skb_set_owner_r(skb, sk);
+			__skb_queue_tail(&sk->sk_receive_queue, skb);
 		}
 		tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
 		if (skb->len)
@@ -4797,7 +4700,7 @@ queue_and_out:
 		tcp_fast_path_check(sk);
 
 		if (eaten > 0)
-			kfree_skb_partial(skb, fragstolen);
+			__kfree_skb(skb);
 		else if (!sock_flag(sk, SOCK_DEAD))
 			sk->sk_data_ready(sk, 0);
 		return;
@@ -6208,3 +6111,4 @@ discard:
 	return 0;
 }
 EXPORT_SYMBOL(tcp_rcv_state_process);
+

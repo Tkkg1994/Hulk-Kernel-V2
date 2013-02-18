@@ -3222,7 +3222,7 @@ int ip_rt_dump(struct sk_buff *skb,  struct netlink_callback *cb)
 			if (rt_is_expired(rt))
 				continue;
 			skb_dst_set_noref(skb, &rt->dst);
-			if (rt_fill_info(net, skb, NETLINK_CB(cb->skb).pid,
+			if (rt_fill_info(net, skb, NETLINK_CB(cb->skb).portid,
 					 cb->nlh->nlmsg_seq, RTM_NEWROUTE,
 					 1, NLM_F_MULTI) <= 0) {
 				skb_dst_drop(skb);
@@ -3529,7 +3529,7 @@ int __init ip_rt_init(void)
 	devinet_init();
 	ip_fib_init();
 
-	INIT_DELAYED_WORK_DEFERRABLE(&expires_work, rt_worker_func);
+	INIT_DEFERRABLE_WORK(&expires_work, rt_worker_func);
 	expires_ljiffies = jiffies;
 	schedule_delayed_work(&expires_work,
 		net_random() % ip_rt_gc_interval + ip_rt_gc_interval);
