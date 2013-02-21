@@ -29,6 +29,7 @@
 static struct timekeeper timekeeper;
 static DEFINE_RAW_SPINLOCK(timekeeper_lock);
 static seqcount_t timekeeper_seq;
+static struct timekeeper shadow_timekeeper;
 
 /* flag for if timekeeping is suspended */
 int __read_mostly timekeeping_suspended;
@@ -226,7 +227,7 @@ int pvclock_gtod_unregister_notifier(struct notifier_block *nb)
 EXPORT_SYMBOL_GPL(pvclock_gtod_unregister_notifier);
 
 /* must hold timekeeper_lock */
-static void timekeeping_update(struct timekeeper *tk, bool clearntp)
+static void timekeeping_update(struct timekeeper *tk, bool clearntp, bool mirror)
 {
 	if (clearntp) {
 		tk->ntp_error = 0;
@@ -234,6 +235,9 @@ static void timekeeping_update(struct timekeeper *tk, bool clearntp)
 	}
 	update_vsyscall(tk);
 	update_pvclock_gtod(tk);
+
+	if (mirror)
+		memcpy(&shadow_timekeeper, &timekeeper, sizeof(timekeeper));
 }
 
 /**
@@ -471,7 +475,7 @@ int do_settimeofday(const struct timespec *tv)
 
 	tk_set_xtime(tk, tv);
 
-	timekeeping_update(tk, true);
+	timekeeping_update(tk, true, true);
 
 	write_seqcount_end(&timekeeper_seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
@@ -515,7 +519,7 @@ int timekeeping_inject_offset(struct timespec *ts)
 	tk_set_wall_to_mono(tk, timespec_sub(tk->wall_to_monotonic, *ts));
 
 error: /* even if we error out, we forwarded the time, so call update */
-	timekeeping_update(tk, true);
+	timekeeping_update(tk, true, true);
 
 	write_seqcount_end(&timekeeper_seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
@@ -595,7 +599,7 @@ static int change_clocksource(void *data)
 		if (old->disable)
 			old->disable(old);
 	}
-	timekeeping_update(tk, true);
+	timekeeping_update(tk, true, true);
 
 	write_seqcount_end(&timekeeper_seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
@@ -776,6 +780,8 @@ void __init timekeeping_init(void)
 	tmp.tv_nsec = 0;
 	tk_set_sleep_time(tk, tmp);
 
+	memcpy(&shadow_timekeeper, &timekeeper, sizeof(timekeeper));
+
 	write_seqcount_end(&timekeeper_seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
 }
@@ -832,7 +838,7 @@ void timekeeping_inject_sleeptime(struct timespec *delta)
 
 	__timekeeping_inject_sleeptime(tk, delta);
 
-	timekeeping_update(tk, true);
+	timekeeping_update(tk, true, true);
 
 	write_seqcount_end(&timekeeper_seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
@@ -914,7 +920,7 @@ static void timekeeping_resume(void)
 	clock->cycle_last = cycle_now;
 	tk->ntp_error = 0;
 	timekeeping_suspended = 0;
-	timekeeping_update(tk, false);
+	timekeeping_update(tk, false, true);
 	write_seqcount_end(&timekeeper_seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
 
@@ -1296,7 +1302,8 @@ static inline void old_vsyscall_fixup(struct timekeeper *tk)
 static void update_wall_time(void)
 {
 	struct clocksource *clock;
-	struct timekeeper *tk = &timekeeper;
+	struct timekeeper *real_tk = &timekeeper;
+	struct timekeeper *tk = &shadow_timekeeper;
 	cycle_t offset;
 	int shift = 0, maxshift;
 	unsigned int clock_set = 0;
@@ -1309,15 +1316,15 @@ static void update_wall_time(void)
 	if (unlikely(timekeeping_suspended))
 		goto out;
 
-	clock = tk->clock;
+	clock = real_tk->clock;
 
 #ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
-	offset = tk->cycle_interval;
+	offset = real_tk->cycle_interval;
 #else
 	offset = (clock->read(clock) - clock->cycle_last) & clock->mask;
 #endif
 	/* Check if there's really nothing to do */
-	if (offset < tk->cycle_interval)
+	if (offset < real_tk->cycle_interval)
 		goto out;
 
 	/*
@@ -1356,7 +1363,18 @@ static void update_wall_time(void)
 
 	/* Update clock->cycle_last with the new value */
 	clock->cycle_last = tk->cycle_last;
-	timekeeping_update(tk, false);
+	/*
+	 * Update the real timekeeper.
+	 *
+	 * We could avoid this memcpy by switching pointers, but that
+	 * requires changes to all other timekeeper usage sites as
+	 * well, i.e. move the timekeeper pointer getter into the
+	 * spinlocked/seqcount protected sections. And we trade this
+	 * memcpy under the timekeeper_seq against one before we start
+	 * updating.
+	 */
+	memcpy(real_tk, tk, sizeof(*tk));
+	timekeeping_update(real_tk, false, false);
 
 out:
 	write_seqcount_end(&timekeeper_seq);
