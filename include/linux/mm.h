@@ -1702,6 +1702,9 @@ int vmemmap_populate_basepages(struct page *start_page,
 int vmemmap_populate(struct page *start_page, unsigned long pages, int node);
 void vmemmap_populate_print_last(void);
 
+#ifdef CONFIG_MEMORY_HOTPLUG
+void vmemmap_free(struct page *memmap, unsigned long nr_pages);
+#endif
 
 enum mf_flags {
 	MF_COUNT_INCREASED = 1 << 0,
