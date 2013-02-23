@@ -372,7 +372,6 @@ static struct file *sock_alloc_file(struct socket *sock, int flags)
 
 	sock->file = file;
 	file->f_flags = O_RDWR | (flags & O_NONBLOCK);
-	file->f_pos = 0;
 	file->private_data = sock;
 	return file;
 }
