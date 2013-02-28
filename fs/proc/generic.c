@@ -15,6 +15,7 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/printk.h>
 #include <linux/mount.h>
 #include <linux/init.h>
 #include <linux/idr.h>
@@ -359,7 +360,7 @@ static int proc_register(struct proc_dir_entry * dir, struct proc_dir_entry * dp
 
 	for (tmp = dir->subdir; tmp; tmp = tmp->next)
 		if (strcmp(tmp->name, dp->name) == 0) {
-			WARN(1, KERN_WARNING "proc_dir_entry '%s/%s' already registered\n",
+			WARN(1, "proc_dir_entry '%s/%s' already registered\n",
 				dir->name, dp->name);
 			break;
 		}
@@ -597,9 +598,9 @@ void remove_proc_entry(const char *name, struct proc_dir_entry *parent)
 	if (S_ISDIR(de->mode))
 		parent->nlink--;
 	de->nlink = 0;
-	WARN(de->subdir, KERN_WARNING "%s: removing non-empty directory "
-			"'%s/%s', leaking at least '%s'\n", __func__,
-			de->parent->name, de->name, de->subdir->name);
+	WARN(de->subdir, "%s: removing non-empty directory "
+			 "'%s/%s', leaking at least '%s'\n", __func__,
+			 de->parent->name, de->name, de->subdir->name);
 	pde_put(de);
 }
 EXPORT_SYMBOL(remove_proc_entry);
