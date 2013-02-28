@@ -1711,7 +1711,6 @@ static int __cfq_set_weight(struct cgroup *cgrp, struct cftype *cft, u64 val,
 	if (!is_leaf_weight)
 		blkcg->cfq_weight = val;
 	else
-		blkcg->cfq_leaf_weight = val;
 
 	hlist_for_each_entry(blkg, &blkcg->blkg_list, blkcg_node) {
 		struct cfq_group *cfqg = blkg_to_cfqg(blkg);

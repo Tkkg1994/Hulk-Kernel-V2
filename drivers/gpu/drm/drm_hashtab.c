@@ -60,7 +60,6 @@ void drm_ht_verbose_list(struct drm_open_hash *ht, unsigned long key)
 {
 	struct drm_hash_item *entry;
 	struct hlist_head *h_list;
-	struct hlist_node *list;
 	unsigned int hashed_key;
 	int count = 0;
 
@@ -78,7 +77,6 @@ static struct hlist_node *drm_ht_find_key(struct drm_open_hash *ht,
 {
 	struct drm_hash_item *entry;
 	struct hlist_head *h_list;
-	struct hlist_node *list;
 	unsigned int hashed_key;
 
 	hashed_key = hash_long(key, ht->order);
@@ -86,7 +84,7 @@ static struct hlist_node *drm_ht_find_key(struct drm_open_hash *ht,
 	hlist_for_each(list, h_list) {
 		entry = hlist_entry(list, struct drm_hash_item, head);
 		if (entry->key == key)
-			return list;
+			return &entry->head;
 		if (entry->key > key)
 			break;
 	}
@@ -98,7 +96,7 @@ int drm_ht_insert_item(struct drm_open_hash *ht, struct drm_hash_item *item)
 {
 	struct drm_hash_item *entry;
 	struct hlist_head *h_list;
-	struct hlist_node *list, *parent;
+	struct hlist_node *parent;
 	unsigned int hashed_key;
 	unsigned long key = item->key;
 
@@ -111,7 +109,7 @@ int drm_ht_insert_item(struct drm_open_hash *ht, struct drm_hash_item *item)
 			return -EINVAL;
 		if (entry->key > key)
 			break;
-		parent = list;
+		parent = &entry->head;
 	}
 	if (parent) {
 		hlist_add_after(parent, &item->head);
