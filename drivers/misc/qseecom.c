@@ -1618,8 +1618,12 @@ int qseecom_start_app(struct qseecom_handle **handle,
 	app_ireq.qsee_cmd_id = QSEOS_APP_LOOKUP_COMMAND;
 	memcpy(app_ireq.app_name, app_name, MAX_APP_NAME_SIZE);
 	ret = __qseecom_check_app_exists(app_ireq);
-	if (ret < 0)
+	if (ret < 0) {
+		kzfree(data);
+		kfree(*handle);
+		*handle = NULL;
 		return -EINVAL;
+	}
 
 	if (ret > 0) {
 		pr_warn("App id %d for [%s] app exists\n", ret,
@@ -1649,6 +1653,7 @@ int qseecom_start_app(struct qseecom_handle **handle,
 		if (ret < 0) {
 			kfree(data);
 			kfree(*handle);
+			kfree(data);
 			*handle = NULL;
 			return ret;
 		}
