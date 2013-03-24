@@ -1055,9 +1055,10 @@ static int get_transition_latency(struct powernow_k8_data *data)
 static int transition_frequency_fidvid(struct powernow_k8_data *data,
 		unsigned int index)
 {
+	struct cpufreq_policy *policy;
 	u32 fid = 0;
 	u32 vid = 0;
-	int res, i;
+	int res;
 	struct cpufreq_freqs freqs;
 
 	pr_debug("cpu %d transition to index %u\n", smp_processor_id(), index);
@@ -1086,10 +1087,10 @@ static int transition_frequency_fidvid(struct powernow_k8_data *data,
 	freqs.old = find_khz_freq_from_fid(data->currfid);
 	freqs.new = find_khz_freq_from_fid(fid);
 
-	for_each_cpu(i, data->available_cores) {
-		freqs.cpu = i;
-		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-	}
+	policy = cpufreq_cpu_get(smp_processor_id());
+	cpufreq_cpu_put(policy);
+
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 
 	res = transition_fid_vid(data, fid, vid);
 	if (res)
@@ -1097,10 +1098,7 @@ static int transition_frequency_fidvid(struct powernow_k8_data *data,
 
 	freqs.new = find_khz_freq_from_fid(data->currfid);
 
-	for_each_cpu(i, data->available_cores) {
-		freqs.cpu = i;
-		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-	}
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 	return res;
 }
 

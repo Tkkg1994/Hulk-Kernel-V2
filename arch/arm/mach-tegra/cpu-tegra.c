@@ -71,6 +71,42 @@ static unsigned int tegra_getspeed(unsigned int cpu)
 	return rate;
 }
 
+static int tegra_cpu_clk_set_rate(unsigned long rate)
+{
+	int ret;
+
+	/*
+	 * Take an extra reference to the main pll so it doesn't turn
+	 * off when we move the cpu off of it
+	 */
+	clk_prepare_enable(pll_x_clk);
+
+	ret = clk_set_parent(cpu_clk, pll_p_clk);
+	if (ret) {
+		pr_err("Failed to switch cpu to clock pll_p\n");
+		goto out;
+	}
+
+	if (rate == clk_get_rate(pll_p_clk))
+		goto out;
+
+	ret = clk_set_rate(pll_x_clk, rate);
+	if (ret) {
+		pr_err("Failed to change pll_x to %lu\n", rate);
+		goto out;
+	}
+
+	ret = clk_set_parent(cpu_clk, pll_x_clk);
+	if (ret) {
+		pr_err("Failed to switch cpu to clock pll_x\n");
+		goto out;
+	}
+
+out:
+	clk_disable_unprepare(pll_x_clk);
+	return ret;
+}
+
 static int tegra_update_cpu_speed(unsigned long rate)
 {
 	int ret = 0;
@@ -93,8 +129,7 @@ static int tegra_update_cpu_speed(unsigned long rate)
 	else
 		clk_set_rate(emc_clk, 100000000);  /* emc 50Mhz */
 
-	for_each_online_cpu(freqs.cpu)
-		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_PRECHANGE);
 
 #ifdef CONFIG_CPU_FREQ_DEBUG
 	printk(KERN_DEBUG "cpufreq-tegra: transition: %u --> %u\n",
@@ -108,8 +143,7 @@ static int tegra_update_cpu_speed(unsigned long rate)
 		return ret;
 	}
 
-	for_each_online_cpu(freqs.cpu)
-		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+	cpufreq_notify_transition(policy, &freqs, CPUFREQ_POSTCHANGE);
 
 	return 0;
 }
@@ -146,7 +180,7 @@ static int tegra_target(struct cpufreq_policy *policy,
 
 	target_cpu_speed[policy->cpu] = freq;
 
-	ret = tegra_update_cpu_speed(tegra_cpu_highest_speed());
+	ret = tegra_update_cpu_speed(policy, tegra_cpu_highest_speed());
 
 out:
 	mutex_unlock(&tegra_cpu_lock);
@@ -158,10 +192,12 @@ static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
 {
 	mutex_lock(&tegra_cpu_lock);
 	if (event == PM_SUSPEND_PREPARE) {
+		struct cpufreq_policy *policy = cpufreq_cpu_get(0);
 		is_suspended = true;
 		pr_info("Tegra cpufreq suspend: setting frequency to %d kHz\n",
 			freq_table[0].frequency);
-		tegra_update_cpu_speed(freq_table[0].frequency);
+		tegra_update_cpu_speed(policy, freq_table[0].frequency);
+		cpufreq_cpu_put(policy);
 	} else if (event == PM_POST_SUSPEND) {
 		is_suspended = false;
 	}
