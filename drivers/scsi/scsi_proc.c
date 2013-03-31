@@ -48,7 +48,7 @@ static DEFINE_MUTEX(global_host_template_mutex);
 static ssize_t proc_scsi_host_write(struct file *file, const char __user *buf,
                            size_t count, loff_t *ppos)
 {
-	struct Scsi_Host *shost = PDE_DATA(file->f_path.dentry->d_inode);
+	struct Scsi_Host *shost = PDE_DATA(file_inode(file));
 	ssize_t ret = -ENOMEM;
 	char *page;
     
