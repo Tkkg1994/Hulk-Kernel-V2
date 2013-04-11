@@ -348,8 +348,7 @@ static int proc_register(struct proc_dir_entry * dir, struct proc_dir_entry * dp
 	} else if (S_ISLNK(dp->mode)) {
 		dp->proc_iops = &proc_link_inode_operations;
 	} else if (S_ISREG(dp->mode)) {
-		if (dp->proc_fops == NULL)
-			dp->proc_fops = &proc_file_operations;
+		BUG_ON(dp->proc_fops == NULL);
 		dp->proc_iops = &proc_file_inode_operations;
 	} else {
 		WARN_ON(1);
@@ -475,36 +474,6 @@ struct proc_dir_entry *proc_mkdir(const char *name,
 	return proc_mkdir_mode(name, S_IRUGO | S_IXUGO, parent);
 }
 EXPORT_SYMBOL(proc_mkdir);
-
-struct proc_dir_entry *create_proc_read_entry(
-	const char *name, umode_t mode, struct proc_dir_entry *parent, 
-	read_proc_t *read_proc, void *data)
-{
-	struct proc_dir_entry *ent;
-
-	if ((mode & S_IFMT) == 0)
-		mode |= S_IFREG;
-
-	if (!S_ISREG(mode)) {
-		WARN_ON(1);	/* use proc_mkdir(), damnit */
-		return NULL;
-	}
-
-	if ((mode & S_IALLUGO) == 0)
-		mode |= S_IRUGO;
-
-	ent = __proc_create(&parent, name, mode, 1);
-	if (ent) {
-		ent->read_proc = read_proc;
-		ent->data = data;
-		if (proc_register(parent, ent) < 0) {
-			kfree(ent);
-			ent = NULL;
-		}
-	}
-	return ent;
-}
-EXPORT_SYMBOL(create_proc_read_entry);
 
 struct proc_dir_entry *proc_create_data(const char *name, umode_t mode,
 					struct proc_dir_entry *parent,
