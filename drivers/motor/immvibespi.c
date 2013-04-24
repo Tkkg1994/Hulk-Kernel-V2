@@ -388,7 +388,6 @@ ssize_t pwm_value_store(struct device *dev, struct device_attribute *attr,
 static DEVICE_ATTR(pwm_value, S_IRUGO | S_IWUSR,
     pwm_value_show, pwm_value_store);
 
-
 /*
 ** Called to get the device name (device name must be returned as ANSI char)
 */
