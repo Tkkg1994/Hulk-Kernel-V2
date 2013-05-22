@@ -1146,7 +1146,7 @@ int mmc_stop_bkops(struct mmc_card *card)
 	 * If idle time bkops is running on the card, let's not get into
 	 * suspend.
 	 */
-	if (mmc_card_doing_bkops(card)
+	if (!mmc_use_core_runtime_pm(card->host) && mmc_card_doing_bkops(card)
 	    && (card->host->parent->power.runtime_status == RPM_SUSPENDING)
 	    && mmc_card_is_prog_state(card)) {
 		err = -EBUSY;
