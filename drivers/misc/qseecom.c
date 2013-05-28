@@ -1045,27 +1045,8 @@ static int qseecom_send_cmd(struct qseecom_dev_handle *data, void __user *argp)
 	return ret;
 }
 
-static int __qseecom_send_cmd_req_clean_up(
-			struct qseecom_send_modfd_cmd_req *req)
-{
-	char *field;
-	uint32_t *update;
-	int ret = 0;
-	int i = 0;
-
-	for (i = 0; i < MAX_ION_FD; i++) {
-		if (req->ifd_data[i].fd > 0) {
-			field = (char *)req->cmd_req_buf +
-					req->ifd_data[i].cmd_buf_offset;
-			update = (uint32_t *) field;
-			*update = 0;
-		}
-	}
-	return ret;
-}
-
-static int __qseecom_update_with_phy_addr(
-			struct qseecom_send_modfd_cmd_req *req)
+static int __qseecom_update_cmd_buf(struct qseecom_send_modfd_cmd_req *req,
+								bool cleanup)
 {
 	struct ion_handle *ihandle;
 	char *field;
@@ -1111,7 +1092,11 @@ static int __qseecom_update_with_phy_addr(
 			if (sg_ptr->nents == 1) {
 				uint32_t *update;
 				update = (uint32_t *) field;
-				*update = (uint32_t)sg_dma_address(sg_ptr->sgl);
+				if (cleanup)
+					*update = 0;
+				else
+					*update = (uint32_t)sg_dma_address(
+								sg_ptr->sgl);
 			} else {
 				struct qseecom_sg_entry *update;
 				struct scatterlist *sg;
@@ -1119,9 +1104,14 @@ static int __qseecom_update_with_phy_addr(
 				update = (struct qseecom_sg_entry *) field;
 				sg = sg_ptr->sgl;
 				for (j = 0; j < sg_ptr->nents; j++) {
-					update->phys_addr = (uint32_t)
-						sg_dma_address(sg);
-					update->len = (uint32_t)sg->length;
+					if (cleanup) {
+						update->phys_addr = 0;
+						update->len = 0;
+					} else {
+						update->phys_addr = (uint32_t)
+							sg_dma_address(sg);
+						update->len = sg->length;
+					}
 					update++;
 					sg = sg_next(sg);
 				}
@@ -1168,15 +1158,18 @@ static int qseecom_send_modfd_cmd(struct qseecom_dev_handle *data,
 			return -EINVAL;
 		}
 	}
-	ret = __qseecom_update_with_phy_addr(&req);
+	ret = __qseecom_update_cmd_buf(&req, false);
 	if (ret)
 		return ret;
-
 	ret = __qseecom_send_cmd(data, &send_cmd_req);
-	__qseecom_send_cmd_req_clean_up(&req);
 	if (ret)
 		return ret;
 
+	ret = __qseecom_update_cmd_buf(&req, true);
+	if (ret)
+		return ret;
+	pr_debug("sending cmd_req->rsp size: %u, ptr: 0x%p\n",
+			req.resp_len, req.resp_buf);
 	return ret;
 }
 
