@@ -198,6 +198,12 @@ struct mmc_context_info {
 	spinlock_t		lock;
 };
 
+enum dev_state {
+	DEV_SUSPENDING = 1,
+	DEV_SUSPENDED,
+	DEV_RESUMED,
+};
+
 struct mmc_host {
 	struct device		*parent;
 	struct device		class_dev;
@@ -417,7 +423,7 @@ struct mmc_host {
 	} clk_scaling;
 
 	unsigned int		actual_clock;	/* Actual HC clock rate */
-
+	enum dev_state dev_status;
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
