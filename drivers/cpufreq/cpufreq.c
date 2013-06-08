@@ -34,9 +34,6 @@
 #include <linux/completion.h>
 #include <linux/mutex.h>
 #include <linux/syscore_ops.h>
-#ifdef CONFIG_MSM_LIMITER
-#include <linux/msm_thermal.h>
-#endif
 
 #include <trace/events/power.h>
 
@@ -2357,18 +2354,16 @@ int cpufreq_set_freq(unsigned int max_freq, unsigned int min_freq,
 			goto skip;
 		}
 
-		down_write(&policy->rwsem);
+		lock_policy_rwsem_write(policy->cpu);
 		if (max_freq && max_freq >= policy->min) {
 			policy->user_policy.max = max_freq;
 			policy->max = max_freq;
-			msm_thermal_set_frequency(cpu, max_freq, true);
 		}
 		if (min_freq && min_freq <= policy->max) {
 			policy->user_policy.min = min_freq;
 			policy->min = min_freq;
-			msm_thermal_set_frequency(cpu, min_freq, false);
 		}
-		up_write(&policy->rwsem);
+		unlock_policy_rwsem_write(policy->cpu);
 
 		cpufreq_cpu_put(policy);
 	}
@@ -2436,9 +2431,9 @@ int cpufreq_set_gov(char *target_gov, unsigned int cpu)
 			goto skip;
 		}
 
-		down_write(&policy->rwsem);
+		lock_policy_rwsem_write(policy->cpu);
 		ret = store_scaling_governor(policy, target_gov, ret);
-		up_write(&policy->rwsem);
+		unlock_policy_rwsem_write(policy->cpu);
 
 		cpufreq_cpu_put(policy);
 	}
