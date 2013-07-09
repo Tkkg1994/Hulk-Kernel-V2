@@ -269,6 +269,7 @@ static inline void suspend_thaw_processes(void)
 #endif
 
 #ifdef CONFIG_PM_AUTOSLEEP
+
 /* kernel/power/autosleep.c */
 extern int pm_autosleep_init(void);
 extern int pm_autosleep_lock(void);
