@@ -1665,14 +1665,11 @@ static int mmc_suspend(struct mmc_host *host)
 	if (err)
 		goto out;
 
-	if (mmc_can_poweroff_notify(host->card))
-		err = mmc_poweroff_notify(host->card, EXT_CSD_POWER_OFF_SHORT);
-	else if (mmc_card_can_sleep(host))
+	if (mmc_card_can_sleep(host))
 	{       
 		if ((!strcmp(mmc_hostname(host), "mmc0")) && (host->card->cid.manfid == 0x45))
 			mmc_switch(host->card, EXT_CSD_CMD_SET_NORMAL,
 				EXT_CSD_BUS_WIDTH, EXT_CSD_BUS_WIDTH_1, 0);
-
 		err = mmc_card_sleep(host);
 	}
 	else if (!mmc_host_is_spi(host))
