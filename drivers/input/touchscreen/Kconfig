@@ -1059,6 +1059,12 @@ config TOUCHSCREEN_SYNAPTICS_I2C_RMI4
 	  To compile this driver as a module, choose M here: the
 	  module will be called synaptics_i2c_rmi4.
 
+config TOUCHSCREEN_SWEEP2WAKE
+	tristate "Sweep2Wake for touchscreens"
+	default n
+
+endif
+
 config TOUCHSCREEN_MXT224
 	tristate "Atmel MaxTouch 224"
 	depends on I2C
