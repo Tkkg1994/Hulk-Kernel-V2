@@ -72,14 +72,14 @@ static int cprm_ake_retry_flag;
 #define INAND_CMD38_ARG_SECTRIM2 0x88
 #define MMC_BLK_TIMEOUT_MS  (30 * 1000)        /* 30 sec timeout */
 
-#define MMC_SANITIZE_REQ_TIMEOUT 240000 /* msec */
-
 #define mmc_req_rel_wr(req)	(((req->cmd_flags & REQ_FUA) || \
-			(req->cmd_flags & REQ_META)) && \
-			(rq_data_dir(req) == WRITE))
+				  (req->cmd_flags & REQ_META)) && \
+				  (rq_data_dir(req) == WRITE))
 #define PACKED_CMD_VER		0x01
 #define PACKED_CMD_WR		0x02
 #define PACKED_TRIGGER_MAX_ELEMENTS	5000
+
+#define MMC_SANITIZE_REQ_TIMEOUT 240000 /* msec */
 #define MMC_BLK_UPDATE_STOP_REASON(stats, reason)			\
 	do {								\
 		if (stats->enabled)					\
@@ -1796,6 +1796,13 @@ static int mmc_blk_update_interrupted_req(struct mmc_card *card,
 		 ext_csd[EXT_CSD_CORRECTLY_PRG_SECTORS_NUM + 1] << 8 |
 		 ext_csd[EXT_CSD_CORRECTLY_PRG_SECTORS_NUM + 2] << 16 |
 		 ext_csd[EXT_CSD_CORRECTLY_PRG_SECTORS_NUM + 3] << 24);
+
+	/*
+	 * skip packed command header (1 sector) included by the counter but not
+	 * actually written to the NAND
+	 */
+	if (correctly_done >= card->ext_csd.data_sector_size)
+		correctly_done -= card->ext_csd.data_sector_size;
 
 	list_for_each_entry(prq, &mq_rq->packed_list, queuelist) {
 		if ((correctly_done - (int)blk_rq_bytes(prq)) < 0) {
