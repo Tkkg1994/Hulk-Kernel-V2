@@ -720,14 +720,14 @@ static struct attribute_group dbs_attr_group = {
 
 /************************** sysfs end ************************/
 
-static void dbs_freq_increase(struct cpufreq_policy *p, unsigned int freq)
+static void dbs_freq_increase(struct cpufreq_policy *policy, unsigned int freq)
 {
 	if (dbs_tuners_ins.powersave_bias)
-		freq = powersave_bias_target(p, freq, CPUFREQ_RELATION_H);
-	else if (p->cur == p->max)
+		freq = powersave_bias_target(policy, freq, CPUFREQ_RELATION_H);
+	else if (policy->cur == policy->max)
 		return;
 
-	__cpufreq_driver_target(p, freq, dbs_tuners_ins.powersave_bias ?
+	__cpufreq_driver_target(policy, freq, dbs_tuners_ins.powersave_bias ?
 			CPUFREQ_RELATION_L : CPUFREQ_RELATION_H);
 }
 
