@@ -6289,7 +6289,6 @@ msmsdcc_probe(struct platform_device *pdev)
 	mmc->max_current_300 = msmsdcc_get_vreg_vdd_max_current(host);
 	mmc->max_current_330 = msmsdcc_get_vreg_vdd_max_current(host);
 
-
 	mmc->caps2 |= (MMC_CAP2_BOOTPART_NOACC | MMC_CAP2_DETECT_ON_ERR);
 	/* Disable Sanitize & BKOPS
 	 * mmc->caps2 |= MMC_CAP2_SANITIZE;
