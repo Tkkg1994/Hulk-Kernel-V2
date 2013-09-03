@@ -17,8 +17,10 @@
 #define __MSM_CLK_PROVIDER_H
 
 #include <linux/types.h>
+#include <linux/err.h>
 #include <linux/list.h>
 #include <linux/clkdev.h>
+#include <linux/device.h>
 #include <linux/spinlock.h>
 #include <linux/mutex.h>
 #include <linux/regulator/consumer.h>
@@ -197,5 +199,14 @@ extern struct clk dummy_clk;
 
 #define CLK_LOOKUP(con, c, dev) { .con_id = con, .clk = &c, .dev_id = dev }
 #define CLK_LIST(_c) { .clk = &(&_c)->c, .of_idx = clk_##_c }
+
+static inline bool is_better_rate(unsigned long req, unsigned long best,
+				  unsigned long new)
+{
+	if (IS_ERR_VALUE(new))
+		return false;
+
+	return (req <= new && new < best) || (best < req && best < new);
+}
 
 #endif
