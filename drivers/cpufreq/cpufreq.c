@@ -48,7 +48,10 @@ extern void set_gpu_vdd_levels(int uv_tbl[]);
 static struct cpufreq_driver *cpufreq_driver;
 static DEFINE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_data);
 #ifdef CONFIG_HOTPLUG_CPU
-/* This one keeps track of the previously set governor of a removed CPU */
+/*
+ * This one keeps track of the previously set governor and user-set
+ * min/max freq of a removed CPU
+ */
 struct cpufreq_cpu_save_data {
 	char gov[CPUFREQ_NAME_LEN];
 	unsigned int max, min;
@@ -1241,12 +1244,13 @@ static int __cpufreq_remove_dev(struct device *dev, struct subsys_interface *sif
 		__cpufreq_governor(data, CPUFREQ_GOV_STOP);
 
 #ifdef CONFIG_HOTPLUG_CPU
-	strncpy(per_cpu(cpufreq_policy_save, cpu).gov, data->governor->name,
-			CPUFREQ_NAME_LEN);
+	if (!cpufreq_driver->setpolicy)
+		strlcpy(per_cpu(cpufreq_policy_save, cpu).gov,
+			data->governor->name, CPUFREQ_NAME_LEN);
 	per_cpu(cpufreq_policy_save, cpu).min = data->user_policy.min;
 	per_cpu(cpufreq_policy_save, cpu).max = data->user_policy.max;
 	pr_debug("Saving CPU%d user policy min %d and max %d\n",
-			cpu, data->user_policy.min, data->user_policy.max);
+		 cpu, data->user_policy.min, data->user_policy.max);
 #endif
 
 	WARN_ON(lock_policy_rwsem_write(cpu));
@@ -1860,6 +1864,7 @@ void cpufreq_unregister_governor(struct cpufreq_governor *governor)
 {
 #ifdef CONFIG_HOTPLUG_CPU
 	int cpu;
+	struct cpufreq_cpu_save_data *saved_policy;
 #endif
 
 	if (!governor)
@@ -1872,11 +1877,10 @@ void cpufreq_unregister_governor(struct cpufreq_governor *governor)
 	for_each_present_cpu(cpu) {
 		if (cpu_online(cpu))
 			continue;
-		if (!strcmp(per_cpu(cpufreq_policy_save, cpu).gov,
-					governor->name))
-			strcpy(per_cpu(cpufreq_policy_save, cpu).gov, "\0");
-		per_cpu(cpufreq_policy_save, cpu).min = 0;
-		per_cpu(cpufreq_policy_save, cpu).max = 0;
+
+		saved_policy = &per_cpu(cpufreq_policy_save, cpu);
+		if (!strcmp(saved_policy->gov, governor->name))
+			strlcpy(saved_policy->gov, "\0", CPUFREQ_NAME_LEN);
 	}
 #endif
 
