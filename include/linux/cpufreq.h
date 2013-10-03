@@ -586,4 +586,8 @@ void cpufreq_frequency_table_put_attr(unsigned int cpu);
 
 ssize_t cpufreq_show_cpus(const struct cpumask *mask, char *buf);
 
+int cpufreq_generic_init(struct cpufreq_policy *policy,
+		struct cpufreq_frequency_table *table,
+		unsigned int transition_latency);
+
 #endif /* _LINUX_CPUFREQ_H */
