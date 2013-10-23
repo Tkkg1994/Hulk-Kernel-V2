@@ -29,6 +29,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/types.h>
+#include <linux/clk/msm-clk.h>
 #include <asm/mach/pci.h>
 #include <mach/gpiomux.h>
 #include <mach/hardware.h>

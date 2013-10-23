@@ -28,11 +28,11 @@
 #include <linux/wakelock.h>
 #include <linux/pm_runtime.h>
 #include <linux/regulator/consumer.h>
+#include <linux/clk/msm-clk.h>
 
 #include <linux/usb/ulpi.h>
 #include <linux/usb/msm_hsusb_hw.h>
 #include <linux/usb/msm_hsusb.h>
-#include <mach/clk.h>
 #include <mach/msm_xo.h>
 #include <mach/msm_iomap.h>
 

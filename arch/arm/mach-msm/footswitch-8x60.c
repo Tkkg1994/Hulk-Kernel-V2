@@ -21,10 +21,10 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 #include <linux/clk.h>
+#include <linux/clk/msm-clk.h>
 #include <mach/msm_iomap.h>
 #include <mach/msm_bus.h>
 #include <mach/scm-io.h>
-#include <mach/clk.h>
 #include <mach/rpm.h>
 
 #include "footswitch.h"

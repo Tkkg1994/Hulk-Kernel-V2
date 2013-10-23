@@ -19,6 +19,7 @@
 #include <linux/slab.h>
 #include <linux/clk.h>
 #include <linux/of_device.h>
+#include <linux/clk/msm-clk.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
@@ -26,7 +27,6 @@
 #include <sound/q6afe-v2.h>
 #include <sound/msm-dai-q6-v2.h>
 #include <sound/pcm_params.h>
-#include <mach/clk.h>
 
 enum {
 	STATUS_PORT_STARTED, /* track if AFE port has started */

@@ -31,6 +31,7 @@
 #include <asm/arch_timer.h>
 #include <mach/gpio.h>
 #include <mach/mpm.h>
+#include <linux/clk/msm-clk.h>
 
 enum {
 	MSM_MPM_GIC_IRQ_DOMAIN,

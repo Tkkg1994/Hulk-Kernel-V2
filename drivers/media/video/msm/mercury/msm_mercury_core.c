@@ -15,7 +15,7 @@
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/clk.h>
-#include <mach/clk.h>
+#include <linux/clk/msm-clk.h>
 #include <mach/msm_bus.h>
 #include <mach/msm_bus_board.h>
 #include "msm_mercury_hw.h"

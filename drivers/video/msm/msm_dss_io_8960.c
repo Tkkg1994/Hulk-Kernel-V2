@@ -11,7 +11,7 @@
  *
  */
 #include <linux/clk.h>
-#include <mach/clk.h>
+#include <linux/clk/msm-clk.h>
 #include "msm_fb.h"
 #include "mdp.h"
 #include "mdp4.h"

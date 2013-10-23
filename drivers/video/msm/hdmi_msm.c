@@ -23,8 +23,8 @@
 #include <linux/clk.h>
 #include <linux/mutex.h>
 #include <linux/slimport.h>
+#include <linux/clk/msm-clk.h>
 #include <mach/msm_hdmi_audio.h>
-#include <mach/clk.h>
 #include <mach/msm_iomap.h>
 #include <mach/socinfo.h>
 

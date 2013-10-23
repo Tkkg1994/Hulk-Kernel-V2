@@ -22,6 +22,8 @@
 #include <linux/spinlock.h>
 #include <linux/delay.h>
 #include <linux/clk.h>
+#include <linux/clk/msm-clk-provider.h>
+#include <linux/clk/msm-clk.h>
 
 #include <mach/clk.h>
 #include <mach/clk-provider.h>

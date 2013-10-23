@@ -24,6 +24,7 @@
 #include <linux/spinlock.h>
 #include <linux/hrtimer.h>
 #include <linux/clk.h>
+#include <linux/clk/msm-clk.h>
 #include <mach/hardware.h>
 #include <linux/io.h>
 #include <linux/debugfs.h>
@@ -36,7 +37,6 @@
 #include <linux/semaphore.h>
 #include <linux/uaccess.h>
 #include <mach/event_timer.h>
-#include <mach/clk.h>
 #include "mdp.h"
 #include "msm_fb.h"
 #ifdef CONFIG_FB_MSM_MDP40

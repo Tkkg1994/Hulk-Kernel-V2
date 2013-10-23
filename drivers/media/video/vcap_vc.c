@@ -19,7 +19,7 @@
 #include <mach/camera.h>
 #include <linux/io.h>
 #include <linux/regulator/consumer.h>
-#include <mach/clk.h>
+#include <linux/clk/msm-clk.h>
 #include <linux/clk.h>
 
 #include <media/v4l2-event.h>
