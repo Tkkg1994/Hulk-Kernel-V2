@@ -15,13 +15,13 @@
 #include <linux/io.h>
 #include <linux/regulator/consumer.h>
 #include <linux/mfd/pm8xxx/pm8921.h>
+#include <linux/clk/msm-clk.h>
 #include <mach/gpio.h>
 #include <mach/gpiomux.h>
 #include <mach/board.h>
 #include <mach/camera.h>
 #include <mach/vreg.h>
 #include <mach/camera.h>
-#include <mach/clk.h>
 #include <mach/msm_bus.h>
 #include <mach/msm_bus_board.h>
 

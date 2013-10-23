@@ -24,8 +24,8 @@
 #include <linux/list.h>
 #include <linux/regulator/consumer.h>
 #include <linux/mutex.h>
+#include <linux/clk/msm-clk-provider.h>
 #include <trace/events/power.h>
-#include <mach/clk-provider.h>
 #include "clock.h"
 
 struct handoff_clk {

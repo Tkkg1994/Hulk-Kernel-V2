@@ -40,9 +40,9 @@
 #include <linux/pm_qos.h>
 #include <linux/irq.h>
 #include <linux/ktime.h>
+#include <linux/clk/msm-clk.h>
 
 #include <mach/msm_bus.h>
-#include <mach/clk.h>
 #include <mach/msm_iomap.h>
 #include <mach/msm_xo.h>
 #include <linux/spinlock.h>

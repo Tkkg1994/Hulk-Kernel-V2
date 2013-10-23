@@ -24,8 +24,7 @@
 #include <linux/err.h>
 #include <linux/of.h>
 #include <linux/regulator/consumer.h>
-
-#include <mach/clk.h>
+#include <linux/clk/msm-clk.h>
 
 #include "peripheral-loader.h"
 #include "pil-q6v5.h"

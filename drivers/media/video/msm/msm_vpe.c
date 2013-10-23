@@ -19,7 +19,7 @@
 #include <linux/slab.h>
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
-#include <mach/clk.h>
+#include <linux/clk/msm-clk.h>
 #include <asm/div64.h>
 #include <linux/workqueue.h>
 #include <linux/delay.h>
