@@ -24,11 +24,11 @@
 #include <linux/uaccess.h>
 #include <linux/clk.h>
 #include <linux/platform_device.h>
+#include <linux/clk/msm-clk.h>
 #include <asm/system.h>
 #include <asm/mach-types.h>
 #include <mach/hardware.h>
 #include <mach/gpio.h>
-#include <mach/clk.h>
 
 #include "msm_fb.h"
 #include "mipi_dsi.h"

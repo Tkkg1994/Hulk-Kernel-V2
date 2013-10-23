@@ -27,13 +27,13 @@
 #include <linux/iopoll.h>
 #include <linux/platform_device.h>
 #include <linux/iopoll.h>
+#include <linux/clk/msm-clk.h>
 
 #include <asm/system.h>
 #include <asm/mach-types.h>
 
 #include <mach/hardware.h>
 #include <mach/gpio.h>
-#include <mach/clk.h>
 #include <mach/dma.h>
 
 #include "msm_fb.h"
