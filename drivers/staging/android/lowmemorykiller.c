@@ -417,12 +417,18 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	int array_size = ARRAY_SIZE(lowmem_adj);
 	int other_free;
 	int other_file;
-	struct zone_avail zall[MAX_NUMNODES][MAX_NR_ZONES];
 #if (!defined(CONFIG_MACH_JF) \
 	&& !defined(CONFIG_SEC_PRODUCT_8960)\
 	)
 	unsigned long nr_to_scan = sc->nr_to_scan;
 #endif
+	struct zone_avail zall[MAX_NUMNODES][MAX_NR_ZONES];
+
+	tsk = current->group_leader;
+	if ((tsk->flags & PF_EXITING) && test_task_flag(tsk, TIF_MEMDIE)) {
+		set_tsk_thread_flag(current, TIF_MEMDIE);
+		return 0;
+	}
 #ifndef CONFIG_CMA
 	other_free = global_page_state(NR_FREE_PAGES);
 #else
@@ -506,7 +512,11 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 			if (test_task_flag(tsk, TIF_MEMDIE)) {
 				read_unlock(&tasklist_lock);
 				/* give the system time to free up the memory */
-				msleep_interruptible(20);
+				if (!same_thread_group(current, tsk))
+					msleep_interruptible(20);
+				else
+					set_tsk_thread_flag(current,
+								TIF_MEMDIE);
 				mutex_unlock(&scan_mutex);
 				return 0;
 			}
@@ -525,7 +535,9 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 			continue;
 #endif
 		}
-		if (fatal_signal_pending(p)) {
+		if (fatal_signal_pending(p) ||
+				((p->flags & PF_EXITING) &&
+					test_task_flag(p, TIF_MEMDIE))) {
 			lowmem_print(2, "skip slow dying process %d\n", p->pid);
 			task_unlock(p);
 			continue;
