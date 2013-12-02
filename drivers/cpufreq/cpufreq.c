@@ -393,6 +393,7 @@ void cpufreq_notify_transition(struct cpufreq_policy *policy,
 		__cpufreq_notify_transition(policy, freqs, state);
 }
 EXPORT_SYMBOL_GPL(cpufreq_notify_transition);
+
 /**
  * cpufreq_notify_utilization - notify CPU userspace about CPU utilization
  * change
@@ -410,6 +411,20 @@ void cpufreq_notify_utilization(struct cpufreq_policy *policy,
 		sysfs_notify(&policy->kobj, NULL, "cpu_utilization");
 
 }
+
+/* Do post notifications when there are chances that transition has failed */
+void cpufreq_notify_post_transition(struct cpufreq_policy *policy,
+		struct cpufreq_freqs *freqs, int transition_failed)
+{
+	cpufreq_notify_transition(policy, freqs, CPUFREQ_POSTCHANGE);
+	if (!transition_failed)
+		return;
+
+	swap(freqs->old, freqs->new);
+	cpufreq_notify_transition(policy, freqs, CPUFREQ_PRECHANGE);
+	cpufreq_notify_transition(policy, freqs, CPUFREQ_POSTCHANGE);
+}
+EXPORT_SYMBOL_GPL(cpufreq_notify_post_transition);
 
 /*********************************************************************
  *                          SYSFS INTERFACE                          *
