@@ -1014,6 +1014,11 @@ static void cpufreq_init_policy(struct cpufreq_policy *policy)
 
 	memcpy(&new_policy, policy, sizeof(*policy));
 
+	/* Use the default policy if its valid. */
+	if (cpufreq_driver->setpolicy)
+		cpufreq_parse_governor(policy->governor->name,
+					&new_policy.policy, NULL);
+
 	/* assure that the starting sequence is run in cpufreq_set_policy */
 	policy->governor = NULL;
 
