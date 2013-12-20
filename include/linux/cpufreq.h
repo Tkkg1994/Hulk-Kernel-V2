@@ -280,6 +280,11 @@ struct cpufreq_driver {
 	int	(*suspend)	(struct cpufreq_policy *policy);
 	int	(*resume)	(struct cpufreq_policy *policy);
 	struct freq_attr	**attr;
+
+	/* platform specific boost support code */
+	bool                    boost_supported;
+	bool                    boost_enabled;
+	int     (*set_boost)    (int state);
 };
 
 /* flags */
@@ -572,6 +577,7 @@ extern struct cpufreq_governor cpufreq_gov_yankdemand;
 
 #define CPUFREQ_ENTRY_INVALID ~0
 #define CPUFREQ_TABLE_END     ~1
+#define CPUFREQ_BOOST_FREQ    ~2
 
 struct cpufreq_frequency_table {
 	unsigned int	index;     /* any */
@@ -593,6 +599,25 @@ int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 				   unsigned int *index);
 int cpufreq_frequency_table_get_index(struct cpufreq_policy *policy,
 		unsigned int freq);
+
+#ifdef CONFIG_CPU_FREQ
+int cpufreq_boost_trigger_state(int state);
+int cpufreq_boost_supported(void);
+int cpufreq_boost_enabled(void);
+#else
+static inline int cpufreq_boost_trigger_state(int state)
+{
+	return 0;
+}
+static inline int cpufreq_boost_supported(void)
+{
+	return 0;
+}
+static inline int cpufreq_boost_enabled(void)
+{
+	return 0;
+}
+#endif
 
 /* the following 3 funtions are for cpufreq core use only */
 struct cpufreq_frequency_table *cpufreq_frequency_get_table(unsigned int cpu);
