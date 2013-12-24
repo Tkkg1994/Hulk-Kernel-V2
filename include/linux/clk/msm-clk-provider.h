@@ -196,5 +196,6 @@ extern struct clk dummy_clk;
 	}
 
 #define CLK_LOOKUP(con, c, dev) { .con_id = con, .clk = &c, .dev_id = dev }
+#define CLK_LIST(_c) { .clk = &(&_c)->c, .of_idx = clk_##_c }
 
 #endif
