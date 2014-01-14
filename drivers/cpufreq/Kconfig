@@ -313,6 +313,12 @@ config CPU_FREQ_DEFAULT_GOV_PRESERVATIVE
 	  Use the CPUFreq governor 'preservative' as default. This allows
 	  you to eat jam.
 
+config CPU_FREQ_DEFAULT_GOV_TRIPNDROID
+	bool "tripndroid"
+	select CPU_FREQ_GOV_TRIPNDROID
+	help
+	  Select tripndroid cpu governor as default
+
 endchoice
 
 config CPU_FREQ_GOV_LIONHEART
@@ -765,6 +771,14 @@ config CPU_FREQ_GOV_PRESERVATIVE
 	  'preservative' - this driver is good in cakes
 	  If in doubt, say N.
 	  If not in doubt, say N.
+
+config CPU_FREQ_GOV_TRIPNDROID
+        tristate "'tripndroid' cpufreq governor"
+        depends on CPU_FREQ
+        help
+	  Custom cpu governor designed specificly for multi cpu mobile devices.
+	  Aiming at a balance between performance and battery lifetime, but it
+	  hangs a little bit more towards performance at low latencys.
 
 config CPU_FREQ_GOV_CONSERVATIVE
 	tristate "'conservative' cpufreq governor"
