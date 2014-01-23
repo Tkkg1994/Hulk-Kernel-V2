@@ -169,6 +169,7 @@ static irqreturn_t bam_isr(int irq, void *ctxt)
 	list_for_each_entry(pipe, &dev->pipes_q, list) {
 		/* Check this pipe's bit in the source mask */
 		if (BAM_PIPE_IS_ASSIGNED(pipe)
+				&& (!pipe->disconnecting)
 				&& (source & pipe->pipe_index_mask)) {
 			/* This pipe has an interrupt pending */
 			pipe_handler(dev, pipe);
@@ -585,6 +586,7 @@ static void pipe_clear(struct sps_pipe *pipe)
 	pipe->mode = -1;
 	pipe->num_descs = 0;
 	pipe->desc_size = 0;
+	pipe->disconnecting = false;
 	memset(&pipe->sys, 0, sizeof(pipe->sys));
 	INIT_LIST_HEAD(&pipe->sys.events_q);
 }
