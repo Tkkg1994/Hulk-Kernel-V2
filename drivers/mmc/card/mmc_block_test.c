@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2284,7 +2284,7 @@ static ssize_t send_write_packing_test_read(struct file *file,
 			       loff_t *offset)
 {
 	if (!access_ok(VERIFY_WRITE, buffer, count))
-		return count;
+		return -EFAULT;
 
 	memset((void *)buffer, 0, count);
 
@@ -2385,7 +2385,7 @@ static ssize_t err_check_test_read(struct file *file,
 			       loff_t *offset)
 {
 	if (!access_ok(VERIFY_WRITE, buffer, count))
-		return count;
+		return -EFAULT;
 
 	memset((void *)buffer, 0, count);
 
@@ -2496,7 +2496,7 @@ static ssize_t send_invalid_packed_test_read(struct file *file,
 			       loff_t *offset)
 {
 	if (!access_ok(VERIFY_WRITE, buffer, count))
-		return count;
+		return -EFAULT;
 
 	memset((void *)buffer, 0, count);
 
@@ -2613,7 +2613,7 @@ static ssize_t write_packing_control_test_read(struct file *file,
 			       loff_t *offset)
 {
 	if (!access_ok(VERIFY_WRITE, buffer, count))
-		return count;
+		return -EFAULT;
 
 	memset((void *)buffer, 0, count);
 
@@ -2741,7 +2741,7 @@ static ssize_t bkops_test_read(struct file *file,
 			       loff_t *offset)
 {
 	if (!access_ok(VERIFY_WRITE, buffer, count))
-		return count;
+		return -EFAULT;
 
 	memset((void *)buffer, 0, count);
 
@@ -2832,7 +2832,7 @@ static ssize_t long_sequential_read_test_read(struct file *file,
 			       loff_t *offset)
 {
 	if (!access_ok(VERIFY_WRITE, buffer, count))
-		return count;
+		return -EFAULT;
 
 	memset((void *)buffer, 0, count);
 
@@ -2995,7 +2995,7 @@ static ssize_t long_sequential_write_test_read(struct file *file,
 			       loff_t *offset)
 {
 	if (!access_ok(VERIFY_WRITE, buffer, count))
-		return count;
+		return -EFAULT;
 
 	memset((void *)buffer, 0, count);
 
@@ -3071,7 +3071,7 @@ static ssize_t new_req_notification_test_read(struct file *file,
 			       loff_t *offset)
 {
 	if (!access_ok(VERIFY_WRITE, buffer, count))
-		return count;
+		return -EFAULT;
 
 	memset((void *)buffer, 0, count);
 
