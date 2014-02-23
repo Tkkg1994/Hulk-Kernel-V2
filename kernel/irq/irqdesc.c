@@ -593,6 +593,11 @@ int irq_set_percpu_devid(unsigned int irq)
 	return 0;
 }
 
+void kstat_incr_irq_this_cpu(unsigned int irq)
+{
+	kstat_incr_irqs_this_cpu(irq, irq_to_desc(irq));
+}
+
 /**
  * kstat_irqs_cpu - Get the statistics for an interrupt on a cpu
  * @irq:	The interrupt number
