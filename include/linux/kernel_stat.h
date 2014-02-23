@@ -57,27 +57,15 @@ extern unsigned long long nr_context_switches(void);
 
 struct irq_desc;
 
-static inline void kstat_incr_irqs_this_cpu(unsigned int irq,
-					    struct irq_desc *desc)
-{
-	__this_cpu_inc(kstat.irqs[irq]);
-	__this_cpu_inc(kstat.irqs_sum);
-}
-
 static inline unsigned int kstat_irqs_cpu(unsigned int irq, int cpu)
 {
        return kstat_cpu(cpu).irqs[irq];
 }
 #else
 #include <linux/irq.h>
+=======
+>>>>>>> 8f945a3... genirq: Move kstat_incr_irqs_this_cpu() to core
 extern unsigned int kstat_irqs_cpu(unsigned int irq, int cpu);
-
-static inline void kstat_incr_irqs_this_cpu(unsigned int irq, struct irq_desc *desc)
-{
-	__this_cpu_inc(*desc->kstat_irqs);
-	__this_cpu_inc(kstat.irqs_sum);
-}
-
 extern void kstat_incr_irq_this_cpu(unsigned int irq);
 
 #endif
