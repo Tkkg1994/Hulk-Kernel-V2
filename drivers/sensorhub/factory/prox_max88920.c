@@ -732,3 +732,4 @@ void remove_prox_factorytest(struct ssp_data *data)
 {
 	sensors_unregister(data->prox_device, prox_attrs);
 }
+

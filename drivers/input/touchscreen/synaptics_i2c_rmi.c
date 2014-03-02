@@ -27,7 +27,7 @@
 #include <linux/earlysuspend.h>
 #endif
 #include "synaptics_i2c_rmi.h"
-#include "../../sensorhub/ssp.h"
+#include "../../sensorhub/ssp_defs.h"
 #include <linux/wakelock.h>
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
