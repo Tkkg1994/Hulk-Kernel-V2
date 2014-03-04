@@ -354,11 +354,20 @@ cpufreq_verify_within_cpu_limits(struct cpufreq_policy *policy)
 			policy->cpuinfo.max_freq);
 }
 
+#ifdef CONFIG_CPU_FREQ
+void cpufreq_suspend(void);
+void cpufreq_resume(void);
+#else
+static inline void cpufreq_suspend(void) {}
+static inline void cpufreq_resume(void) {}
+#endif
+
 struct freq_attr {
 	struct attribute attr;
 	ssize_t (*show)(struct cpufreq_policy *, char *);
 	ssize_t (*store)(struct cpufreq_policy *, const char *, size_t count);
 };
+
 
 #define cpufreq_freq_attr_ro(_name)		\
 static struct freq_attr _name =			\

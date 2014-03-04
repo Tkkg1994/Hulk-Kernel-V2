@@ -68,7 +68,7 @@ struct cpufreq_suspend_t {
 	int device_suspended;
 };
 
-static DEFINE_PER_CPU(struct cpufreq_suspend_t, cpufreq_suspend);
+static DEFINE_PER_CPU(struct cpufreq_suspend_t, cpufreq_msm_suspend);
 
 struct cpu_freq {
 	uint32_t max;
@@ -260,9 +260,9 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 
 	struct cpufreq_work_struct *cpu_work = NULL;
 
-	mutex_lock(&per_cpu(cpufreq_suspend, policy->cpu).suspend_mutex);
+	mutex_lock(&per_cpu(cpufreq_msm_suspend, policy->cpu).suspend_mutex);
 
-	if (per_cpu(cpufreq_suspend, policy->cpu).device_suspended) {
+	if (per_cpu(cpufreq_msm_suspend, policy->cpu).device_suspended) {
 		pr_debug("cpufreq: cpu%d scheduling frequency change "
 				"in suspend.\n", policy->cpu);
 		ret = -EFAULT;
@@ -295,7 +295,7 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 	ret = cpu_work->status;
 
 done:
-	mutex_unlock(&per_cpu(cpufreq_suspend, policy->cpu).suspend_mutex);
+	mutex_unlock(&per_cpu(cpufreq_msm_suspend, policy->cpu).suspend_mutex);
 	return ret;
 }
 
@@ -513,9 +513,9 @@ static int msm_cpufreq_suspend(void)
 	int cpu;
 
 	for_each_possible_cpu(cpu) {
-		mutex_lock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
-		per_cpu(cpufreq_suspend, cpu).device_suspended = 1;
-		mutex_unlock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
+		mutex_lock(&per_cpu(cpufreq_msm_suspend, cpu).suspend_mutex);
+		per_cpu(cpufreq_msm_suspend, cpu).device_suspended = 1;
+		mutex_unlock(&per_cpu(cpufreq_msm_suspend, cpu).suspend_mutex);
 	}
 
 	return NOTIFY_DONE;
@@ -527,7 +527,7 @@ static int msm_cpufreq_resume(void)
 	struct cpufreq_policy policy;
 
 	for_each_possible_cpu(cpu) {
-		per_cpu(cpufreq_suspend, cpu).device_suspended = 0;
+		per_cpu(cpufreq_msm_suspend, cpu).device_suspended = 0;
 	}
 
 	/*
@@ -779,8 +779,8 @@ static int __init msm_cpufreq_register(void)
 	int cpu;
 
 	for_each_possible_cpu(cpu) {
-		mutex_init(&(per_cpu(cpufreq_suspend, cpu).suspend_mutex));
-		per_cpu(cpufreq_suspend, cpu).device_suspended = 0;
+		mutex_init(&(per_cpu(cpufreq_msm_suspend, cpu).suspend_mutex));
+		per_cpu(cpufreq_msm_suspend, cpu).device_suspended = 0;
 	}
 
 	platform_driver_probe(&msm_cpufreq_plat_driver, msm_cpufreq_probe);
