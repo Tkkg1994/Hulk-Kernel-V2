@@ -29,6 +29,8 @@
 #include "board-8064.h"
 
 extern void check_prox_value_trig(bool trig);
+extern void set_screen_synaptic_on(void);
+extern void set_screen_synaptic_off(void);
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OLED_VIDEO_HD_PT_PANEL)
@@ -907,7 +909,7 @@ static int mipi_panel_power_oled(int enable)
 			return -ENODEV;
 		}
 #endif
-
+		set_screen_synaptic_on();
 		check_prox_value_trig(false);
 	} else {
 
@@ -939,6 +941,7 @@ static int mipi_panel_power_oled(int enable)
 			pr_err("disable reg_L30 failed, rc=%d\n", rc);
 			return -ENODEV;
 		}
+		set_screen_synaptic_off();
 		check_prox_value_trig(true);
 	}
 
