@@ -28,6 +28,8 @@
 #include "devices.h"
 #include "board-8064.h"
 
+extern void check_prox_value_trig(bool trig);
+
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OLED_VIDEO_HD_PT_PANEL)
 /* prim = 1280 x 736 x 3(bpp) x 3(pages) */
@@ -905,6 +907,8 @@ static int mipi_panel_power_oled(int enable)
 			return -ENODEV;
 		}
 #endif
+
+		check_prox_value_trig(false);
 	} else {
 
 		pr_info("[lcd] PANEL OFF\n");
@@ -935,6 +939,7 @@ static int mipi_panel_power_oled(int enable)
 			pr_err("disable reg_L30 failed, rc=%d\n", rc);
 			return -ENODEV;
 		}
+		check_prox_value_trig(true);
 	}
 
 	return rc;
