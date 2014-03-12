@@ -232,6 +232,12 @@ static ssize_t synaptics_rmi4_screen_wake_options_hold_wlock_show(struct device 
 static ssize_t synaptics_rmi4_screen_wake_options_hold_wlock_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count);
 
+static ssize_t synaptics_rmi4_screen_sleep_options_show(struct device *dev,
+		struct device_attribute *attr, char *buf);
+
+static ssize_t synaptics_rmi4_screen_sleep_options_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count);
+
 struct synaptics_rmi4_f01_device_status {
 	union {
 		struct {
@@ -618,6 +624,9 @@ static struct device_attribute attrs[] = {
 	__ATTR(screen_wake_options_prox_max, (S_IRUGO | S_IWUSR | S_IWGRP),
 			synaptics_rmi4_screen_wake_options_prox_max_show,
 			synaptics_rmi4_screen_wake_options_prox_max_store),
+	__ATTR(screen_sleep_options, (S_IRUGO | S_IWUSR | S_IWGRP),
+			synaptics_rmi4_screen_sleep_options_show,
+			synaptics_rmi4_screen_sleep_options_store),
 };
 
 static struct list_head exp_fn_list;
@@ -669,6 +678,7 @@ static unsigned int screen_wake_options_prox_max = 55;
 static unsigned int screen_wake_options_debug = 0;
 static unsigned int screen_wake_options_hold_wlock = 0;
 static unsigned int screen_wake_options_when_off = 0;
+static unsigned int screen_sleep_options = 0; // 0 = disabled; 1 = dtap2sleep
 static struct pmic8xxx_pwrkey *screenwake_pwrdev;
 static DEFINE_MUTEX(scr_lock);
 
@@ -1145,6 +1155,26 @@ static ssize_t synaptics_rmi4_screen_wake_options_hold_wlock_store(struct device
 	check_options_while_soff(dev);
 	return count;
 
+}
+
+static ssize_t synaptics_rmi4_screen_sleep_options_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int ret;
+	ret = sprintf(buf, "%d\n", screen_sleep_options);
+	return ret;
+}
+static ssize_t synaptics_rmi4_screen_sleep_options_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int retval;
+	unsigned int val = 0;
+
+	retval = sscanf(buf, "%d", &val);
+	if (retval != 0 && val >= 0 && val <= 6) {
+		screen_sleep_options = val;
+	}
+	return count;
 }
 
 #ifdef CONFIG_GLOVE_TOUCH
@@ -1937,8 +1967,9 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 							if (screen_wake_options_debug) pr_alert("DOUBLE TAP WAKE TOUCH %d-%d-%ld-%ld-%d\n", x, y, jiffies, last_touch_time, touch_count);
 							if (!touch_count && jiffies_to_msecs(jiffies - last_touch_time) < 2000) //(x < x_lo) && (y > y_hi) && //jiffies_to_msecs(jiffies - last_touch_time) > 50
 							{
-								if (screen_wake_options_debug) pr_alert("DOUBLE TAP WAKE WAKING %d-%d\n", x, y);
+								if (screen_wake_options_debug) pr_alert("DOUBLE TAP WAKE POWER BTN CALLED %d-%d\n", x, y);
 								pwr_trig_fscreen();
+								last_touch_time = 0;
 								block_store = true;
 							}
 							else
@@ -1953,20 +1984,50 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 					}
 				}
 			}
-
-			if (!rmi4_data->finger[finger].state)
+			if (!screen_is_off)
+			{
+				//Double Tap 2 Sleep
+				if (screen_sleep_options == 1 && !rmi4_data->finger[finger].state)
+				{
+					bool block_store = false;
+					if (last_touch_time)
+					{
+						if (screen_wake_options_debug) pr_alert("DOUBLE TAP SLEEP TOUCH %d-%d-%ld-%ld-%d\n", x, y, jiffies, last_touch_time, touch_count);
+						if (!touch_count && (y < 100) && jiffies_to_msecs(jiffies - last_touch_time) < 1000) //(x < x_lo) && (y > y_hi) && //jiffies_to_msecs(jiffies - last_touch_time) > 50
+						{
+							if (screen_wake_options_debug) pr_alert("DOUBLE TAP SLEEP POWER BTN CALLED %d-%d\n", x, y);
+							pwr_trig_fscreen();
+							last_touch_time = 0;
+							block_store = true;
+						}
+						else
+						{
+							if (screen_wake_options_debug) pr_alert("DOUBLE TAP SLEEP DELETE %d-%d-%ld-%ld\n", x, y, jiffies, last_touch_time);
+							last_touch_time = 0;
+							block_store = true;
+						}
+					}
+					if (!last_touch_time && !block_store && (y < 100))
+						last_touch_time = jiffies;
+				}
+			}
+			
+			/*if (!rmi4_data->finger[finger].state)
+			{
 				dev_info(&rmi4_data->i2c_client->dev, "[%d][P] 0x%02x\n",
 					finger, finger_status);
 			else
-				rmi4_data->finger[finger].mcount++;
+				rmi4_data->finger[finger].mcount++;*/
+			if (rmi4_data->finger[finger].state)
+ 				rmi4_data->finger[finger].mcount++;
 
 			touch_count++;
 		}
 
 		if (rmi4_data->finger[finger].state && !finger_status) {
-			dev_info(&rmi4_data->i2c_client->dev, "[%d][R] 0x%02x M[%d] V[%x]\n",
-				finger, finger_status, rmi4_data->finger[finger].mcount,
-				rmi4_data->fw_version_of_ic);
+			//dev_info(&rmi4_data->i2c_client->dev, "[%d][R] 0x%02x M[%d] V[%x]\n",
+			//	finger, finger_status, rmi4_data->finger[finger].mcount,
+			//	rmi4_data->fw_version_of_ic);
 				wake_start = 0;
 
 			rmi4_data->finger[finger].mcount = 0;
