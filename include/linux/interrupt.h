@@ -249,7 +249,7 @@ extern int __irq_set_affinity(unsigned int irq, const struct cpumask *cpumask,
 /**
  * irq_set_affinity - Set the irq affinity of a given irq
  * @irq:	Interrupt to set affinity
- * @mask:	cpumask
+ * @cpumask:	cpumask
  *
  * Fails if cpumask does not contain an online CPU
  */
@@ -262,7 +262,7 @@ irq_set_affinity(unsigned int irq, const struct cpumask *cpumask)
 /**
  * irq_force_affinity - Force the irq affinity of a given irq
  * @irq:	Interrupt to set affinity
- * @mask:	cpumask
+ * @cpumask:	cpumask
  *
  * Same as irq_set_affinity, but without checking the mask against
  * online cpus.
