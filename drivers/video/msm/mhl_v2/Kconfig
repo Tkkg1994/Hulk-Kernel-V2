@@ -57,4 +57,9 @@ config MHL_VERSION
 	with MHL Specification version 2.0 
 	shell set this MHL_VERSION to 0x20
 
+config MHL_D3_SUPPORT
+	bool "Support D3 mode in mhl"
+	default n
+	---help---
+	Power saving mode of MHL chip
 endmenu
