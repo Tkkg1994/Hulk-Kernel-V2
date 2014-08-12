@@ -72,7 +72,6 @@ extern void mmc_queue_bounce_post(struct mmc_queue_req *);
 
 extern void print_mmc_packing_stats(struct mmc_card *card);
 
-
 #define IS_RT_CLASS_REQ(x)     \
 	       (IOPRIO_PRIO_CLASS(req_get_ioprio(x)) == IOPRIO_CLASS_RT)
 
@@ -80,5 +79,7 @@ static inline void mmc_set_nopacked_period(struct mmc_queue *mq, unsigned long n
 {
 	mq->nopacked_period = jiffies + nopacked_jiffies;
 }
+
+extern int mmc_access_rpmb(struct mmc_queue *);
 
 #endif
