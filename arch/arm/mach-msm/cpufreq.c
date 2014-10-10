@@ -176,18 +176,6 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
 	struct cpufreq_frequency_table *table;
 
-	if (limit->limits_init) {
-		if (new_freq > limit->allowed_max) {
-			new_freq = limit->allowed_max;
-			pr_debug("max: limiting freq to %d\n", new_freq);
-		}
-
-		if (new_freq < limit->allowed_min) {
-			new_freq = limit->allowed_min;
-			pr_debug("min: limiting freq to %d\n", new_freq);
-		}
-	}
-
 #ifdef CONFIG_SEC_DVFS
 	if (lower_limit_freq || upper_limit_freq) {
 		unsigned int t_freq = new_freq;
@@ -204,7 +192,23 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 			new_freq = policy->min;
 		if (new_freq > policy->max)
 			new_freq = policy->max;
+	}
+#endif
 
+	if (limit->limits_init) {
+		if (new_freq > limit->allowed_max) {
+			new_freq = limit->allowed_max;
+			pr_debug("max: limiting freq to %d\n", new_freq);
+		}
+
+		if (new_freq < limit->allowed_min) {
+			new_freq = limit->allowed_min;
+			pr_debug("min: limiting freq to %d\n", new_freq);
+		}
+	}
+
+#ifdef CONFIG_SEC_DVFS
+	if (lower_limit_freq || upper_limit_freq) {
 		if (new_freq == policy->cur)
 			return 0;
 	}
