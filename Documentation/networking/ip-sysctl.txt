@@ -1284,13 +1284,18 @@ force_tllao - BOOLEAN
 	race condition where the sender deletes the cached link-layer address
 	prior to receiving a response to a previous solicitation."
 
-icmp/*:
-ratelimit - INTEGER
-	Limit the maximal rates for sending ICMPv6 packets.
-	0 to disable any limiting,
-	otherwise the minimal space between responses in milliseconds.
-	Default: 1000
+optimistic_dad - BOOLEAN
+	Whether to perform Optimistic Duplicate Address Detection (RFC 4429).
+		0: disabled (default)
+		1: enabled
 
+use_optimistic - BOOLEAN
+	If enabled, do not classify optimistic addresses as deprecated during
+	source address selection.  Preferred addresses will still be chosen
+	before optimistic addresses, subject to other ranking in the source
+	address selection algorithm.
+		0: disabled (default)
+		1: enabled
 
 IPv6 Update by:
 Pekka Savola <pekkas@netcore.fi>
