@@ -170,3 +170,6 @@ endif
 
 obj-$(CONFIG_SEC_NET_FILTER)	+= secfilter/
 
+#sensor_class
+obj-$(CONFIG_SENSORS)		+= sensors/
+
