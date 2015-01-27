@@ -140,6 +140,8 @@ DHDCFLAGS :=$(filter-out -DMULTIPLE_SUPPLICANT,$(DHDCFLAGS))
 ##########################
 DRIVER_TYPE ?= m
 
+DHDCFLAGS += -DCUSTOM_SET_SHORT_DWELL_TIME
+
 #########################
 # Chip dependent feature
 #########################
