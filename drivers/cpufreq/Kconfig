@@ -305,6 +305,14 @@ config CPU_FREQ_DEFAULT_GOV_ARTERACTIVE
 	  loading your cpufreq low-level hardware driver, using the
 	  'arteractive' governor for latency-sensitive workloads.
 
+config CPU_FREQ_DEFAULT_GOV_PRESERVATIVE
+	bool "preservative"
+	select CPU_FREQ_GOV_PRESERVATIVE
+	select CPU_FREQ_GOV_PERFORMANCE
+	help
+	  Use the CPUFreq governor 'preservative' as default. This allows
+	  you to eat jam.
+
 endchoice
 
 config CPU_FREQ_GOV_LIONHEART
@@ -750,6 +758,13 @@ config CPU_FREQ_GOV_ARTERACTIVE
 	help
 	  'arteractive' - This driver adds the interactive governor
 	  from the SM-G900F source drop.
+
+config CPU_FREQ_GOV_PRESERVATIVE
+	tristate "'preservative' cpufreq governor"
+	help
+	  'preservative' - this driver is good in cakes
+	  If in doubt, say N.
+	  If not in doubt, say N.
 
 config CPU_FREQ_GOV_CONSERVATIVE
 	tristate "'conservative' cpufreq governor"
