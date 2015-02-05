@@ -125,12 +125,10 @@
 
 #if defined(CONFIG_SMP) || defined(CONFIG_GENERIC_HARDIRQS)
 extern void synchronize_irq(unsigned int irq);
-extern void synchronize_hardirq(unsigned int irq);
+extern bool synchronize_hardirq(unsigned int irq);
 #else
 # define synchronize_irq(irq)	barrier()
 #endif
-
-struct task_struct;
 
 #if !defined(CONFIG_VIRT_CPU_ACCOUNTING) && !defined(CONFIG_IRQ_TIME_ACCOUNTING)
 static inline void account_system_vtime(struct task_struct *tsk)
