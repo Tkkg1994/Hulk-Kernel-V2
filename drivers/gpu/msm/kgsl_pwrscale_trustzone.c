@@ -84,7 +84,7 @@ static ssize_t tz_governor_show(struct kgsl_device *device,
 		ret = snprintf(buf, 10, "ondemand\n");
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
 	else if (priv->governor == TZ_GOVERNOR_SIMPLE)
-		 ret = snprintf(buf, 8, "simple\n");
+		ret = snprintf(buf, 8, "simple\n");
 #endif
 	else
 		ret = snprintf(buf, 13, "performance\n");
@@ -104,7 +104,7 @@ static ssize_t tz_governor_store(struct kgsl_device *device,
 	if (!strncmp(buf, "ondemand", 8))
 		priv->governor = TZ_GOVERNOR_ONDEMAND;
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
-	else if (!strncmp(str, "simple", 6))
+	else if (!strncmp(buf, "simple", 6))
 		priv->governor = TZ_GOVERNOR_SIMPLE;
 #endif
 	else if (!strncmp(buf, "performance", 11))
