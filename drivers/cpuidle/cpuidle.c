@@ -23,7 +23,7 @@
 #include "cpuidle.h"
 
 DEFINE_PER_CPU(struct cpuidle_device *, cpuidle_devices);
-DEFINE_PER_CPU(struct cpuidle_device, cpuidle_dev);	
+DEFINE_PER_CPU(struct cpuidle_device, cpuidle_dev);
 
 DEFINE_MUTEX(cpuidle_lock);
 LIST_HEAD(cpuidle_detected_devices);
@@ -549,8 +549,8 @@ static int cpuidle_latency_notify(struct notifier_block *b,
 {
 #if 0
 	smp_call_function(smp_callback, NULL, 1);
-	return NOTIFY_OK;
 #endif
+	return NOTIFY_OK;
 }
 
 static struct notifier_block cpuidle_latency_notifier = {
