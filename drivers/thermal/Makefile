@@ -8,7 +8,7 @@ obj-$(CONFIG_THERMAL_TSENS)	+= msm_tsens.o
 obj-$(CONFIG_THERMAL_TSENS8960) += msm8960_tsens.o
 obj-$(CONFIG_THERMAL_PM8XXX)	+= pm8xxx-tm.o
 ifdef CONFIG_MAKO_THERMAL
-obj-$(CONFIG_MAKO_THERMAL)	+= mako/msm_thermal.o
+obj-$(CONFIG_MAKO_THERMAL)	+= mako_msm_thermal.o
 else
 obj-$(CONFIG_THERMAL_MONITOR)	+= msm_thermal.o
 endif
