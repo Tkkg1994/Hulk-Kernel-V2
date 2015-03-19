@@ -69,7 +69,7 @@ static inline void outer_clean_all(void)
 {
 	if (outer_cache.clean_all)
 		outer_cache.clean_all();
-+}
+}
 
 static inline void outer_inv_all(void)
 {
