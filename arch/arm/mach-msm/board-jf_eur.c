@@ -1014,13 +1014,13 @@ static struct persistent_ram_descriptor per_ram_descs[] __initdata = {
        {
                .name = "ram_console",
 #ifdef CONFIG_KEXEC_HARDBOOT
-		.size = KEXEC_HB_PAGE_ADDR - RAMCONSOLE_PHYS_ADDR,
-	},
-	{
-		.name = "kexec_hb_page",
-		.size = SZ_1M - (KEXEC_HB_PAGE_ADDR - RAMCONSOLE_PHYS_ADDR),
+               .size = KEXEC_HB_PAGE_ADDR - RAMCONSOLE_PHYS_ADDR,
+       },
+       {
+               .name = "kexec_hb_page",
+               .size = SZ_1M - (KEXEC_HB_PAGE_ADDR - RAMCONSOLE_PHYS_ADDR),
 #else
-		.size = SZ_1M,
+               .size = SZ_1M,
 #endif
        }
 };

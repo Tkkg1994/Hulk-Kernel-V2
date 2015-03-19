@@ -65,7 +65,7 @@ relocate_new_kernel:
 	ldr	r0, kexec_hardboot
 	teq	r0, #0
 	bne	hardboot
-#endif	
+#endif
 	/* Jump to relocated kernel */
 	mov lr,r1
 	mov r0,#0
@@ -130,7 +130,7 @@ kexec_boot_atags:
 #ifdef CONFIG_KEXEC_HARDBOOT
 	.globl kexec_hardboot
 kexec_hardboot:
-	.long 0x0
+	.long	0x0
 #endif
 
 relocate_new_kernel_end:
