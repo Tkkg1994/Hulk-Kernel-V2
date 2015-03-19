@@ -16,6 +16,7 @@ CONFIG_MAKO_THERMAL=y
 # CONFIG_LCD_NOTIFY is not set
 # CONFIG_F2FS_FS is not set
 CONFIG_INTELLI_PLUG=y
+CONFIG_KSM=y
 
 # kexec hardboot support
 CONFIG_KEXEC=y
