@@ -2042,7 +2042,7 @@ static struct attribute *ksm_attrs[] = {
 	&pages_unshared_attr.attr,
 	&pages_volatile_attr.attr,
 	&full_scans_attr.attr,
-	&deferred_timer_attr.attr
+	&deferred_timer_attr.attr,
 	NULL,
 };
 
