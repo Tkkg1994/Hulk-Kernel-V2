@@ -296,10 +296,6 @@ enum {
  * system_long_wq is similar to system_wq but may host long running
  * works.  Queue flushing might take relatively long.
  *
- * system_nrt_wq is non-reentrant and guarantees that any given work
- * item is never executed in parallel by multiple CPUs.  Queue
- * flushing might take relatively long.
- *
  * system_unbound_wq is unbound workqueue.  Workers are not bound to
  * any specific CPU, not concurrency managed, and all queued works are
  * executed immediately as long as max_active limit is not reached and
