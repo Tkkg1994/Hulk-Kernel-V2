@@ -308,15 +308,25 @@ enum {
  * system_freezable_wq is equivalent to system_wq except that it's
  * freezable.
  *
- * system_nrt_freezable_wq is equivalent to system_nrt_wq except that
- * it's freezable.
  */
 extern struct workqueue_struct *system_wq;
 extern struct workqueue_struct *system_long_wq;
-extern struct workqueue_struct *system_nrt_wq;
 extern struct workqueue_struct *system_unbound_wq;
 extern struct workqueue_struct *system_freezable_wq;
-extern struct workqueue_struct *system_nrt_freezable_wq;
+
+static inline struct workqueue_struct *__system_nrt_wq(void)
+{
+	return system_wq;
+}
+
+static inline struct workqueue_struct *__system_nrt_freezable_wq(void)
+{
+	return system_freezable_wq;
+}
+
+/* equivlalent to system_wq and system_freezable_wq, deprecated */
+#define system_nrt_wq			__system_nrt_wq()
+#define system_nrt_freezable_wq		__system_nrt_freezable_wq()
 
 extern struct workqueue_struct *
 __alloc_workqueue_key(const char *fmt, unsigned int flags, int max_active,
