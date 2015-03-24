@@ -332,7 +332,9 @@ struct inodes_stat_t {
 #define FIFREEZE	_IOWR('X', 119, int)	/* Freeze */
 #define FITHAW		_IOWR('X', 120, int)	/* Thaw */
 #define FITRIM		_IOWR('X', 121, struct fstrim_range)	/* Trim */
-#define FS_IOC_SHUTDOWN		_IOR('X', 125, __u32)	/* Shutdown */
+#define FS_IOC_SHUTDOWN	_IOR('X', 125, __u32)	/* Shutdown */
+#define FIDTRIM		_IOWR('f', 128, struct fstrim_range)	/* Deep discard trim */
+#define FSECTRIM	_IOWR('X', 129, struct fstrim_range)	/* Secure Trim */
 
 #define	FS_IOC_GETFLAGS			_IOR('f', 1, long)
 #define	FS_IOC_SETFLAGS			_IOW('f', 2, long)
@@ -2452,6 +2454,7 @@ enum {
 void dio_end_io(struct bio *bio, int error);
 void inode_dio_wait(struct inode *inode);
 void inode_dio_done(struct inode *inode);
+struct inode *dio_bio_get_inode(struct bio *bio);
 
 ssize_t __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	struct block_device *bdev, const struct iovec *iov, loff_t offset,
