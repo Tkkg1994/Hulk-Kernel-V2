@@ -250,7 +250,7 @@ static int expand_fdtable(struct files_struct *files, int nr)
  * expanded and execution may have blocked.
  * The files->file_lock should be held on entry, and will be held on exit.
  */
-int expand_files(struct files_struct *files, int nr)
+static int expand_files(struct files_struct *files, int nr)
 {
 	struct fdtable *fdt;
 
@@ -441,7 +441,7 @@ struct files_struct init_files = {
 /*
  * allocate a file descriptor, mark it busy.
  */
-int alloc_fd(unsigned start, unsigned flags)
+static int alloc_fd(unsigned start, unsigned flags)
 {
 	struct files_struct *files = current->files;
 	unsigned int fd;
