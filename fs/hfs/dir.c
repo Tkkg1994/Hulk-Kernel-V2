@@ -18,7 +18,7 @@
  * hfs_lookup()
  */
 static struct dentry *hfs_lookup(struct inode *dir, struct dentry *dentry,
-				 unsigned int flags)
+				 struct nameidata *nd)
 {
 	hfs_cat_rec rec;
 	struct hfs_find_data fd;

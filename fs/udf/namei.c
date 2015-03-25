@@ -251,7 +251,7 @@ out_ok:
 }
 
 static struct dentry *udf_lookup(struct inode *dir, struct dentry *dentry,
-				 unsigned int flags)
+				 struct nameidata *nd)
 {
 	struct inode *inode = NULL;
 	struct fileIdentDesc cfi;
