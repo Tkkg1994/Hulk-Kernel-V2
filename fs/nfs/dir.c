@@ -111,8 +111,8 @@ const struct inode_operations nfs3_dir_inode_operations = {
 
 #ifdef CONFIG_NFS_V4
 
-static struct dentry *nfs_atomic_lookup(struct inode *, struct dentry *, struct nameidata *);
-static int nfs_open_create(struct inode *dir, struct dentry *dentry, umode_t mode, struct nameidata *nd);
+static struct dentry *nfs_atomic_lookup(struct inode *, struct dentry *, unsigned int);
+static int nfs_open_create(struct inode *dir, struct dentry *dentry, umode_t mode, unsigned int flags);
 const struct inode_operations nfs4_dir_inode_operations = {
 	.create		= nfs_open_create,
 	.lookup		= nfs_atomic_lookup,
@@ -1076,9 +1076,8 @@ int nfs_neg_need_reval(struct inode *dir, struct dentry *dentry,
  * If the parent directory is seen to have changed, we throw out the
  * cached dentry and do a new lookup.
  */
-static int nfs_lookup_revalidate(struct dentry *dentry, struct nameidata *nd)
+static int nfs_lookup_revalidate(struct dentry *dentry, unsigned int flags)
 {
-	unsigned int flags = nd->flags;
 	struct inode *dir;
 	struct inode *inode;
 	struct dentry *parent;
@@ -1570,7 +1569,7 @@ out_put_ctx:
 no_open_dput:
 	dput(parent);
 no_open:
-	return nfs_lookup_revalidate(dentry, nd);
+	return nfs_lookup_revalidate(dentry, flags);
 }
 
 static int nfs_open_create(struct inode *dir, struct dentry *dentry,
