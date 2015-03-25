@@ -1113,7 +1113,7 @@ static struct dentry *lookup_dcache(struct qstr *name, struct dentry *dir,
  * dir->d_inode->i_mutex must be held
  */
 static struct dentry *lookup_real(struct inode *dir, struct dentry *dentry,
-				  unsigned int flags)
+				  struct nameidata *nd)
 {
 	struct dentry *old;
 
@@ -1123,7 +1123,7 @@ static struct dentry *lookup_real(struct inode *dir, struct dentry *dentry,
 		return ERR_PTR(-ENOENT);
 	}
 
-	old = dir->i_op->lookup(dir, dentry, flags);
+	old = dir->i_op->lookup(dir, dentry, nd ? nd->flags : 0);
 	if (unlikely(old)) {
 		dput(dentry);
 		dentry = old;
@@ -1132,16 +1132,16 @@ static struct dentry *lookup_real(struct inode *dir, struct dentry *dentry,
 }
 
 static struct dentry *__lookup_hash(struct qstr *name,
-		struct dentry *base, unsigned int flags)
+		struct dentry *base, struct nameidata *nd)
 {
 	bool need_lookup;
 	struct dentry *dentry;
 
-	dentry = lookup_dcache(name, base, flags, &need_lookup);
+	dentry = lookup_dcache(name, base, nd ? nd->flags : 0, &need_lookup);
 	if (!need_lookup)
 		return dentry;
 
-	return lookup_real(base->d_inode, dentry, flags);
+	return lookup_real(base->d_inode, dentry, nd);
 }
 
 /*
@@ -1236,7 +1236,7 @@ need_lookup:
 	BUG_ON(nd->inode != parent->d_inode);
 
 	mutex_lock(&parent->d_inode->i_mutex);
-	dentry = __lookup_hash(name, parent, nd->flags);
+	dentry = __lookup_hash(name, parent, nd);
 	mutex_unlock(&parent->d_inode->i_mutex);
 	if (IS_ERR(dentry))
 		return PTR_ERR(dentry);
@@ -1846,7 +1846,7 @@ int vfs_path_lookup(struct dentry *dentry, struct vfsmount *mnt,
  */
 static struct dentry *lookup_hash(struct nameidata *nd)
 {
-	return __lookup_hash(&nd->last, nd->path.dentry, nd->flags);
+	return __lookup_hash(&nd->last, nd->path.dentry, nd);
 }
 
 /**
@@ -1893,7 +1893,7 @@ struct dentry *lookup_one_len(const char *name, struct dentry *base, int len)
 	if (err)
 		return ERR_PTR(err);
 
-	return __lookup_hash(&this, base, 0);
+	return __lookup_hash(&this, base, NULL);
 }
 
 int user_path_at_empty(int dfd, const char __user *name, unsigned flags,
