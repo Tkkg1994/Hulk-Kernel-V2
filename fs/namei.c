@@ -494,7 +494,11 @@ void release_open_intent(struct nameidata *nd)
 
 static inline int d_revalidate(struct dentry *dentry, unsigned int flags)
 {
+<<<<<<< HEAD
 	return dentry->d_op->d_revalidate(dentry, flags);
+=======
+	return dentry->d_op->d_revalidate(dentry, nd);
+>>>>>>> parent of b8feb9b... stop passing nameidata * to ->d_revalidate()
 }
 
 /**

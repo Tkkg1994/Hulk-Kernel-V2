@@ -793,9 +793,9 @@ static const struct inode_operations proc_sys_dir_operations = {
 	.getattr	= proc_sys_getattr,
 };
 
-static int proc_sys_revalidate(struct dentry *dentry, unsigned int flags)
+static int proc_sys_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
-	if (flags & LOOKUP_RCU)
+	if (nd->flags & LOOKUP_RCU)
 		return -ECHILD;
 	return !PROC_I(dentry->d_inode)->sysctl->unregistering;
 }
