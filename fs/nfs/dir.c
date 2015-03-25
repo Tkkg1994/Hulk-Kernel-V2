@@ -1015,10 +1015,10 @@ static int nfs_check_verifier(struct inode *dir, struct dentry *dentry)
  * component of the path and none of them is set before that last
  * component.
  */
-static inline unsigned int nfs_lookup_check_intent(unsigned int flags,
+static inline unsigned int nfs_lookup_check_intent(struct nameidata *nd,
 						unsigned int mask)
 {
-	return flags & mask;
+	return nd->flags & mask;
 }
 
 /*
@@ -1029,7 +1029,7 @@ static int nfs_is_exclusive_create(struct inode *dir, struct nameidata *nd)
 {
 	if (NFS_PROTO(dir)->version == 2)
 		return 0;
-	return nd && nfs_lookup_check_intent(nd->flags, LOOKUP_EXCL);
+	return nd && nfs_lookup_check_intent(nd, LOOKUP_EXCL);
 }
 
 /*
@@ -1047,6 +1047,7 @@ int nfs_lookup_verify_inode(struct inode *inode, struct nameidata *nd)
 
 	if (IS_AUTOMOUNT(inode))
 		return 0;
+<<<<<<< HEAD
 	/* VFS wants an on-the-wire revalidation */
 	if (nd->flags & LOOKUP_REVAL)
 		goto out_force;
@@ -1057,6 +1058,21 @@ int nfs_lookup_verify_inode(struct inode *inode, struct nameidata *nd)
 			 S_ISDIR(inode->i_mode)))
 		goto out_force;
 	return 0;
+=======
+	if (nd != NULL) {
+		/* VFS wants an on-the-wire revalidation */
+		if (nd->flags & LOOKUP_REVAL)
+			goto out_force;
+		/* This is an open(2) */
+		if (nfs_lookup_check_intent(nd, LOOKUP_OPEN) != 0 &&
+				!(server->flags & NFS_MOUNT_NOCTO) &&
+				(S_ISREG(inode->i_mode) ||
+				 S_ISDIR(inode->i_mode)))
+			goto out_force;
+		return 0;
+	}
+	return nfs_revalidate_inode(server, inode);
+>>>>>>> parent of 921e394... switch nfs_lookup_check_intent() away from nameidata
 out_force:
 	return __nfs_revalidate_inode(server, inode);
 }
@@ -1073,7 +1089,7 @@ int nfs_neg_need_reval(struct inode *dir, struct dentry *dentry,
 		       struct nameidata *nd)
 {
 	/* Don't revalidate a negative dentry if we're creating a new file */
-	if (nd != NULL && nfs_lookup_check_intent(nd->flags, LOOKUP_CREATE) != 0)
+	if (nd != NULL && nfs_lookup_check_intent(nd, LOOKUP_CREATE) != 0)
 		return 0;
 	if (NFS_SERVER(dir)->flags & NFS_MOUNT_LOOKUP_CACHE_NONEG)
 		return 1;
