@@ -137,7 +137,7 @@ cifs_bp_rename_retry:
 
 int
 cifs_create(struct inode *inode, struct dentry *direntry, umode_t mode,
-		struct nameidata *nd)
+		bool excl)
 {
 	int rc = -ENOENT;
 	int xid;
