@@ -55,7 +55,7 @@ static int minix_mknod(struct inode * dir, struct dentry *dentry, umode_t mode, 
 }
 
 static int minix_create(struct inode *dir, struct dentry *dentry, umode_t mode,
-		bool excl)
+		struct nameidata *nd)
 {
 	return minix_mknod(dir, dentry, mode, 0);
 }

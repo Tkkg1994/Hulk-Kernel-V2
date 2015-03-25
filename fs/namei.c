@@ -2073,6 +2073,7 @@ int vfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 		struct nameidata *nd)
 {
 	int error = may_create(dir, dentry);
+
 	if (error)
 		return error;
 
@@ -2083,7 +2084,7 @@ int vfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	error = security_inode_create(dir, dentry, mode);
 	if (error)
 		return error;
-	error = dir->i_op->create(dir, dentry, mode, !nd || (nd->flags & LOOKUP_EXCL));
+	error = dir->i_op->create(dir, dentry, mode, nd);
 	if (error)
 		return error;
 
