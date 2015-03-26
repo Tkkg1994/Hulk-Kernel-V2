@@ -1,4 +1,3 @@
-
 mkdir $(pwd)/out
 make -C $(pwd) O=$(pwd)/out VARIANT_DEFCONFIG=jf_eur_defconfig jf_defconfig SELINUX_DEFCONFIG=selinux_defconfig
 make -C $(pwd) O=$(pwd)/out
