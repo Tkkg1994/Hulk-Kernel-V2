@@ -81,12 +81,8 @@ static void		ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu);
 #ifdef CONFIG_IPV6_ROUTE_INFO
 static struct rt6_info *rt6_add_route_info(struct net_device *dev,
 					   const struct in6_addr *prefix, int prefixlen,
-<<<<<<< HEAD
 					   const struct in6_addr *gwaddr,
 					   unsigned pref);
-=======
-					   const struct in6_addr *gwaddr, unsigned int pref);
->>>>>>> 045ad74... net: ipv6: autoconf routes into per-device tables
 static struct rt6_info *rt6_get_route_info(struct net_device *dev,
 					   const struct in6_addr *prefix, int prefixlen,
 					   const struct in6_addr *gwaddr);
@@ -1901,12 +1897,8 @@ out:
 
 static struct rt6_info *rt6_add_route_info(struct net_device *dev,
 					   const struct in6_addr *prefix, int prefixlen,
-<<<<<<< HEAD
 					   const struct in6_addr *gwaddr,
 					   unsigned pref)
-=======
-					   const struct in6_addr *gwaddr, unsigned int pref)
->>>>>>> 045ad74... net: ipv6: autoconf routes into per-device tables
 {
 	struct fib6_config cfg = {
 		.fc_table	= addrconf_rt_table(dev, RT6_TABLE_INFO),
