@@ -154,7 +154,7 @@ source "drivers/battery/Kconfig"
 
 source "drivers/samsung/Kconfig"
 
-source "drivers/sensors/Kconfig"
+source "drivers/sensors_samsung/Kconfig"
 
 source "drivers/sensorhub/Kconfig"
 
