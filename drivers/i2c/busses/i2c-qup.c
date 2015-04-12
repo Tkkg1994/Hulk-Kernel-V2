@@ -16,7 +16,6 @@
  */
 
 /* #define DEBUG */
-#define SECURE_INPUT
 #include <linux/module.h>
 #include <linux/clk.h>
 #include <linux/err.h>
@@ -1608,7 +1607,8 @@ qup_i2c_probe(struct platform_device *pdev)
 	qup_mem = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 						"qup_phys_addr");
 	if (!qup_mem) {
-		dev_err(&pdev->dev, "no qup mem resource?\n");
+		dev_err(&pdev->dev,
+			"platform_get_resource_byname(qup_phys_addr) failed\n");
 		ret = -ENODEV;
 		goto get_res_failed;
 	}
