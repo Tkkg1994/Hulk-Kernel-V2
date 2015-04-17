@@ -2,6 +2,7 @@
 /arch/arm/boot/compressed/piggy.lzma
 /arch/arm/boot/compressed/piggy.lzo
 /arch/arm/boot/compressed/piggy.lz4
+/source
 /scripts/basic/fixdep
 /scripts/bin2c
 /scripts/conmakehash
