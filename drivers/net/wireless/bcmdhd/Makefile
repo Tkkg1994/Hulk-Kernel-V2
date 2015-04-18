@@ -5,7 +5,7 @@
 
 DHDCFLAGS += -Wall -Wstrict-prototypes -Dlinux -DLINUX -DBCMDRIVER             \
         -DBCMDONGLEHOST -DUNRELEASEDCHIP -DBCMDMA32 -DBCMFILEIMAGE            \
-        -DDHDTHREAD -DBDC -DOOB_INTR_ONLY -DDHD_USE_POWERSUSPEND              \
+        -DDHDTHREAD -DBDC -DOOB_INTR_ONLY                                     \
         -DDHD_BCMEVENTS -DSHOW_EVENTS -DBCMDBG                                \
         -DMMC_SDIO_ABORT -DBCMSDIO -DBCMLXSDMMC -DWLP2P     \
         -DWIFI_ACT_FRAME -DARP_OFFLOAD_SUPPORT          \
@@ -71,7 +71,11 @@ DHDCFLAGS += -DCUSTOM_PNO_EVENT_LOCK_xTIME=10
 # For Passing all multicast packets to host when not in suspend mode.
 DHDCFLAGS += -DPASS_ALL_MCAST_PKTS
 
-#DHDCFLAGS += -DDHD_USE_EARLYSUSPEND -DCONFIG_HAS_EARLYSUSPEND
+# Early suspend
+#DHDCFLAGS += -DDHD_USE_EARLYSUSPEND
+
+# Powersuspend
+DHDCFLAGS += -DDHD_USE_POWERSUSPEND
 
 # WiFi turn off delay
 #DHDCFLAGS += -DWIFI_TURNOFF_DELAY=100
