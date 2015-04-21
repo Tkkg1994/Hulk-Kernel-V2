@@ -294,13 +294,7 @@ struct hpf_work {
 };
 
 static struct hpf_work tx_hpf_work[NUM_DECIMATORS];
-struct mute_work {
-		struct tabla_priv *tabla;
-		u32 decimator;
-		struct delayed_work dwork;
-};
 
-static struct mute_work tx_mute_work[NUM_DECIMATORS];
 struct tabla_priv {
 	struct snd_soc_codec *codec;
 	struct tabla_reg_address reg_addr;
@@ -2170,11 +2164,8 @@ static int tabla_codec_enable_clock_block(struct snd_soc_codec *codec,
 			tabla_codec_enable_config_mode(codec, 0);
 		}
 	}
-#ifndef CONFIG_MACH_M2
+
 	snd_soc_update_bits(codec, TABLA_A_CLK_BUFF_EN1, 0x01, 0x01);
-#else
-	snd_soc_update_bits(codec, TABLA_A_CLK_BUFF_EN1, 0x05, 0x05);
-#endif
 	snd_soc_update_bits(codec, TABLA_A_CLK_BUFF_EN2, 0x02, 0x00);
 	/* on MCLK */
 	snd_soc_update_bits(codec, TABLA_A_CLK_BUFF_EN2, 0x04, 0x04);
@@ -2845,27 +2836,6 @@ static void tx_hpf_corner_freq_callback(struct work_struct *work)
 	snd_soc_update_bits(codec, tx_mux_ctl_reg, 0x30, hpf_cut_of_freq << 4);
 }
 
-static void tx_digital_unmute_callback(struct work_struct *work)
-{
-	struct delayed_work *mute_delayed_work;
-	struct mute_work *tx_mute_work;
-	struct tabla_priv *tabla;
-	struct snd_soc_codec *codec;
-	u16 tx_vol_ctl_reg;
-
-	mute_delayed_work = to_delayed_work(work);
-	tx_mute_work = container_of(mute_delayed_work, struct mute_work, dwork);
-	tabla = tx_mute_work->tabla;
-	codec = tx_mute_work->tabla->codec;
-
-	tx_vol_ctl_reg = TABLA_A_CDC_TX1_VOL_CTL_CFG +
-		(tx_mute_work->decimator - 1) * 8;
-
-	pr_debug("%s(): tabla %p decimator %u tx digital mute 0\n",
-		__func__, tx_mute_work->tabla, tx_mute_work->decimator);
-
-	snd_soc_update_bits(codec, tx_vol_ctl_reg, 0x01, 0x00);
-}
 #define  TX_MUX_CTL_CUT_OFF_FREQ_MASK	0x30
 #define  CF_MIN_3DB_4HZ			0x0
 #define  CF_MIN_3DB_75HZ		0x1
@@ -2956,9 +2926,7 @@ static int tabla_codec_enable_dec(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMU:
 
 		/* Disable TX digital mute */
-		schedule_delayed_work(
-			&tx_mute_work[decimator - 1].dwork,
-			msecs_to_jiffies(100));
+		snd_soc_update_bits(codec, tx_vol_ctl_reg, 0x01, 0x00);
 
 		if (tx_hpf_work[decimator - 1].tx_hpf_cut_of_freq !=
 				CF_MIN_3DB_150HZ) {
@@ -2980,7 +2948,6 @@ static int tabla_codec_enable_dec(struct snd_soc_dapm_widget *w,
 
 		snd_soc_update_bits(codec, tx_vol_ctl_reg, 0x01, 0x01);
 		cancel_delayed_work_sync(&tx_hpf_work[decimator - 1].dwork);
-		cancel_delayed_work_sync(&tx_mute_work[decimator - 1].dwork);
 		break;
 
 	case SND_SOC_DAPM_POST_PMD:
@@ -3034,25 +3001,6 @@ static int tabla_codec_enable_ldo_h(struct snd_soc_dapm_widget *w,
 	}
 	return 0;
 }
-
-static int tabla_codec_enable_ear_rx_bias(struct snd_soc_dapm_widget *w,
-	struct snd_kcontrol *kcontrol, int event)
-{
-	struct snd_soc_codec *codec = w->codec;
-	pr_debug("%s %d\n", __func__, event);
-
-	switch (event) {
-	case SND_SOC_DAPM_PRE_PMU:
-		tabla_enable_rx_bias(codec, 1);
-		break;
-	case SND_SOC_DAPM_POST_PMD:
-		msleep(40);
-		tabla_enable_rx_bias(codec, 0);
-		break;
-	}
-	return 0;
-}
-
 
 static int tabla_codec_enable_rx_bias(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
@@ -3651,11 +3599,7 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"RX1 MIX2", NULL, "ANC1 MUX"},
 	{"RX2 MIX2", NULL, "ANC2 MUX"},
 
-#ifdef CONFIG_MACH_M2
-	{"CP", NULL, "EAR_RX_BIAS"},
-#else
 	{"CP", NULL, "RX_BIAS"},
-#endif
 	{"LINEOUT1 DAC", NULL, "RX_BIAS"},
 	{"LINEOUT2 DAC", NULL, "RX_BIAS"},
 	{"LINEOUT3 DAC", NULL, "RX_BIAS"},
@@ -4094,14 +4038,29 @@ static int tabla_volatile(struct snd_soc_codec *ssc, unsigned int reg)
 }
 
 #define TABLA_FORMATS (SNDRV_PCM_FMTBIT_S16_LE)
+#ifndef CONFIG_SOUND_CONTROL_HAX_GPL
+static
+#endif
+int tabla_write(struct snd_soc_codec *codec, unsigned int reg,
+	unsigned int value)
+{
+	int ret;
+	BUG_ON(reg > TABLA_MAX_REGISTER);
 
-#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
-extern int snd_hax_reg_access(unsigned int);
-extern unsigned int snd_hax_cache_read(unsigned int);
-extern void snd_hax_cache_write(unsigned int, unsigned int);
+	if (!tabla_volatile(codec, reg)) {
+		ret = snd_soc_cache_write(codec, reg, value);
+		if (ret != 0)
+			dev_err(codec->dev, "Cache write to %x failed: %d\n",
+				reg, ret);
+	}
+
+	return wcd9xxx_reg_write(codec->control_data, reg, value);
+}
+#ifdef CONFIG_SOUND_CONTROL_HAX_GPL
+EXPORT_SYMBOL(tabla_write);
 #endif
 
-#ifndef CONFIG_SOUND_CONTROL_HAX_3_GPL
+#ifndef CONFIG_SOUND_CONTROL_HAX_GPL
 static
 #endif
 unsigned int tabla_read(struct snd_soc_codec *codec,
@@ -4126,45 +4085,8 @@ unsigned int tabla_read(struct snd_soc_codec *codec,
 	return val;
 }
 
-#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
+#ifdef CONFIG_SOUND_CONTROL_HAX_GPL
 EXPORT_SYMBOL(tabla_read);
-#endif
-
-#ifndef CONFIG_SOUND_CONTROL_HAX_3_GPL
-static
-#endif
-int tabla_write(struct snd_soc_codec *codec, unsigned int reg,
-	unsigned int value)
-{
-	int ret;
-#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
-	int val;
-#endif
-
-	BUG_ON(reg > TABLA_MAX_REGISTER);
-
-	if (!tabla_volatile(codec, reg)) {
-		ret = snd_soc_cache_write(codec, reg, value);
-		if (ret != 0)
-			dev_err(codec->dev, "Cache write to %x failed: %d\n",
-				reg, ret);
-	}
-#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
-	if (!snd_hax_reg_access(reg)) {
-		if (!((val = snd_hax_cache_read(reg)) != -1)) {
-			val = wcd9xxx_reg_read_safe(codec->control_data, reg);
-		}
-	} else {
-		snd_hax_cache_write(reg, value);
-		val = value;
-	}
-	return wcd9xxx_reg_write(codec->control_data, reg, val);
-#else
-	return wcd9xxx_reg_write(codec->control_data, reg, value);
-#endif
-}
-#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
-EXPORT_SYMBOL(tabla_write);
 #endif
 
 static s16 tabla_get_current_v_ins(struct tabla_priv *tabla, bool hu)
@@ -5565,10 +5487,6 @@ static const struct snd_soc_dapm_widget tabla_dapm_widgets[] = {
 	SND_SOC_DAPM_SUPPLY("RX_BIAS", SND_SOC_NOPM, 0, 0,
 		tabla_codec_enable_rx_bias, SND_SOC_DAPM_PRE_PMU |
 		SND_SOC_DAPM_POST_PMD),
-
-	SND_SOC_DAPM_SUPPLY("EAR_RX_BIAS", SND_SOC_NOPM, 0, 0,
-			tabla_codec_enable_ear_rx_bias, SND_SOC_DAPM_PRE_PMU |
-			SND_SOC_DAPM_POST_PMD),
 
 	/* TX */
 
@@ -8455,7 +8373,7 @@ static int tabla_handle_pdata(struct tabla_priv *tabla)
 		snd_soc_update_bits(codec, TABLA_A_RX_HPH_OCP_CTL,
 			0xE0, (pdata->ocp.hph_ocp_limit << 5));
 	}
-#ifndef CONFIG_MACH_M2
+
 	for (i = 0; i < ARRAY_SIZE(pdata->regulator); i++) {
 		if (!strncmp(pdata->regulator[i].name, "CDC_VDDA_RX", 11)) {
 			if (pdata->regulator[i].min_uV == 1800000 &&
@@ -8476,7 +8394,6 @@ static int tabla_handle_pdata(struct tabla_priv *tabla)
 			break;
 		}
 	}
-#endif
 done:
 	return rc;
 }
@@ -8684,9 +8601,6 @@ static void tabla_codec_init_reg(struct snd_soc_codec *codec)
 				      tabla_2_higher_codec_reg_init_val[i].mask,
 				      tabla_2_higher_codec_reg_init_val[i].val);
 	}
-#ifdef CONFIG_MACH_M2
-	snd_soc_write(codec, TABLA_A_BIAS_REF_CTL, 0x1E);
-#endif
 }
 
 static void tabla_update_reg_address(struct tabla_priv *priv)
@@ -8927,7 +8841,7 @@ static const struct file_operations poke_reg_fops = {
 };
 #endif
 
-#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
+#ifdef CONFIG_SOUND_CONTROL_HAX_GPL
 struct snd_kcontrol_new *gpl_faux_snd_controls_ptr =
 		(struct snd_kcontrol_new *)tabla_snd_controls;
 struct snd_soc_codec *fauxsound_codec_ptr;
@@ -8945,32 +8859,31 @@ static int tabla_codec_probe(struct snd_soc_codec *codec)
 	int i;
 	int ch_cnt;
 
-#ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
-	pr_info("tabla codec probe...\n");
-	fauxsound_codec_ptr = codec;
+#ifdef CONFIG_SOUND_CONTROL_HAX_GPL
+ pr_info("tabla codec probe...\n");
+ fauxsound_codec_ptr = codec;
 #endif
 
 	codec->control_data = dev_get_drvdata(codec->dev->parent);
 	control = codec->control_data;
 
 #ifdef CONFIG_SOUND_CONTROL_HAX_3_GPL
-	if (TABLA_IS_2_0(control->version))
-		wcd9xxx_hw_revision = 1;
-	else
-		wcd9xxx_hw_revision = 2;
+ if (TABLA_IS_2_0(control->version))
+ wcd9xxx_hw_revision = 1;
+ else
+ wcd9xxx_hw_revision = 2;
 #endif
+
 	tabla = kzalloc(sizeof(struct tabla_priv), GFP_KERNEL);
 	if (!tabla) {
 		dev_err(codec->dev, "Failed to allocate private data\n");
 		return -ENOMEM;
 	}
 	for (i = 0 ; i < NUM_DECIMATORS; i++) {
-		tx_mute_work[i].tabla = tx_hpf_work[i].tabla = tabla;
-		tx_mute_work[i].decimator = tx_hpf_work[i].decimator = i + 1;
+		tx_hpf_work[i].tabla = tabla;
+		tx_hpf_work[i].decimator = i + 1;
 		INIT_DELAYED_WORK(&tx_hpf_work[i].dwork,
 			tx_hpf_corner_freq_callback);
-		INIT_DELAYED_WORK(&tx_mute_work[i].dwork,
-			tx_digital_unmute_callback);
 	}
 
 	/* Make sure mbhc micbias register addresses are zeroed out */
