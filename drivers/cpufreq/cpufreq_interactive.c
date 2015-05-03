@@ -861,7 +861,10 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		if (atomic_inc_return(&active_count) > 1)
 			return 0;
 
-		rc = sysfs_create_group(cpufreq_global_kobject,
+		if (!have_governor_per_policy())
+			WARN_ON(cpufreq_get_global_kobject());
+
+		rc = sysfs_create_group(get_governor_parent_kobj(policy),
 				&interactive_attr_group);
 		if (rc)
 			return rc;
@@ -894,8 +897,10 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			return 0;
 
 		input_unregister_handler(&cpufreq_interactive_input_handler);
-		sysfs_remove_group(cpufreq_global_kobject,
+		sysfs_remove_group(get_governor_parent_kobj(policy),
 				&interactive_attr_group);
+		if (!have_governor_per_policy())
+			cpufreq_put_global_kobject();
 
 		break;
 
