@@ -18,6 +18,8 @@
 #include <mach/msm_iomap.h>
 #include <mach/msm_bus.h>
 #include <linux/ktime.h>
+#include <linux/delay.h>
+#include <linux/cpufreq.h>
 
 #include "kgsl.h"
 #include "kgsl_pwrscale.h"
@@ -36,6 +38,10 @@
 
 #ifdef CONFIG_MSM_KGSL_KERNEL_API_ENABLE
 struct device *stored_dev;
+#endif
+
+#ifdef CONFIG_CPU_FREQ_GOV_BADASS_GPU_CONTROL
+extern bool gpu_busy_state;
 #endif
 
 struct clk_pair {
@@ -859,6 +865,12 @@ static void kgsl_pwrctrl_busy_time(struct kgsl_device *device, bool on_time)
 	if ((clkstats->elapsed > UPDATE_BUSY_VAL) ||
 		!test_bit(KGSL_PWRFLAGS_AXI_ON, &device->pwrctrl.power_flags)) {
 		update_statistics(device);
+#ifdef CONFIG_CPU_FREQ_GOV_BADASS_GPU_CONTROL
+	if (on_time)
+		gpu_busy_state = true;
+	else
+		gpu_busy_state = false;
+#endif
 	}
 }
 

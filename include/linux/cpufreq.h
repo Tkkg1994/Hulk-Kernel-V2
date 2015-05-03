@@ -25,6 +25,10 @@
 /* Print length for names. Extra 1 space for accomodating '\n' in prints */
 #define CPUFREQ_NAME_PLEN (CPUFREQ_NAME_LEN + 1)
 
+#ifdef CONFIG_CPU_FREQ_GOV_BADASS_GPU_CONTROL
+/* Badass gpu state detection */
+extern bool gpu_busy_state;
+#endif
 
 /*********************************************************************
  *                     CPUFREQ NOTIFIER INTERFACE                    *
