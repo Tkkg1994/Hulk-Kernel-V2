@@ -79,6 +79,9 @@
 #define SPS_BAM_NO_EXT_P_RST        (1UL << 4)
 /* Verify Low Memory status */
 #define SPS_BAM_ATMC_MEM            (1UL << 8)
+/* Hold memory for BAM DMUX */
+#define SPS_BAM_HOLD_MEM            (1UL << 9)
+
 
 /* BAM device management flags */
 
