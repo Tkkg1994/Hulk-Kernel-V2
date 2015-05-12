@@ -1075,8 +1075,6 @@ config TOUCHSCREEN_PREVENT_SLEEP
 	help
 	  This disables the sleep function of modified touchscreen drivers.
 
-endif
-
 config TOUCHSCREEN_MXT224
 	tristate "Atmel MaxTouch 224"
 	depends on I2C
