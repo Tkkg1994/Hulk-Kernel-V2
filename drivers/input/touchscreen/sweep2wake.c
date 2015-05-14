@@ -17,10 +17,6 @@
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- *
- * History:
- *	Added sysfs adjustments for different sweep styles
- * 		by paul reioux (aka Faux123) <reioux@gmail.com>
  */
 
 #include <linux/kernel.h>
@@ -32,31 +28,23 @@
 #include <linux/input/sweep2wake.h>
 
 /* Tuneables */
-#define DEBUG                   1
-#define DEFAULT_S2W_Y_LIMIT             2350
-#define DEFAULT_S2W_X_MAX               1540
-#define DEFAULT_S2W_X_B1                500
-#define DEFAULT_S2W_X_B2                1000
-#define DEFAULT_S2W_X_FINAL             300
-#define DEFAULT_S2W_PWRKEY_DUR          60
+#define DEBUG                   0
+#define S2W_Y_LIMIT             2350
+#define S2W_X_MAX               1540
+#define S2W_X_B1                500
+#define S2W_X_B2                1000
+#define S2W_X_FINAL             300
+#define S2W_PWRKEY_DUR          60
 
 /* external function from the ts driver */
 extern bool is_single_touch(struct lge_touch_data *ts);
 
 /* Resources */
-int s2w_switch = 0;
+int s2w_switch = 1;
 bool scr_suspended = false, exec_count = true;
 bool scr_on_touch = false, barrier[2] = {false, false};
 static struct input_dev * sweep2wake_pwrdev;
 static DEFINE_MUTEX(pwrkeyworklock);
-
-static int s2w_start_posn = DEFAULT_S2W_X_B1;
-static int s2w_mid_posn = DEFAULT_S2W_X_B2;
-static int s2w_end_posn = (DEFAULT_S2W_X_MAX - DEFAULT_S2W_X_FINAL);
-static int s2w_threshold = DEFAULT_S2W_X_FINAL;
-//static int s2w_max_posn = DEFAULT_S2W_X_MAX;
-
-static int s2w_swap_coord = 0;
 
 #ifdef CONFIG_CMDLINE_OPTIONS
 /* Read cmdline for s2w */
@@ -90,10 +78,10 @@ static void sweep2wake_presspwr(struct work_struct * sweep2wake_presspwr_work) {
                 return;
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 1);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
-	msleep(DEFAULT_S2W_PWRKEY_DUR);
+	msleep(S2W_PWRKEY_DUR);
 	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
 	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
-	msleep(DEFAULT_S2W_PWRKEY_DUR);
+	msleep(S2W_PWRKEY_DUR);
         mutex_unlock(&pwrkeyworklock);
 	return;
 }
@@ -106,43 +94,34 @@ void sweep2wake_pwrtrigger(void) {
 }
 
 /* Sweep2wake main function */
-void detect_sweep2wake(int sweep_coord, int sweep_height, struct lge_touch_data *ts)
+void detect_sweep2wake(int x, int y, struct lge_touch_data *ts)
 {
-	int swap_temp1, swap_temp2;
-
-        int prev_coord = 0, next_coord = 0;
+        int prevx = 0, nextx = 0;
         bool single_touch = is_single_touch(ts);
 #if DEBUG
-        pr_info("[sweep2wake]: sweep_coord,sweep_height(%4d,%4d) single:%s\n",
-                sweep_coord, sweep_height, (single_touch) ? "true" : "false");
+        pr_info("[sweep2wake]: x,y(%4d,%4d) single:%s\n",
+                x, y, (single_touch) ? "true" : "false");
 #endif
-
-	if (s2w_swap_coord == 1) {
-		//swap the coordinate system
-		swap_temp1 = sweep_coord;
-		swap_temp2 = sweep_height;
-
-		sweep_height = swap_temp1;
-		sweep_coord = swap_temp2;
-	}
-
-	//power on
+	//left->right
 	if ((single_touch) && (scr_suspended == true) && (s2w_switch > 0)) {
-		prev_coord = 0;
-		next_coord = s2w_start_posn;
+		prevx = 0;
+		nextx = S2W_X_B1;
 		if ((barrier[0] == true) ||
-		   ((sweep_coord > prev_coord) &&
-		    (sweep_coord < next_coord))) {
-			prev_coord = next_coord;
-			next_coord = s2w_mid_posn;
+		   ((x > prevx) &&
+		    (x < nextx) &&
+		    (y > 0))) {
+			prevx = nextx;
+			nextx = S2W_X_B2;
 			barrier[0] = true;
 			if ((barrier[1] == true) ||
-			   ((sweep_coord > prev_coord) &&
-			    (sweep_coord < next_coord))) {
-				prev_coord = next_coord;
+			   ((x > prevx) &&
+			    (x < nextx) &&
+			    (y > 0))) {
+				prevx = nextx;
 				barrier[1] = true;
-				if ((sweep_coord > prev_coord)) {
-					if (sweep_coord > s2w_end_posn) {
+				if ((x > prevx) &&
+				    (y > 0)) {
+					if (x > (S2W_X_MAX - S2W_X_FINAL)) {
 						if (exec_count) {
 							printk(KERN_INFO "[sweep2wake]: ON");
 							sweep2wake_pwrtrigger();
@@ -152,36 +131,27 @@ void detect_sweep2wake(int sweep_coord, int sweep_height, struct lge_touch_data 
 				}
 			}
 		}
-	//power off
+	//right->left
 	} else if ((single_touch) && (scr_suspended == false) && (s2w_switch > 0)) {
-		if (s2w_swap_coord == 1) {
-			//swap back for off scenario ONLY
-			swap_temp1 = sweep_coord;
-			swap_temp2 = sweep_height;
-
-			sweep_height = swap_temp1;
-			sweep_coord = swap_temp2;
-		}
-
 		scr_on_touch=true;
-		prev_coord = (DEFAULT_S2W_X_MAX - DEFAULT_S2W_X_FINAL);
-		next_coord = DEFAULT_S2W_X_B2;
+		prevx = (S2W_X_MAX - S2W_X_FINAL);
+		nextx = S2W_X_B2;
 		if ((barrier[0] == true) ||
-		   ((sweep_coord < prev_coord) &&
-		    (sweep_coord > next_coord) &&
-		    (sweep_height > DEFAULT_S2W_Y_LIMIT))) {
-			prev_coord = next_coord;
-			next_coord = DEFAULT_S2W_X_B1;
+		   ((x < prevx) &&
+		    (x > nextx) &&
+		    (y > S2W_Y_LIMIT))) {
+			prevx = nextx;
+			nextx = S2W_X_B1;
 			barrier[0] = true;
 			if ((barrier[1] == true) ||
-			   ((sweep_coord < prev_coord) &&
-			    (sweep_coord > next_coord) &&
-			    (sweep_height > DEFAULT_S2W_Y_LIMIT))) {
-				prev_coord = next_coord;
+			   ((x < prevx) &&
+			    (x > nextx) &&
+			    (y > S2W_Y_LIMIT))) {
+				prevx = nextx;
 				barrier[1] = true;
-				if ((sweep_coord < prev_coord) &&
-				    (sweep_height > DEFAULT_S2W_Y_LIMIT)) {
-					if (sweep_coord < DEFAULT_S2W_X_FINAL) {
+				if ((x < prevx) &&
+				    (y > S2W_Y_LIMIT)) {
+					if (x < S2W_X_FINAL) {
 						if (exec_count) {
 							printk(KERN_INFO "[sweep2wake]: OFF");
 							sweep2wake_pwrtrigger();
@@ -194,162 +164,14 @@ void detect_sweep2wake(int sweep_coord, int sweep_height, struct lge_touch_data 
 	}
 }
 
-/********************* SYSFS INTERFACE ***********************/
-static ssize_t s2w_start_posn_show(struct kobject *kobj,
-	struct kobj_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%i\n", s2w_start_posn);
-}
-
-static ssize_t s2w_start_posn_store(struct kobject *kobj,
-	struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	unsigned int data;
-	if(sscanf(buf, "%i\n", &data) == 1)
-		s2w_start_posn = data;
-	else
-		pr_info("%s: unknown input!\n", __FUNCTION__);
-	return count;
-}
-
-static ssize_t s2w_mid_posn_show(struct kobject *kobj,
-	struct kobj_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%i\n", s2w_mid_posn);
-}
-
-static ssize_t s2w_mid_posn_store(struct kobject *kobj,
-	struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	unsigned int data;
-	if(sscanf(buf, "%i\n", &data) == 1)
-		s2w_mid_posn = data;
-	else
-		pr_info("%s: unknown input!\n", __FUNCTION__);
-	return count;
-}
-
-static ssize_t s2w_end_posn_show(struct kobject *kobj,
-	struct kobj_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%i\n", s2w_end_posn);
-}
-
-static ssize_t s2w_end_posn_store(struct kobject *kobj,
-	struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	unsigned int data;
-	if(sscanf(buf, "%i\n", &data) == 1)
-		s2w_end_posn = data;
-	else
-		pr_info("%s: unknown input!\n", __FUNCTION__);
-	return count;
-}
-
-static ssize_t s2w_threshold_show(struct kobject *kobj,
-	struct kobj_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%i\n", s2w_threshold);
-}
-
-static ssize_t s2w_threshold_store(struct kobject *kobj,
-	struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	unsigned int data;
-	if(sscanf(buf, "%i\n", &data) == 1)
-		s2w_threshold = data;
-	else
-		pr_info("%s: unknown input!\n", __FUNCTION__);
-	return count;
-}
-
-static ssize_t s2w_swap_coord_show(struct kobject *kobj,
-	struct kobj_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%i\n", s2w_swap_coord);
-}
-
-static ssize_t s2w_swap_coord_store(struct kobject *kobj,
-	struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	unsigned int data;
-	if(sscanf(buf, "%i\n", &data) == 1)
-		s2w_swap_coord = data;
-	else
-		pr_info("%s: unknown input!\n", __FUNCTION__);
-	return count;
-}
-
-static struct kobj_attribute s2w_start_posn_attribute =
-	__ATTR(s2w_start_posn,
-		0666,
-		s2w_start_posn_show,
-		s2w_start_posn_store);
-
-static struct kobj_attribute s2w_mid_posn_attribute =
-	__ATTR(s2w_mid_posn,
-		0666,
-		s2w_mid_posn_show,
-		s2w_mid_posn_store);
-
-static struct kobj_attribute s2w_end_posn_attribute =
-	__ATTR(s2w_end_posn,
-		0666,
-		s2w_end_posn_show,
-		s2w_end_posn_store);
-
-static struct kobj_attribute s2w_threshold_attribute =
-	__ATTR(s2w_threshold,
-		0666,
-		s2w_threshold_show,
-		s2w_threshold_store);
-
-static struct kobj_attribute s2w_swap_coord_attribute =
-	__ATTR(s2w_swap_coord,
-		0666,
-		s2w_swap_coord_show,
-		s2w_swap_coord_store);
-
-static struct attribute *s2w_parameters_attrs[] =
-	{
-		&s2w_start_posn_attribute.attr,
-		&s2w_mid_posn_attribute.attr,
-		&s2w_end_posn_attribute.attr,
-		&s2w_threshold_attribute.attr,
-		&s2w_swap_coord_attribute.attr,
-		NULL,
-	};
-
-static struct attribute_group s2w_parameters_attr_group =
-	{
-		.attrs = s2w_parameters_attrs,
-	};
-
-static struct kobject *s2w_parameters_kobj;
-
 /*
  * INIT / EXIT stuff below here
  */
 
 static int __init sweep2wake_init(void)
 {
-	int sysfs_result;
-
-	s2w_parameters_kobj = kobject_create_and_add("s2w_parameters", kernel_kobj);
-	if (!s2w_parameters_kobj) {
-		pr_err("%s kobject create failed!\n", __FUNCTION__);
-		return -ENOMEM;
-        }
-
-	sysfs_result = sysfs_create_group(s2w_parameters_kobj, &s2w_parameters_attr_group);
-
-        if (sysfs_result) {
-		pr_info("%s sysfs create failed!\n", __FUNCTION__);
-		kobject_put(s2w_parameters_kobj);
-	}
-
 	pr_info("[sweep2wake]: %s done\n", __func__);
-	return sysfs_result;
+	return 0;
 }
 
 static void __exit sweep2wake_exit(void)
