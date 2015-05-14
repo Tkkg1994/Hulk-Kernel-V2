@@ -1,7 +1,7 @@
 /*
- * include/linux/input/sweep2wake.h
+ * include/linux/sweep2wake.h
  *
- * Copyright (c) 2013, Dennis Rassmann <showp1984@gmail.com>
+ * Copyright (c) 2012, Dennis Rassmann <showp1984@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +21,21 @@
 #ifndef _LINUX_SWEEP2WAKE_H
 #define _LINUX_SWEEP2WAKE_H
 
-extern int s2w_switch, s2w_s2sonly;
+#include <linux/input.h>
+#include <linux/earlysuspend.h>
+#include <linux/hrtimer.h>
+#include <linux/input/lge_touch_core.h>
+
+extern int s2w_switch;
+extern bool scr_suspended;
+extern bool scr_on_touch;
+extern bool exec_count;
+extern bool barrier[2];
+
+/* Sweep2wake main function */
+extern void detect_sweep2wake(int, int, struct lge_touch_data *ts);
+
+/* PowerKey setter */
+extern void sweep2wake_setdev(struct input_dev *);
 
 #endif	/* _LINUX_SWEEP2WAKE_H */
