@@ -19,9 +19,9 @@
 
 #ifdef CONFIG_CPU_OVERCLOCK
 #ifdef CONFIG_LOW_CPUCLOCKS
-#define FREQ_TABLE_SIZE         41
+#define FREQ_TABLE_SIZE         42
 #else
-#define FREQ_TABLE_SIZE         37
+#define FREQ_TABLE_SIZE         38
 #endif
 #else
 #ifdef CONFIG_LOW_CPUCLOCKS

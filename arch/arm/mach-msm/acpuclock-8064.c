@@ -520,9 +520,7 @@ static struct acpu_level tbl_PVS0_2000MHz[] __initdata = {
 #ifdef CONFIG_CPU_OVERCLOCK
 	{ 1, {  1998000, HFPLL, 1, 0x4A }, L2(14), 1337500 },
 	{ 1, {  2106000, HFPLL, 1, 0x4E }, L2(14), 1387500 },
-#ifdef CONFIG_OC_ULTIMATE
 	{ 1, {  2214000, HFPLL, 1, 0x52 }, L2(14), 1437500 },
-#endif
 #endif
 	{ 0, { 0 } }
 };
@@ -554,9 +552,7 @@ static struct acpu_level tbl_PVS1_2000MHz[] __initdata = {
 #ifdef CONFIG_CPU_OVERCLOCK
 	{ 1, {  1998000, HFPLL, 1, 0x4A }, L2(14), 1300000 },
 	{ 1, {  2106000, HFPLL, 1, 0x4E }, L2(14), 1350000 },
-#ifdef CONFIG_OC_ULTIMATE
 	{ 1, {  2214000, HFPLL, 1, 0x52 }, L2(14), 1400000 },
-#endif
 #endif
 	{ 0, { 0 } }
 };
@@ -588,9 +584,7 @@ static struct acpu_level tbl_PVS2_2000MHz[] __initdata = {
 #ifdef CONFIG_CPU_OVERCLOCK
 	{ 1, {  1998000, HFPLL, 1, 0x4A }, L2(14), 1262500 },
 	{ 1, {  2106000, HFPLL, 1, 0x4E }, L2(14), 1312500 },
-#ifdef CONFIG_OC_ULTIMATE
 	{ 1, {  2214000, HFPLL, 1, 0x52 }, L2(14), 1362500 },
-#endif
 #endif
 	{ 0, { 0 } }
 };
@@ -622,9 +616,7 @@ static struct acpu_level tbl_PVS3_2000MHz[] __initdata = {
 #ifdef CONFIG_CPU_OVERCLOCK
 	{ 1, {  1998000, HFPLL, 1, 0x4A }, L2(14), 1225000 },
 	{ 1, {  2106000, HFPLL, 1, 0x4E }, L2(14), 1275000 },
-#ifdef CONFIG_OC_ULTIMATE
 	{ 1, {  2214000, HFPLL, 1, 0x52 }, L2(14), 1325000 },
-#endif
 #endif
 	{ 0, { 0 } }
 };
@@ -656,9 +648,7 @@ static struct acpu_level tbl_PVS4_2000MHz[] __initdata = {
 #ifdef CONFIG_CPU_OVERCLOCK
 	{ 1, {  1998000, HFPLL, 1, 0x4A }, L2(14), 1200000 },
 	{ 1, {  2106000, HFPLL, 1, 0x4E }, L2(14), 1250000 },
-#ifdef CONFIG_OC_ULTIMATE
 	{ 1, {  2214000, HFPLL, 1, 0x52 }, L2(14), 1300000 },
-#endif
 #endif
 	{ 0, { 0 } }
 };
@@ -690,9 +680,7 @@ static struct acpu_level tbl_PVS5_2000MHz[] __initdata = {
 #ifdef CONFIG_CPU_OVERCLOCK
 	{ 1, {  1998000, HFPLL, 1, 0x4A }, L2(14), 1175000 },
 	{ 1, {  2106000, HFPLL, 1, 0x4E }, L2(14), 1225000 },
-#ifdef CONFIG_OC_ULTIMATE
 	{ 1, {  2214000, HFPLL, 1, 0x52 }, L2(14), 1275000 },
-#endif
 #endif
 	{ 0, { 0 } }
 };
@@ -724,9 +712,7 @@ static struct acpu_level tbl_PVS6_2000MHz[] __initdata = {
 #ifdef CONFIG_CPU_OVERCLOCK
 	{ 1, {  1998000, HFPLL, 1, 0x4A }, L2(14), 1150000 },
 	{ 1, {  2106000, HFPLL, 1, 0x4E }, L2(14), 1200000 },
-#ifdef CONFIG_OC_ULTIMATE
 	{ 1, {  2214000, HFPLL, 1, 0x52 }, L2(14), 1250000 },
-#endif
 #endif
 	{ 0, { 0 } }
 };

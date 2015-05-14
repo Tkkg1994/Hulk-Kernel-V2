@@ -2043,13 +2043,6 @@ config CPU_OVERCLOCK
 	help
 	  Krait overclocking up to 2.1 GHz
 
-config OC_ULTIMATE
-	bool "Ultimate CPU Overclocking"
-	depends on CPU_OVERCLOCK
-	default n
-	help
-	  Ultimate Krait overclocking up to 2.3 GHz
-
 config MSM_AVS_HW
 	bool "Enable Adaptive Voltage Scaling (AVS)"
 	default n
