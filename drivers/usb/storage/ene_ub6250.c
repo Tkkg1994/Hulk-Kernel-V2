@@ -1916,12 +1916,11 @@ static int ene_load_bincode(struct us_data *us, unsigned char flag)
 		US_DEBUGP("load firmware %s failed\n", fw_name);
 		goto nofw;
 	}
-	buf = kmalloc(sd_fw->size, GFP_KERNEL);
+	buf = kmemdup(sd_fw->data, sd_fw->size, GFP_KERNEL);
 	if (buf == NULL) {
 		US_DEBUGP("Malloc memory for fireware failed!\n");
 		goto nofw;
 	}
-	memcpy(buf, sd_fw->data, sd_fw->size);
 	memset(bcb, 0, sizeof(struct bulk_cb_wrap));
 	bcb->Signature = cpu_to_le32(US_BULK_CB_SIGN);
 	bcb->DataTransferLength = sd_fw->size;
