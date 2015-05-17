@@ -139,6 +139,7 @@ static void mcapi_callback(struct sk_buff *skb)
 
 static int __init mcapi_init(void)
 {
+
 #if defined MC_NETLINK_COMPAT || defined MC_NETLINK_COMPAT_V37
 	struct netlink_kernel_cfg cfg = {
 		.input  = mcapi_callback,
@@ -150,6 +151,7 @@ static int __init mcapi_init(void)
 	dev_info(mc_kapi, "Mobicore API module initialized!\n");
 
 	mod_ctx = kzalloc(sizeof(struct mc_kernelapi_ctx), GFP_KERNEL);
+
 	if (mod_ctx == NULL) {
 		MCDRV_DBG_ERROR(mc_kapi, "Allocation failure");
 		return -ENOMEM;
