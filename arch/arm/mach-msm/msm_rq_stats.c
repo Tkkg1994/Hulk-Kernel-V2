@@ -58,7 +58,7 @@ static bool io_is_busy;
 
 static int update_average_load(unsigned int freq, unsigned int cpu)
 {
-	int ret
+	int ret;
 	cputime64_t cur_wall_time, cur_idle_time;
 	unsigned int idle_time, wall_time;
 	unsigned int cur_load, load_at_max_freq;
