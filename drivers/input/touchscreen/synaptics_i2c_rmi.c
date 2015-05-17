@@ -101,8 +101,8 @@
 #define EDGE_SWIPE_DATA_OFFSET	8
 
 #define EDGE_SWIPE_WIDTH_MAX	255
-#define EDGE_SWIPE_ANGLE_MIN	(-90)
-#define EDGE_SWIPE_ANGLE_MAX	90
+//#define EDGE_SWIPE_ANGLE_MIN	(-90)
+//#define EDGE_SWIPE_ANGLE_MAX	90
 #define EDGE_SWIPE_PALM_MAX		1
 #endif
 
@@ -637,8 +637,7 @@ struct pmic8xxx_pwrkey {
 	const struct pm8xxx_pwrkey_platform_data *pdata;
 };
 
-#define PROX_CLEAR	55
-static struct device *gdev;
+#define PROX_CLEAR	25
 static bool call_in_progress = false;
 static bool ischarging = false;
 extern void ischarging_relay(bool status);
@@ -1802,26 +1801,31 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				}
 			}
 
-			if (!rmi4_data->finger[finger].state)
-				dev_info(&rmi4_data->i2c_client->dev, "[%d][P] 0x%02x\n",
-					finger, finger_status);
-			else
-				rmi4_data->finger[finger].mcount++;
-
-			touch_count++;
-		}
+ 			/*if (!rmi4_data->finger[finger].state)
+ 			{
+ 				dev_info(&rmi4_data->i2c_client->dev, "[%d][P] 0x%02x\n",
+ 					finger, finger_status);
+ 			}
+ 			else
+ 				rmi4_data->finger[finger].mcount++;*/
+ 			if (rmi4_data->finger[finger].state)
+ 				rmi4_data->finger[finger].mcount++;
+ 				
+ 			touch_count++;
+ 		}
 
 		if (rmi4_data->finger[finger].state && !finger_status) {
-			dev_info(&rmi4_data->i2c_client->dev, "[%d][R] 0x%02x M[%d] V[%x]\n",
-				finger, finger_status, rmi4_data->finger[finger].mcount,
-				rmi4_data->fw_version_of_ic);
-				wake_start = 0;
+			//dev_info(&rmi4_data->i2c_client->dev, "[%d][R] 0x%02x M[%d] V[%x]\n",
+			//	finger, finger_status, rmi4_data->finger[finger].mcount,
+			//	rmi4_data->fw_version_of_ic);
+			wake_start = 0;
 
 			rmi4_data->finger[finger].mcount = 0;
 		}
 
 		rmi4_data->finger[finger].state = finger_status;
 	}
+
 
 	if (touch_count == 0) {
 		/* Clear BTN_TOUCH when All touch are released  */
@@ -1969,7 +1973,7 @@ static int synaptics_rmi4_f51_edge_swipe(struct synaptics_rmi4_data *rmi4_data,
 	if (!f51)
 		return -ENODEV;
 
-	if (data->edge_swipe_dg >= 90 && data->edge_swipe_dg <= 180)
+	/*if (data->edge_swipe_dg >= 90 && data->edge_swipe_dg <= 180)
 #if defined(CONFIG_MACH_JACTIVE_EUR)
 		f51->surface_data.angle = data->edge_swipe_dg - 90;
 #else
@@ -1985,7 +1989,7 @@ static int synaptics_rmi4_f51_edge_swipe(struct synaptics_rmi4_data *rmi4_data,
 		dev_err(&rmi4_data->i2c_client->dev,
 				"Skip wrong edge swipe angle [%d]\n",
 				data->edge_swipe_dg);
-
+*/
 	f51->surface_data.width_major = data->edge_swipe_mm;
 	f51->surface_data.wx = data->edge_swipe_wx;
 	f51->surface_data.wy = data->edge_swipe_wy;
@@ -3553,9 +3557,10 @@ static int synaptics_rmi4_set_input_device
 	input_set_abs_params(rmi4_data->input_dev,
 			ABS_MT_WIDTH_MAJOR, 0,
 			EDGE_SWIPE_WIDTH_MAX, 0, 0);
-	input_set_abs_params(rmi4_data->input_dev,
+	/*input_set_abs_params(rmi4_data->input_dev,
 			ABS_MT_ANGLE, 0,
 			EDGE_SWIPE_ANGLE_MAX, 0, 0);
+	*/
 	input_set_abs_params(rmi4_data->input_dev,
 			ABS_MT_PALM, 0,
 			EDGE_SWIPE_PALM_MAX, 0, 0);
@@ -4120,7 +4125,6 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 	if (ret < 0)
 		pr_alert("KT_PM unable to set runtime pm state\n");
 	pm_runtime_enable(&client->dev);
-	gdev = &client->dev;
 	
 	rmi = &(rmi4_data->rmi4_mod_info);
 
@@ -4558,13 +4562,10 @@ void notif_wakelock_forwake_funcs(bool state)
  */
 static void synaptics_rmi4_early_suspend(struct early_suspend *h)
 {
+	struct synaptics_rmi4_data *rmi4_data =
+			container_of(h, struct synaptics_rmi4_data,
+			early_suspend);
 
-}
-
-void set_screen_synaptic_off(void)
-{
-	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(gdev);
-	
 	int retval;
 	screen_is_off = true;
 	
@@ -4632,12 +4633,9 @@ void set_screen_synaptic_off(void)
  */
 static void synaptics_rmi4_late_resume(struct early_suspend *h)
 {
-
-}
-
-void set_screen_synaptic_on(void)
-{
-	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(gdev);
+	struct synaptics_rmi4_data *rmi4_data =
+			container_of(h, struct synaptics_rmi4_data,
+			early_suspend);
 	
 	int retval;
 
@@ -4668,7 +4666,6 @@ void set_screen_synaptic_on(void)
 	
 	rmi4_data->board->power(true);
 	rmi4_data->touch_stopped = false;
-	rmi4_data->current_page = MASK_8BIT;
 	//retval = gpio_request(rmi4_data->board->gpio, "tsp_int");
 	//if (retval != 0) {
 	//	dev_info(&rmi4_data->i2c_client->dev, "%s: tsp int request failed, ret=%d", __func__, retval);
