@@ -13,8 +13,6 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/cpufreq.h>
-#include <linux/cpu.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/input.h>
@@ -54,28 +52,8 @@ struct pmic8xxx_pwrkey {
 
 extern void sensorwake_setdev(struct pmic8xxx_pwrkey * input_device);
 extern void screenwake_setdev(struct pmic8xxx_pwrkey * input_device);
-struct work_struct pwr_online_work;
-static struct workqueue_struct *dbs_wq;
 
-static void __cpuinit pwr_online_work_fn(struct work_struct *work)
-{
-	int cpu, ret;
-	struct cpufreq_policy new_policy;
-	for_each_possible_cpu(cpu) {
-		if (likely(!cpu_online(cpu) && (cpu)))
-		{
-			cpu_up(cpu);
-			if (likely(cpu_online(cpu)))
-			{
-				ret = cpufreq_get_policy(&new_policy, cpu);
-				if (!ret)
-					__cpufreq_driver_target(&new_policy, 810000, CPUFREQ_RELATION_H);
-			}
-		}
-	}
-}
-
-irqreturn_t pwrkey_press_irq(int irq, void *_pwrkey)
+static irqreturn_t pwrkey_press_irq(int irq, void *_pwrkey)
 {
 	struct pmic8xxx_pwrkey *pwrkey = _pwrkey;
 
@@ -97,7 +75,7 @@ irqreturn_t pwrkey_press_irq(int irq, void *_pwrkey)
 	return IRQ_HANDLED;
 }
 
-irqreturn_t pwrkey_release_irq(int irq, void *_pwrkey)
+static irqreturn_t pwrkey_release_irq(int irq, void *_pwrkey)
 {
 	struct pmic8xxx_pwrkey *pwrkey = _pwrkey;
 
@@ -293,13 +271,6 @@ static int __devinit pmic8xxx_pwrkey_probe(struct platform_device *pdev)
 	}
 	dev_set_drvdata(sec_powerkey, pwrkey);
 	device_init_wakeup(&pdev->dev, pdata->wakeup);
-
-	dbs_wq = alloc_workqueue("pwrbtn_dbs_wq", WQ_HIGHPRI, 0);
-	if (!dbs_wq) {
-		printk(KERN_ERR "Failed to create pwrbtn_dbs_wq workqueue\n");
-		return -EFAULT;
-	}
-	INIT_WORK(&pwr_online_work, pwr_online_work_fn);
 
 	return 0;
 
