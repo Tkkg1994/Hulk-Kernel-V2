@@ -518,7 +518,7 @@ static ssize_t autosleep_store(struct kobject *kobj,
 	int error;
 
 	if (state == PM_SUSPEND_ON
-	    && !(strncmp(buf, "off", 3) && strncmp(buf, "off\n", 4)))
+	    && strcmp(buf, "off") && strcmp(buf, "off\n"))
 		return -EINVAL;
 
 	error = pm_autosleep_set_state(state);
@@ -862,8 +862,6 @@ static struct attribute *g[] = {
 #ifdef CONFIG_PM_SLEEP
 	&pm_async_attr.attr,
 	&wakeup_count_attr.attr,
-	&touch_event_attr.attr,
-	&touch_event_timer_attr.attr,
 #ifdef CONFIG_PM_AUTOSLEEP
 	&autosleep_attr.attr,
 #endif
@@ -871,6 +869,8 @@ static struct attribute *g[] = {
 	&wake_lock_attr.attr,
 	&wake_unlock_attr.attr,
 #endif
+	&touch_event_attr.attr,
+	&touch_event_timer_attr.attr,
 #ifdef CONFIG_PM_DEBUG
 	&pm_test_attr.attr,
 #endif
