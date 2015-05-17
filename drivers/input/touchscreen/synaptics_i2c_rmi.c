@@ -650,10 +650,8 @@ static struct device *gdev;
 static bool call_in_progress = false;
 static bool ischarging = false;
 extern void ischarging_relay(bool status);
-extern void prox_max_relay(unsigned int val);
 static struct wake_lock wakelock;
-static struct delayed_work wakelock_monitor;
-static bool notif_cancel_work = false;
+static bool wakelock_held = false;
 static bool isbooted = false;
 static unsigned long last_touch_time = 0;
 static unsigned int wake_start = 0;
@@ -950,62 +948,40 @@ static ssize_t synaptics_rmi4_f51_enables_store(struct device *dev,
 }
 #endif
 
-static void set_wakelock_options(bool setWork)
-{
-	if (!wake_lock_active(&wakelock) && screen_is_off)
-	{
-		if (screen_wake_options_hold_wlock == 1 || (screen_wake_options_hold_wlock == 3 && ischarging) || (screen_wake_options_hold_wlock >= 4 && screen_wake_options_hold_wlock <= 11))
-		{
-			if (screen_wake_options_hold_wlock == 1 || (screen_wake_options_hold_wlock == 3 && ischarging))
-				wake_lock(&wakelock);
-			else if (screen_wake_options_hold_wlock == 4)
-				wake_lock_timeout(&wakelock, msecs_to_jiffies(30000));
-			else if (screen_wake_options_hold_wlock == 5)
-				wake_lock_timeout(&wakelock, msecs_to_jiffies(60000));
-			else if (screen_wake_options_hold_wlock == 6)
-				wake_lock_timeout(&wakelock, msecs_to_jiffies(120000));
-			else if (screen_wake_options_hold_wlock == 7)
-				wake_lock_timeout(&wakelock, msecs_to_jiffies(300000));
-			else if (screen_wake_options_hold_wlock == 8)
-				wake_lock_timeout(&wakelock, msecs_to_jiffies(600000));
-			else if (screen_wake_options_hold_wlock == 9)
-				wake_lock_timeout(&wakelock, msecs_to_jiffies(1800000));
-			else if (screen_wake_options_hold_wlock == 10)
-				wake_lock_timeout(&wakelock, msecs_to_jiffies(3600000));
-			else if (screen_wake_options_hold_wlock == 11)
-				wake_lock_timeout(&wakelock, msecs_to_jiffies(7200000));
-
-			if (setWork)
-			{
-				schedule_delayed_work_on(0, &wakelock_monitor, msecs_to_jiffies(5000));
-				notif_cancel_work = false;
-			}
-		}
-	}
-}
-
-static void wakelock_monitor_func(struct work_struct *work)
-{
-	if (!wake_lock_active(&wakelock) && screen_is_off)
-		set_wakelock_options(false);
-	if (screen_is_off && !notif_cancel_work)
-		schedule_delayed_work_on(0, &wakelock_monitor, msecs_to_jiffies(5000));
-	if (notif_cancel_work)
-		notif_cancel_work = false;
-}
-
 static void check_options_while_soff(struct device *dev)
 {
-	set_wakelock_options(true);
+	if (!wakelock_held && screen_is_off)
+	{
+		if (screen_wake_options_hold_wlock == 1 || (screen_wake_options_hold_wlock >= 3 && screen_wake_options_hold_wlock <= 10))
+		{
+			wakelock_held = true;
+			if (screen_wake_options_hold_wlock == 1)
+				wake_lock(&wakelock);
+			else if (screen_wake_options_hold_wlock == 3)
+				wake_lock_timeout(&wakelock, msecs_to_jiffies(30000));
+			else if (screen_wake_options_hold_wlock == 4)
+				wake_lock_timeout(&wakelock, msecs_to_jiffies(60000));
+			else if (screen_wake_options_hold_wlock == 5)
+				wake_lock_timeout(&wakelock, msecs_to_jiffies(120000));
+			else if (screen_wake_options_hold_wlock == 6)
+				wake_lock_timeout(&wakelock, msecs_to_jiffies(300000));
+			else if (screen_wake_options_hold_wlock == 7)
+				wake_lock_timeout(&wakelock, msecs_to_jiffies(600000));
+			else if (screen_wake_options_hold_wlock == 8)
+				wake_lock_timeout(&wakelock, msecs_to_jiffies(1800000));
+			else if (screen_wake_options_hold_wlock == 9)
+				wake_lock_timeout(&wakelock, msecs_to_jiffies(3600000));
+			else if (screen_wake_options_hold_wlock == 10)
+				wake_lock_timeout(&wakelock, msecs_to_jiffies(7200000));
+		}
+	}
 	if (screen_wake_options && !screen_wake_options_when_off && screen_is_off)
 	{
 		int retval;
 		struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
 		char chTempbuf[2] = { 1, 20};
-		retval = gpio_request(rmi4_data->board->gpio, "tsp_int");
-		if (retval != 0) {
-			dev_info(&rmi4_data->i2c_client->dev, "%s: tsp int request failed, ret=%d", __func__, retval);
-		}
+		rmi4_data->board->power(true);
+		rmi4_data->touch_stopped = false;
 		if (!rmi4_data->irq_enabled)
 		{
 			enable_irq(rmi4_data->i2c_client->irq);
@@ -1056,7 +1032,6 @@ static ssize_t synaptics_rmi4_screen_wake_options_prox_max_store(struct device *
 	retval = sscanf(buf, "%d", &val);
 	if (retval != 0 && val >= 0 && val <= 255) {
 		screen_wake_options_prox_max = val;
-		prox_max_relay(val);
 	}
 
 	return count;
@@ -1096,7 +1071,7 @@ static ssize_t synaptics_rmi4_screen_wake_options_hold_wlock_store(struct device
 	unsigned int val = 0;
 
 	retval = sscanf(buf, "%d", &val);
-	if (retval != 0 && val >= 0 && val <= 19) {
+	if (retval != 0 && val >= 0 && val <= 18) {
 		screen_wake_options_hold_wlock = val;
 	}
 	check_options_while_soff(dev);
@@ -1888,7 +1863,7 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 						if (last_touch_time)
 						{
 							if (screen_wake_options_debug) pr_alert("DOUBLE TAP WAKE TOUCH %d-%d-%ld-%ld\n", x, y, jiffies, last_touch_time);
-							if ((jiffies - last_touch_time < 300)) //(x < x_lo) && (y > y_hi) && 
+							if ((x < x_lo) && (y > y_hi) && (jiffies - last_touch_time < 300))
 							{
 								if (screen_wake_options_debug) pr_alert("DOUBLE TAP WAKE WAKING %d-%d\n", x, y);
 								pwr_trig_fscreen();
@@ -3951,18 +3926,11 @@ static void synaptics_charger_conn(struct synaptics_rmi4_data *rmi4_data,
 	{
 		charger_connected |= CHARGER_CONNECTED;
 		ischarging = true;
-		notif_cancel_work = false;
-		set_wakelock_options(true);
 	}
 	else
 	{
 		charger_connected &= CHARGER_DISCONNECTED;
 		ischarging = false;
-		if (screen_wake_options_hold_wlock == 3)
-		{
-			notif_cancel_work = true;
-			wake_unlock(&wakelock);
-		}
 	}
 	ischarging_relay(ischarging);
 	
@@ -4265,14 +4233,13 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 	mutex_init(&scr_lock);
 	
 	x_lo = 1040 / 10;
-	y_lo = 1700 / 20;
-	x_onethird = (950 / 10) * 3;
-	x_twothird = (950 / 10) * 6;
-	x_hi = (950 / 10) * 9;
-	y_hi = (1700 / 20) * 19;
+	y_lo = 1850 / 20;
+	x_onethird = (1040 / 10) * 3;
+	x_twothird = (1040 / 10) * 6;
+	x_hi = (1040 / 10) * 9;
+	y_hi = (1850 / 20) * 19;
 	wake_lock_init(&wakelock, WAKE_LOCK_SUSPEND, "kt_wake_funcs");
-	INIT_DELAYED_WORK(&wakelock_monitor, wakelock_monitor_func);
-	
+
 	init_completion(&rmi4_data->init_done);
 
 	i2c_set_clientdata(client, rmi4_data);
@@ -4628,33 +4595,34 @@ void set_call_in_progress_scrn(bool state)
 
 void notif_wakelock_forwake_funcs(bool state)
 {
-	if (state && !wake_lock_active(&wakelock) && (screen_wake_options_hold_wlock == 2 || (screen_wake_options_hold_wlock >= 12 && screen_wake_options_hold_wlock <= 19)))
+	if (state && !wakelock_held)
 	{
-		schedule_delayed_work_on(0, &wakelock_monitor, msecs_to_jiffies(5000));
-		notif_cancel_work = false;
+		if (screen_wake_options_hold_wlock == 2 || screen_wake_options_hold_wlock >= 11)
+			wakelock_held = true;
+
 		if (screen_wake_options_hold_wlock == 2)
 			wake_lock(&wakelock);
-		else if (screen_wake_options_hold_wlock == 12)
+		else if (screen_wake_options_hold_wlock == 11)
 			wake_lock_timeout(&wakelock, msecs_to_jiffies(30000));
-		else if (screen_wake_options_hold_wlock == 13)
+		else if (screen_wake_options_hold_wlock == 12)
 			wake_lock_timeout(&wakelock, msecs_to_jiffies(60000));
-		else if (screen_wake_options_hold_wlock == 14)
+		else if (screen_wake_options_hold_wlock == 13)
 			wake_lock_timeout(&wakelock, msecs_to_jiffies(120000));
-		else if (screen_wake_options_hold_wlock == 15)
+		else if (screen_wake_options_hold_wlock == 14)
 			wake_lock_timeout(&wakelock, msecs_to_jiffies(300000));
-		else if (screen_wake_options_hold_wlock == 16)
+		else if (screen_wake_options_hold_wlock == 15)
 			wake_lock_timeout(&wakelock, msecs_to_jiffies(600000));
-		else if (screen_wake_options_hold_wlock == 17)
+		else if (screen_wake_options_hold_wlock == 16)
 			wake_lock_timeout(&wakelock, msecs_to_jiffies(1800000));
-		else if (screen_wake_options_hold_wlock == 18)
+		else if (screen_wake_options_hold_wlock == 17)
 			wake_lock_timeout(&wakelock, msecs_to_jiffies(3600000));
-		else if (screen_wake_options_hold_wlock == 19)
+		else if (screen_wake_options_hold_wlock == 18)
 			wake_lock_timeout(&wakelock, msecs_to_jiffies(7200000));
 	}
-	else if (!state && wake_lock_active(&wakelock))
+	else if (!state && wakelock_held)
 	{
-		notif_cancel_work = true;
 		wake_unlock(&wakelock);
+		wakelock_held = false;
 	}
 }
 
@@ -4680,7 +4648,29 @@ void set_screen_synaptic_off(void)
 	screen_is_off = true;
 	
 	mutex_lock(&rmi4_data->input_dev->mutex);
-	set_wakelock_options(true);
+	if (screen_wake_options_hold_wlock == 1 || (screen_wake_options_hold_wlock >= 3 && screen_wake_options_hold_wlock <= 10))
+	{
+		wakelock_held = true;
+		if (screen_wake_options_hold_wlock == 1)
+			wake_lock(&wakelock);
+		else if (screen_wake_options_hold_wlock == 3)
+			wake_lock_timeout(&wakelock, msecs_to_jiffies(30000));
+		else if (screen_wake_options_hold_wlock == 4)
+			wake_lock_timeout(&wakelock, msecs_to_jiffies(60000));
+		else if (screen_wake_options_hold_wlock == 5)
+			wake_lock_timeout(&wakelock, msecs_to_jiffies(120000));
+		else if (screen_wake_options_hold_wlock == 6)
+			wake_lock_timeout(&wakelock, msecs_to_jiffies(300000));
+		else if (screen_wake_options_hold_wlock == 7)
+			wake_lock_timeout(&wakelock, msecs_to_jiffies(600000));
+		else if (screen_wake_options_hold_wlock == 8)
+			wake_lock_timeout(&wakelock, msecs_to_jiffies(1800000));
+		else if (screen_wake_options_hold_wlock == 9)
+			wake_lock_timeout(&wakelock, msecs_to_jiffies(3600000));
+		else if (screen_wake_options_hold_wlock == 10)
+			wake_lock_timeout(&wakelock, msecs_to_jiffies(7200000));
+
+	}
 	if (screen_wake_options)
 	{
 		if (screen_wake_options_debug) pr_alert("SCREEN POWER OFF1 - %d - %d - %d", screen_wake_options, isbooted, ischarging);
@@ -4736,9 +4726,11 @@ void set_screen_synaptic_on(void)
 	last_touch_time = 0;
 	screen_is_off = false;
 	
-	if (screen_wake_options_hold_wlock || wake_lock_active(&wakelock))
+	if (screen_wake_options_hold_wlock || wakelock_held)
+	{
 		wake_unlock(&wakelock);
-
+		wakelock_held = false;
+	}
 	if (screen_wake_options_when_off)
 	{
 		char chTempbuf[2] = { 1, 20};
@@ -4751,14 +4743,20 @@ void set_screen_synaptic_on(void)
 	else
 	{
 		if (screen_wake_options_debug) pr_alert("SCREEN POWER ON2 - %d - %d - %d", screen_wake_options, screen_wake_options_when_off, ischarging);
-		retval = gpio_request(rmi4_data->board->gpio, "tsp_int");
-		if (retval != 0) {
-			dev_info(&rmi4_data->i2c_client->dev, "%s: tsp int request failed, ret=%d", __func__, retval);
-		}
 	}
 	
 	rmi4_data->board->power(true);
 	rmi4_data->touch_stopped = false;
+	rmi4_data->current_page = MASK_8BIT;
+	//retval = gpio_request(rmi4_data->board->gpio, "tsp_int");
+	//if (retval != 0) {
+	//	dev_info(&rmi4_data->i2c_client->dev, "%s: tsp int request failed, ret=%d", __func__, retval);
+	//}
+
+	//retval = gpio_request(rmi4_data->board->gpio, "tsp_int");
+	//if (retval != 0) {
+	//	dev_info(&rmi4_data->i2c_client->dev, "%s: tsp int request failed, ret=%d", __func__, retval);
+	//}
 	if (rmi4_data->ta_status)
 		synaptics_charger_conn(rmi4_data, rmi4_data->ta_status);
 	if (!rmi4_data->irq_enabled)
