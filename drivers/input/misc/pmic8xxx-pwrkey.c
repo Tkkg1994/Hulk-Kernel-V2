@@ -50,9 +50,6 @@ struct pmic8xxx_pwrkey {
 	struct wake_lock wake_lock;
 };
 
-extern void sensorwake_setdev(struct pmic8xxx_pwrkey * input_device);
-extern void screenwake_setdev(struct pmic8xxx_pwrkey * input_device);
-
 static irqreturn_t pwrkey_press_irq(int irq, void *_pwrkey)
 {
 	struct pmic8xxx_pwrkey *pwrkey = _pwrkey;
@@ -190,10 +187,7 @@ static int __devinit pmic8xxx_pwrkey_probe(struct platform_device *pdev)
 	pwr->name = "pmic8xxx_pwrkey";
 	pwr->phys = "pmic8xxx_pwrkey/input0";
 	pwr->dev.parent = &pdev->dev;
-	
-	screenwake_setdev(pwrkey);
-	sensorwake_setdev(pwrkey);
-	
+
 	delay = (pdata->kpd_trigger_delay_us << 6) / USEC_PER_SEC;
 	delay = ilog2(delay);
 

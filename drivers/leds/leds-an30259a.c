@@ -168,9 +168,6 @@ static struct leds_control {
 
 extern struct class *sec_class;
 struct device *led_dev;
-
-extern void notif_wakelock_forwake_funcs(bool state);
-
 /*path : /sys/class/sec/led/led_pattern*/
 /*path : /sys/class/sec/led/led_blink*/
 /*path : /sys/class/sec/led/led_brightness*/
@@ -351,11 +348,6 @@ static void an30259a_start_led_pattern(int mode)
 	struct work_struct *reset = 0;
 	client = b_client;
 
-	if (mode == LED_OFF || mode == POWERING || mode == CHARGING)
-		notif_wakelock_forwake_funcs(false);
-	else
-		notif_wakelock_forwake_funcs(true);
-
 	if (mode > POWERING)
 		return;
 	/* Set all LEDs Off */
@@ -464,11 +456,6 @@ static void an30259a_set_led_blink(enum an30259a_led_enum led,
 		prev_delay_off_time[led] = delay_off_time;
 		prev_brightness[led] = brightness;
 	}
-
-	if (brightness == LED_OFF)
-		notif_wakelock_forwake_funcs(false);
-	else
-		notif_wakelock_forwake_funcs(true);
 
 	if (brightness == LED_OFF) {
 		leds_on(led, false, false, brightness);
