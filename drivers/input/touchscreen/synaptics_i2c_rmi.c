@@ -1067,14 +1067,6 @@ static void check_options_while_soff(struct device *dev)
 		}
 
 		enable_irq_wake(rmi4_data->i2c_client->irq);
-		
-		retval = synaptics_rmi4_reset_device(rmi4_data);
-		if (retval < 0) {
-			dev_err(dev,
-					"%s: Failed to issue reset command, error = %d\n",
-					__func__, retval);
-		}
-		
 		screen_wake_options_when_off = screen_wake_options;
 	}
 }
@@ -3904,7 +3896,7 @@ static int synaptics_rmi4_reinit_device(struct synaptics_rmi4_data *rmi4_data)
 			__func__, f51->proximity_controls);
 
 #ifdef USE_CUSTOM_REZERO
-	synaptics_rmi4_f51_set_custom_rezero(rmi4_data);
+	//synaptics_rmi4_f51_set_custom_rezero(rmi4_data);
 
 	msleep(100);
 #endif
@@ -4822,11 +4814,6 @@ void set_screen_synaptic_off(void)
 			main_prox_data->bProximityRawEnabled = true;
 		}
 
-		retval = synaptics_rmi4_reset_device(rmi4_data);
-		if (retval < 0) {
-			pr_alert("%s: Failed to issue reset command, error = %d\n",
-					__func__, retval);
-		}
 		enable_irq_wake(rmi4_data->i2c_client->irq);
 		screen_wake_options_when_off = screen_wake_options;
 	}
@@ -4915,8 +4902,7 @@ void set_screen_synaptic_on(void)
 	if (!rmi4_data->irq_enabled)
 	{
 		enable_irq(rmi4_data->i2c_client->irq);
-		if (screen_wake_options_when_off)
-			pr_alert("IRQ DISABLED FROM EXTERNAL");
+		pr_alert("IRQ DISABLED FROM EXTERNAL");
 	}
 	rmi4_data->irq_enabled = true;
 	
