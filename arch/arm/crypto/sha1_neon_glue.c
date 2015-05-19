@@ -27,7 +27,7 @@
 #include <crypto/sha.h>
 #include <crypto/sha1_base.h>
 #include <asm/neon.h>
-#include <asm/simd.h>
+#include <asm-generic/simd.h>
 
 #include "sha1.h"
 
