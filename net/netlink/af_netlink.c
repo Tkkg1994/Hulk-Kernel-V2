@@ -2168,10 +2168,7 @@ static void __init netlink_add_usersock_entry(void)
 	rcu_assign_pointer(nl_table[NETLINK_USERSOCK].listeners, listeners);
 	nl_table[NETLINK_USERSOCK].module = THIS_MODULE;
 	nl_table[NETLINK_USERSOCK].registered = 1;
-<<<<<<< HEAD
-=======
 	nl_table[NETLINK_USERSOCK].flags = NL_CFG_F_NONROOT_SEND;
->>>>>>> 4ee861d1... netlink: kill netlink_set_nonroot
 
 	netlink_table_ungrab();
 }
