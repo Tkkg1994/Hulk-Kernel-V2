@@ -1814,6 +1814,7 @@ static const struct alg_test_desc alg_test_descs[] = {
 				.count = CMAC_DES3_EDE_TEST_VECTORS
 			}
 		}
+	}, {
 		.alg = "crc32c",
 		.test = alg_test_crc32c,
 		.fips_allowed = 1,
