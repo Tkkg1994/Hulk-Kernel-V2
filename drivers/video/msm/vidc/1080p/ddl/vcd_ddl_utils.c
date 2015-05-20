@@ -13,7 +13,7 @@
 #include <linux/memory_alloc.h>
 #include <linux/delay.h>
 #include <mach/msm_subsystem_map.h>
-#include <mach/subsystem_restart.h>
+#include <mach/peripheral-loader.h>
 #include "vcd_ddl_utils.h"
 #include "vcd_ddl.h"
 #include "vcd_res_tracker_api.h"
@@ -366,12 +366,12 @@ u32 ddl_fw_init(struct ddl_buf_addr *dram_base)
 			pr_err("Failed to enable iommu clocks\n");
 			return false;
 		}
-		dram_base->pil_cookie = subsystem_get("vidc");
+		dram_base->pil_cookie = pil_get("vidc");
 		if (res_trk_disable_iommu_clocks())
 			pr_err("Failed to disable iommu clocks\n");
 		if (IS_ERR_OR_NULL(dram_base->pil_cookie)) {
 			res_trk_disable_footswitch();
-			pr_err("subsystem_get failed\n");
+			pr_err("pil_get failed\n");
 			return false;
 		}
 	} else {
@@ -403,7 +403,7 @@ void ddl_fw_release(struct ddl_buf_addr *dram_base)
 		pr_err("Failed to enable iommu clocks\n");
 		return;
 	}
-	subsystem_put(cookie);
+	pil_put(cookie);
 	if (res_trk_disable_iommu_clocks())
 		pr_err("Failed to disable iommu clocks\n");
 	if (res_trk_disable_footswitch())

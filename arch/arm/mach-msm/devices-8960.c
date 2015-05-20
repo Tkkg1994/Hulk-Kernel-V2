@@ -1638,7 +1638,7 @@ static struct smd_subsystem_config smd_config_list[] = {
 	},
 	{
 		.irq_config_id = SMD_Q6,
-		.subsys_name = "adsp",
+		.subsys_name = "q6",
 		.edge = SMD_APPS_QDSP,
 
 		.smd_int.irq_name = "adsp_a11",

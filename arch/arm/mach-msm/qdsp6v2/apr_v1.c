@@ -19,6 +19,7 @@
 #include <mach/qdsp6v2/apr.h>
 #include <mach/qdsp6v2/apr_tal.h>
 #include <mach/qdsp6v2/dsp_debug.h>
+#include <mach/peripheral-loader.h>
 
 struct apr_svc *apr_register(char *dest, char *svc_name, apr_fn svc_fn,
 			     uint32_t src_port, void *priv)
