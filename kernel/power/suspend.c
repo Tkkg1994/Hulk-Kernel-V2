@@ -371,7 +371,6 @@ static int enter_state(suspend_state_t state)
 
 	pr_debug("PM: Preparing system for %s sleep\n", pm_states[state].label);
 	error = suspend_prepare(state);
-
 	if (error)
 		goto Unlock;
 
@@ -436,4 +435,3 @@ static int __init suspendsync_setup(char *str)
 	return 1;
 }
 __setup("suspendsync=", suspendsync_setup);
-
