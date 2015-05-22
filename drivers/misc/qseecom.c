@@ -67,8 +67,6 @@
 /* Check if enterprise security is activate */
 #define	SCM_IS_ACTIVATED_ID		0x02
 
-#define RPMB_SERVICE			0x2000
-
 enum qseecom_clk_definitions {
 	CLK_DFAB = 0,
 	CLK_SFPB,
@@ -194,8 +192,6 @@ static int qsee_vote_for_clock(struct qseecom_dev_handle *, int32_t);
 static void qsee_disable_clock_vote(struct qseecom_dev_handle *, int32_t);
 static int __qseecom_init_clk(void);
 static void __qseecom_disable_clk(void);
-static int __qseecom_enable_clk(enum qseecom_ce_hw_instance ce);
-static void __qseecom_disable_clk(enum qseecom_ce_hw_instance ce);
 
 static int __qseecom_is_svc_unique(struct qseecom_dev_handle *data,
 		struct qseecom_register_listener_req *svc)
@@ -514,18 +510,12 @@ static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 			msm_ion_do_cache_op(qseecom.ion_clnt, ptr_svc->ihandle,
 					ptr_svc->sb_virt, ptr_svc->sb_length,
 						ION_IOC_CLEAN_INV_CACHES);
-
-		if (lstnr == RPMB_SERVICE)
-			__qseecom_enable_clk(CLK_QSEE);
-
 		ret = scm_call(SCM_SVC_TZSCHEDULER, 1,
 					(const void *)&send_data_rsp,
 					sizeof(send_data_rsp), resp,
 					sizeof(*resp));
 		if (ret) {
 			pr_err("qseecom_scm_call failed with err: %d\n", ret);
-			if (lstnr == RPMB_SERVICE)
-				__qseecom_disable_clk(CLK_QSEE);
 			return ret;
 		}
 		if ((resp->result != QSEOS_RESULT_SUCCESS) &&
@@ -534,9 +524,6 @@ static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 							resp->result);
 			return -EINVAL;
 		}
-		if (lstnr == RPMB_SERVICE)
-			__qseecom_disable_clk(CLK_QSEE);
-
 	}
 	if (rc)
 		return rc;
