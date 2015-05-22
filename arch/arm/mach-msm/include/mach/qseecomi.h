@@ -129,6 +129,12 @@ __packed struct qseecom_client_send_data_ireq {
 	uint32_t rsp_len;
 };
 
+__packed struct qseecom_reg_log_buf_ireq {
+	uint32_t qsee_cmd_id;
+	unsigned long phy_addr;
+	uint32_t len;
+};
+
 /* send_data resp */
 __packed struct qseecom_client_listener_data_irsp {
 	uint32_t qsee_cmd_id;
