@@ -405,7 +405,7 @@ CONFIG_MACH_JF=y
 # CONFIG_MACH_JF_TMO is not set
 # CONFIG_MACH_JF_USC is not set
 # CONFIG_MACH_JF_CRI is not set
-CONFIG_MACH_JF_EUR=y
+# CONFIG_MACH_JF_EUR is not set
 # CONFIG_MACH_JFTDD_EUR is not set
 # CONFIG_MACH_JFTDD_CHN_CU is not set
 # CONFIG_MACH_JFVE_EUR is not set
