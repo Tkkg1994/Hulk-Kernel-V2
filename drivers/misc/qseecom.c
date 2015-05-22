@@ -74,13 +74,6 @@ enum qseecom_clk_definitions {
 	CLK_SFPB,
 };
 
-enum qseecom_client_handle_type {
-	QSEECOM_CLIENT_APP = 0,
-	QSEECOM_LISTENER_SERVICE,
-	QSEECOM_SECURE_SERVICE,
-	QSEECOM_GENERIC,
-};
-
 static struct class *driver_class;
 static dev_t qseecom_device_no;
 
@@ -1026,7 +1019,7 @@ static int __qseecom_send_cmd(struct qseecom_dev_handle *data,
 
 	msm_ion_do_cache_op(qseecom.ion_clnt, data->client.ihandle,
 					data->client.sb_virt,
-					(req->cmd_req_len + req->resp_len),
+					reqd_len_sb_in,
 					ION_IOC_CLEAN_INV_CACHES);
 
 	ret = scm_call(SCM_SVC_TZSCHEDULER, 1, (const void *) &send_data_req,
