@@ -38,7 +38,7 @@ BOLD=`tput bold`
 NORMAL=`tput sgr0`
 
 # DEFCONFIG Files
-USER_DEFCONFIG="jf_defconfig"
+USER_DEFCONFIG="0hulk_tw501_defconfig"
 VARIANT_DEFCONFIG="jactive_eur_defconfig"
 SELINUX_DEFCONFIG="selinux_defconfig"
 
