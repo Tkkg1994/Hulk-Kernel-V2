@@ -10,6 +10,9 @@
  * of the License.
  */
 
+#ifndef __ASYNC_H__
+#define __ASYNC_H__
+
 #include <linux/types.h>
 #include <linux/list.h>
 
