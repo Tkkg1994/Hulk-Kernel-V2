@@ -17,7 +17,6 @@
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
 #include <linux/fb.h>
-#include <linux/notifier.h>
 
 #define MSM_CPUFREQ_LIMIT_MAJOR		3
 #define MSM_CPUFREQ_LIMIT_MINOR		5
@@ -25,9 +24,9 @@
 #define MSM_LIMIT			"msm_limiter"
 #define LIMITER_ENABLED			1
 #define DEFAULT_SUSPEND_DEFER_TIME	10 
-#define DEFAULT_SUSPEND_FREQUENCY	1728000
-#define DEFAULT_RESUME_FREQUENCY	2649600
-#define DEFAULT_MIN_FREQUENCY		300000
+#define DEFAULT_SUSPEND_FREQUENCY	1566000
+#define DEFAULT_RESUME_FREQUENCY	189000
+#define DEFAULT_MIN_FREQUENCY		384000
 
 static unsigned int debug = 0;
 module_param_named(debug_mask, debug, uint, 0644);
@@ -186,6 +185,11 @@ static int msm_cpufreq_limit_start(void)
 	}
 
 	limit.notif.notifier_call = fb_notifier_callback;
+	if (fb_register_client(&limit.notif)) {
+		pr_err("%s: Failed to register FB notifier callback\n",
+			MSM_LIMIT);
+		goto err_dev;
+	}
 
 	for_each_possible_cpu(cpu)
 		mutex_init(&limit.msm_limiter_mutex[cpu]);
@@ -197,6 +201,8 @@ static int msm_cpufreq_limit_start(void)
 	queue_work_on(0, limiter_wq, &limit.resume_work);
 
 	return ret;
+err_dev:
+	destroy_workqueue(limiter_wq);
 err_out:
 	limit.limiter_enabled = 0;
 	return ret;
@@ -215,6 +221,7 @@ static void msm_cpufreq_limit_stop(void)
 	for_each_possible_cpu(cpu)	
 		mutex_destroy(&limit.msm_limiter_mutex[cpu]);
 
+	fb_unregister_client(&limit.notif);
 	limit.notif.notifier_call = NULL;
 	destroy_workqueue(limiter_wq);
 }
