@@ -14,8 +14,8 @@
  * published by the Free Software Foundation.
  */
 
-#ifndef _CPUFREQ_GOVERNER_H
-#define _CPUFREQ_GOVERNER_H
+#ifndef _CPUFREQ_GOVERNOR_H
+#define _CPUFREQ_GOVERNOR_H
 
 #include <linux/cpufreq.h>
 #include <linux/kobject.h>
@@ -34,7 +34,7 @@
  */
 #define MIN_SAMPLING_RATE_RATIO			(2)
 #define LATENCY_MULTIPLIER			(1000)
-#define MIN_LATENCY_MULTIPLIER			(100)
+#define MIN_LATENCY_MULTIPLIER			(20)
 #define TRANSITION_LATENCY_LIMIT		(10 * 1000 * 1000)
 
 /* Ondemand Sampling types */
@@ -148,7 +148,6 @@ struct cpu_dbs_common_info {
 
 struct od_cpu_dbs_info_s {
 	struct cpu_dbs_common_info cdbs;
-	u64 prev_cpu_iowait;
 	struct cpufreq_frequency_table *freq_table;
 	unsigned int freq_lo;
 	unsigned int freq_lo_jiffies;
@@ -212,6 +211,7 @@ struct common_dbs_data {
 struct dbs_data {
 	struct common_dbs_data *cdata;
 	unsigned int min_sampling_rate;
+	int usage_count;
 	void *tuners;
 
 	/* dbs_mutex protects dbs_enable in governor start/stop */
@@ -256,10 +256,15 @@ static ssize_t show_sampling_rate_min_gov_pol				\
 	return sprintf(buf, "%u\n", dbs_data->min_sampling_rate);	\
 }
 
-u64 get_cpu_idle_time(unsigned int cpu, u64 *wall);
 void dbs_check_cpu(struct dbs_data *dbs_data, int cpu);
 bool need_load_eval(struct cpu_dbs_common_info *cdbs,
 		unsigned int sampling_rate);
 int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		struct common_dbs_data *cdata, unsigned int event);
-#endif /* _CPUFREQ_GOVERNER_H */
+void gov_queue_work(struct dbs_data *dbs_data, struct cpufreq_policy *policy,
+		unsigned int delay, bool all_cpus);
+void od_register_powersave_bias_handler(unsigned int (*f)
+		(struct cpufreq_policy *, unsigned int, unsigned int),
+		unsigned int powersave_bias);
+void od_unregister_powersave_bias_handler(void);
+#endif /* _CPUFREQ_GOVERNOR_H */

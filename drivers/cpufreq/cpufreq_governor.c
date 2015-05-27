@@ -23,7 +23,6 @@
 #include <linux/kernel_stat.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
-#include <linux/tick.h>
 #include <linux/types.h>
 #include <linux/workqueue.h>
 
@@ -36,41 +35,6 @@ static struct attribute_group *get_sysfs_attr(struct dbs_data *dbs_data)
 	else
 		return dbs_data->cdata->attr_group_gov_sys;
 }
-
-static inline u64 get_cpu_idle_time_jiffy(unsigned int cpu, u64 *wall)
-{
-	u64 idle_time;
-	u64 cur_wall_time;
-	u64 busy_time;
-
-	cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
-
-	busy_time = kcpustat_cpu(cpu).cpustat[CPUTIME_USER];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SYSTEM];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_IRQ];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SOFTIRQ];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_STEAL];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_NICE];
-
-	idle_time = cur_wall_time - busy_time;
-	if (wall)
-		*wall = cputime_to_usecs(cur_wall_time);
-
-	return cputime_to_usecs(idle_time);
-}
-
-u64 get_cpu_idle_time(unsigned int cpu, u64 *wall)
-{
-	u64 idle_time = get_cpu_idle_time_us(cpu, NULL);
-
-	if (idle_time == -1ULL)
-		return get_cpu_idle_time_jiffy(cpu, wall);
-	else
-		idle_time += get_cpu_iowait_time_us(cpu, wall);
-
-	return idle_time;
-}
-EXPORT_SYMBOL_GPL(get_cpu_idle_time);
 
 void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
 {
@@ -92,13 +56,22 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
 	/* Get Absolute Load (in terms of freq for ondemand gov) */
 	for_each_cpu(j, policy->cpus) {
 		struct cpu_dbs_common_info *j_cdbs;
-		u64 cur_wall_time, cur_idle_time, cur_iowait_time;
-		unsigned int idle_time, wall_time, iowait_time;
+		u64 cur_wall_time, cur_idle_time;
+		unsigned int idle_time, wall_time;
 		unsigned int load;
+		int io_busy = 0;
 
 		j_cdbs = dbs_data->cdata->get_cpu_cdbs(j);
 
-		cur_idle_time = get_cpu_idle_time(j, &cur_wall_time);
+		/*
+		 * For the purpose of ondemand, waiting for disk IO is
+		 * an indication that you're performance critical, and
+		 * not that the system is actually idle. So do not add
+		 * the iowait time to the cpu idle time.
+		 */
+		if (dbs_data->cdata->governor == GOV_ONDEMAND)
+			io_busy = od_tuners->io_is_busy;
+		cur_idle_time = get_cpu_idle_time(j, &cur_wall_time, io_busy);
 
 		wall_time = (unsigned int)
 			(cur_wall_time - j_cdbs->prev_cpu_wall);
@@ -126,29 +99,6 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
 			idle_time += jiffies_to_usecs(cur_nice_jiffies);
 		}
 
-		if (dbs_data->cdata->governor == GOV_ONDEMAND) {
-			struct od_cpu_dbs_info_s *od_j_dbs_info =
-				dbs_data->cdata->get_cpu_dbs_info_s(cpu);
-
-			cur_iowait_time = get_cpu_iowait_time_us(j,
-					&cur_wall_time);
-			if (cur_iowait_time == -1ULL)
-				cur_iowait_time = 0;
-
-			iowait_time = (unsigned int) (cur_iowait_time -
-					od_j_dbs_info->prev_cpu_iowait);
-			od_j_dbs_info->prev_cpu_iowait = cur_iowait_time;
-
-			/*
-			 * For the purpose of ondemand, waiting for disk IO is
-			 * an indication that you're performance critical, and
-			 * not that the system is actually idle. So subtract the
-			 * iowait time from the cpu idle time.
-			 */
-			if (od_tuners->io_is_busy && idle_time >= iowait_time)
-				idle_time -= iowait_time;
-		}
-
 		if (unlikely(!wall_time || wall_time < idle_time))
 			continue;
 
@@ -170,20 +120,48 @@ void dbs_check_cpu(struct dbs_data *dbs_data, int cpu)
 }
 EXPORT_SYMBOL_GPL(dbs_check_cpu);
 
-static inline void dbs_timer_init(struct dbs_data *dbs_data, int cpu,
-				  unsigned int sampling_rate)
+static inline void __gov_queue_work(int cpu, struct dbs_data *dbs_data,
+		unsigned int delay)
 {
-	int delay = delay_for_sampling_rate(sampling_rate);
 	struct cpu_dbs_common_info *cdbs = dbs_data->cdata->get_cpu_cdbs(cpu);
 
-	schedule_delayed_work_on(cpu, &cdbs->work, delay);
+	mod_delayed_work_on(cpu, system_wq, &cdbs->work, delay);
 }
 
-static inline void dbs_timer_exit(struct dbs_data *dbs_data, int cpu)
+void gov_queue_work(struct dbs_data *dbs_data, struct cpufreq_policy *policy,
+		unsigned int delay, bool all_cpus)
 {
-	struct cpu_dbs_common_info *cdbs = dbs_data->cdata->get_cpu_cdbs(cpu);
+	int i;
 
-	cancel_delayed_work_sync(&cdbs->work);
+	if (!policy->governor_enabled)
+		return;
+
+	if (!all_cpus) {
+		/*
+		 * Use raw_smp_processor_id() to avoid preemptible warnings.
+		 * We know that this is only called with all_cpus == false from
+		 * works that have been queued with *_work_on() functions and
+		 * those works are canceled during CPU_DOWN_PREPARE so they
+		 * can't possibly run on any other CPU.
+		 */
+		__gov_queue_work(raw_smp_processor_id(), dbs_data, delay);
+	} else {
+		for_each_cpu(i, policy->cpus)
+			__gov_queue_work(i, dbs_data, delay);
+	}
+}
+EXPORT_SYMBOL_GPL(gov_queue_work);
+
+static inline void gov_cancel_work(struct dbs_data *dbs_data,
+		struct cpufreq_policy *policy)
+{
+	struct cpu_dbs_common_info *cdbs;
+	int i;
+
+	for_each_cpu(i, policy->cpus) {
+		cdbs = dbs_data->cdata->get_cpu_cdbs(i);
+		cancel_delayed_work_sync(&cdbs->work);
+	}
 }
 
 /* Will return if we need to evaluate cpu load again or not */
@@ -228,6 +206,7 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 	struct cs_dbs_tuners *cs_tuners = NULL;
 	struct cpu_dbs_common_info *cpu_cdbs;
 	unsigned int sampling_rate, latency, ignore_nice, j, cpu = policy->cpu;
+	int io_busy = 0;
 	int rc;
 
 	if (have_governor_per_policy())
@@ -242,6 +221,7 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		if (have_governor_per_policy()) {
 			WARN_ON(dbs_data);
 		} else if (dbs_data) {
+			dbs_data->usage_count++;
 			policy->governor_data = dbs_data;
 			return 0;
 		}
@@ -253,6 +233,7 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		}
 
 		dbs_data->cdata = cdata;
+		dbs_data->usage_count = 1;
 		rc = cdata->init(dbs_data);
 		if (rc) {
 			pr_err("%s: POLICY_INIT: init() failed\n", __func__);
@@ -281,7 +262,8 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		set_sampling_rate(dbs_data, max(dbs_data->min_sampling_rate,
 					latency * LATENCY_MULTIPLIER));
 
-		if (dbs_data->cdata->governor == GOV_CONSERVATIVE) {
+		if ((cdata->governor == GOV_CONSERVATIVE) &&
+				(!policy->governor->initialized)) {
 			struct cs_ops *cs_ops = dbs_data->cdata->gov_ops;
 
 			cpufreq_register_notifier(cs_ops->notifier_block,
@@ -293,12 +275,12 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 
 		return 0;
 	case CPUFREQ_GOV_POLICY_EXIT:
-		if ((policy->governor->initialized == 1) ||
-				have_governor_per_policy()) {
+		if (!--dbs_data->usage_count) {
 			sysfs_remove_group(get_governor_parent_kobj(policy),
 					get_sysfs_attr(dbs_data));
 
-			if (dbs_data->cdata->governor == GOV_CONSERVATIVE) {
+			if ((dbs_data->cdata->governor == GOV_CONSERVATIVE) &&
+				(policy->governor->initialized == 1)) {
 				struct cs_ops *cs_ops = dbs_data->cdata->gov_ops;
 
 				cpufreq_unregister_notifier(cs_ops->notifier_block,
@@ -327,6 +309,7 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		sampling_rate = od_tuners->sampling_rate;
 		ignore_nice = od_tuners->ignore_nice;
 		od_ops = dbs_data->cdata->gov_ops;
+		io_busy = od_tuners->io_is_busy;
 	}
 
 	switch (event) {
@@ -343,7 +326,7 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 			j_cdbs->cpu = j;
 			j_cdbs->cur_policy = policy;
 			j_cdbs->prev_cpu_idle = get_cpu_idle_time(j,
-					&j_cdbs->prev_cpu_wall);
+					       &j_cdbs->prev_cpu_wall, io_busy);
 			if (ignore_nice)
 				j_cdbs->prev_cpu_nice =
 					kcpustat_cpu(j).cpustat[CPUTIME_NICE];
@@ -372,19 +355,19 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		/* Initiate timer time stamp */
 		cpu_cdbs->time_stamp = ktime_get();
 
-		for_each_cpu(j, policy->cpus)
-			dbs_timer_init(dbs_data, j, sampling_rate);
+		gov_queue_work(dbs_data, policy,
+				delay_for_sampling_rate(sampling_rate), true);
 		break;
 
 	case CPUFREQ_GOV_STOP:
 		if (dbs_data->cdata->governor == GOV_CONSERVATIVE)
 			cs_dbs_info->enable = 0;
 
-		for_each_cpu(j, policy->cpus)
-			dbs_timer_exit(dbs_data, j);
+		gov_cancel_work(dbs_data, policy);
 
 		mutex_lock(&dbs_data->mutex);
 		mutex_destroy(&cpu_cdbs->timer_mutex);
+		cpu_cdbs->cur_policy = NULL;
 
 		mutex_unlock(&dbs_data->mutex);
 
