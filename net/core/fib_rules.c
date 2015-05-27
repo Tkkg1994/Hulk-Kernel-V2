@@ -13,11 +13,11 @@
 #include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/uidgid.h>
 #include <net/net_namespace.h>
 #include <net/sock.h>
 #include <net/fib_rules.h>
 
-#define INVALID_UID ((uid_t) -1)
 #define uid_valid(uid) ((uid) != -1)
 #define uid_lte(a, b) ((a) <= (b))
 #define uid_eq(a, b) ((a) == (b))

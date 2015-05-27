@@ -128,7 +128,7 @@ static void msm_limit_resume(struct work_struct *work)
 
 static void __msm_limit_suspend(void)
 {
-	if (!limit.limiter_enabled)
+	if (!limit.limiter_enabled || limit.suspended)
 		return;
 
 	INIT_DELAYED_WORK(&limit.suspend_work, msm_limit_suspend);
@@ -164,6 +164,8 @@ static int state_notifier_callback(struct notifier_block *this,
 	return NOTIFY_OK;
 }
 #else
+static int prev_fb = FB_BLANK_UNBLANK;
+
 static int fb_notifier_callback(struct notifier_block *self,
 				unsigned long event, void *data)
 {
@@ -174,20 +176,20 @@ static int fb_notifier_callback(struct notifier_block *self,
 		blank = evdata->data;
 		switch (*blank) {
 			case FB_BLANK_UNBLANK:
-				//display on
-				__msm_limit_resume();
-				break;
+				if (prev_fb == FB_BLANK_POWERDOWN) {
+					__msm_limit_resume();
+					prev_fb = FB_BLANK_UNBLANK;
+				}
 			case FB_BLANK_POWERDOWN:
-			case FB_BLANK_HSYNC_SUSPEND:
-			case FB_BLANK_VSYNC_SUSPEND:
-			case FB_BLANK_NORMAL:
-				//display off
-				__msm_limit_suspend();
+			if (prev_fb == FB_BLANK_UNBLANK) {
+					__msm_limit_suspend();
+					prev_fb = FB_BLANK_POWERDOWN;
+				}
 				break;
 		}
 	}
 
-	return 0;
+	return NOTIFY_OK;
 }
 #endif
 
