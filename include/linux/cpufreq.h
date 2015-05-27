@@ -399,7 +399,6 @@ static inline unsigned int cpufreq_quick_get_max(unsigned int cpu)
 }
 #endif
 
-<<<<<<< HEAD
 #ifdef CONFIG_SEC_DVFS
 enum {
 	BOOT_CPU = 0,
@@ -449,8 +448,6 @@ void set_max_lock(int freq);
 
 #endif
 
-=======
->>>>>>> 0309e39... cpufreq: Fix minor formatting issues
 /*********************************************************************
  *                       CPUFREQ DEFAULT GOVERNOR                    *
  *********************************************************************/
