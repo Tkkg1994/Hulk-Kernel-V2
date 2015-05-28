@@ -311,6 +311,13 @@ struct cpufreq_driver {
  */
 #define CPUFREQ_HAVE_GOVERNOR_PER_POLICY (1 << 3)
 
+/*
+ * Driver will do POSTCHANGE notifications from outside of their ->target()
+ * routine and so must set cpufreq_driver->flags with this flag, so that core
+ * can handle them specially.
+ */
+#define CPUFREQ_ASYNC_NOTIFICATION  (1 << 4)
+
 int cpufreq_register_driver(struct cpufreq_driver *driver_data);
 int cpufreq_unregister_driver(struct cpufreq_driver *driver_data);
 
@@ -588,8 +595,16 @@ int cpufreq_frequency_table_target(struct cpufreq_policy *policy,
 
 /* the following 3 funtions are for cpufreq core use only */
 struct cpufreq_frequency_table *cpufreq_frequency_get_table(unsigned int cpu);
+#ifdef CONFIG_CPU_FREQ
 struct cpufreq_policy *cpufreq_cpu_get(unsigned int cpu);
 void cpufreq_cpu_put(struct cpufreq_policy *policy);
+#else
+static inline struct cpufreq_policy *cpufreq_cpu_get(unsigned int cpu)
+{
+	return NULL;
+}
+static inline void cpufreq_cpu_put(struct cpufreq_policy *policy) { }
+#endif
 
 /* the following are really really optional */
 extern struct freq_attr cpufreq_freq_attr_scaling_available_freqs;
