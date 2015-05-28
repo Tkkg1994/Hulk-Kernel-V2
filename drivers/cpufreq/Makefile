@@ -4,9 +4,6 @@ obj-$(CONFIG_CPU_BOOST)			+= cpu-boost.o
 # CPUfreq stats
 obj-$(CONFIG_CPU_FREQ_STAT)             += cpufreq_stats.o
 
-# Don't build thisone at the moment
-#cpufreq_governor.o
-
 # CPUfreq governors 
 obj-$(CONFIG_CPU_FREQ_GOV_ABYSSPLUG)		+= cpufreq_abyssplug.o
 obj-$(CONFIG_CPU_FREQ_GOV_ABYSSPLUG)		+= cpufreq_abyssplugv2.o
