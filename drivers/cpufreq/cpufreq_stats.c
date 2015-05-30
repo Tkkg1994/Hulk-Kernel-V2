@@ -357,6 +357,17 @@ error_out:
 	return ret;
 }
 
+static int compare_for_sort(const void *lhs_ptr, const void *rhs_ptr)
+{
+	unsigned int lhs = *(const unsigned int *)(lhs_ptr);
+	unsigned int rhs = *(const unsigned int *)(rhs_ptr);
+	if (lhs < rhs)
+		return -1;
+	if (lhs > rhs)
+		return 1;
+	return 0;
+}
+
 static bool check_all_freq_table(unsigned int freq)
 {
 	int i;
@@ -381,7 +392,7 @@ static void add_all_freq_table(unsigned int freq)
 	unsigned int size;
 	size = sizeof(unsigned int) * (all_freq_table->table_size + 1);
 	all_freq_table->freq_table = krealloc(all_freq_table->freq_table,
-			size, GFP_KERNEL);
+			size, GFP_ATOMIC);
 	if (IS_ERR(all_freq_table->freq_table)) {
 		pr_warn("Could not reallocate memory for freq_table\n");
 		all_freq_table->freq_table = NULL;
@@ -539,17 +550,6 @@ static struct notifier_block notifier_policy_block = {
 static struct notifier_block notifier_trans_block = {
 	.notifier_call = cpufreq_stat_notifier_trans
 };
-
-static int compare_for_sort(const void *lhs_ptr, const void *rhs_ptr)
-{
-	unsigned int lhs = *(const unsigned int *)(lhs_ptr);
-	unsigned int rhs = *(const unsigned int *)(rhs_ptr);
-	if (lhs < rhs)
-		return -1;
-	if (lhs > rhs)
-		return 1;
-	return 0;
-}
 
 static int __init cpufreq_stats_init(void)
 {
