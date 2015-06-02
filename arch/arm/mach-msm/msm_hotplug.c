@@ -507,16 +507,16 @@ static void __ref msm_hotplug_suspend(struct work_struct *work)
 		hotplug.min_cpus_online_res = hotplug.min_cpus_online;
 		hotplug.min_cpus_online = 1;
 		hotplug.max_cpus_online_res = hotplug.max_cpus_online;
-		hotplug.max_cpus_online = 1;
+		hotplug.max_cpus_online = 2;
 		mutex_unlock(&hotplug.msm_hotplug_mutex);
 
 		/* Flush hotplug workqueue */
 		flush_workqueue(hotplug_wq);
 		cancel_delayed_work_sync(&hotplug_work);
 
-		/* Put all sibling cores to sleep */
+		/* Put 2,3 sibling cores to sleep */
 		for_each_online_cpu(cpu) {
-			if (cpu == 0)
+			if (cpu == 1)
 				continue;
 			cpu_down(cpu);
 		}
