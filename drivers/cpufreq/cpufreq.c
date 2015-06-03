@@ -2746,7 +2746,7 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 		if (!cpufreq_driver->set_boost)
 			cpufreq_driver->set_boost = cpufreq_boost_set_sw;
 
-		ret = cpufreq_sysfs_create_file(&boost.attr);
+		ret = sysfs_create_file(cpufreq_global_kobject, &boost.attr);
 		if (ret) {
 			pr_err("%s: cannot register global BOOST sysfs file\n",
 				__func__);
@@ -2785,7 +2785,7 @@ err_if_unreg:
 	subsys_interface_unregister(&cpufreq_interface);
 err_boost_unreg:
 	if (cpufreq_boost_supported())
-		cpufreq_sysfs_remove_file(&boost.attr);
+		sysfs_remove_file(cpufreq_global_kobject, &boost.attr);
 err_null_driver:
 	unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
 	write_lock_irqsave(&cpufreq_driver_lock, flags);
@@ -2814,7 +2814,7 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 
 	subsys_interface_unregister(&cpufreq_interface);
 	if (cpufreq_boost_supported())
-		cpufreq_sysfs_remove_file(&boost.attr);
+		sysfs_remove_file(cpufreq_global_kobject, &boost.attr);
 
 	unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
 
