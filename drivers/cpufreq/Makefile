@@ -35,6 +35,8 @@ obj-$(CONFIG_CPU_FREQ_GOV_SMARTASSV2)		+= cpufreq_smartass2.o
 obj-$(CONFIG_CPU_FREQ_GOV_ONDEMANDPLUS)		+= cpufreq_ondemandplus.o
 obj-$(CONFIG_CPU_FREQ_GOV_HYPER)		+= cpufreq_HYPER.o
 obj-$(CONFIG_CPU_FREQ_GOV_YANKDEMAND)		+= cpufreq_yankdemand.o
+obj-$(CONFIG_CPU_FREQ_GOV_BLUACTIVE)		+= cpufreq_bluactive.o
+obj-$(CONFIG_CPU_FREQ_GOV_OPTIMAX)		+= cpufreq_optimax.o
 
 # CPUfreq cross-arch helpers
 obj-$(CONFIG_CPU_FREQ_TABLE)			+= freq_table.o

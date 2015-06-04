@@ -578,6 +578,12 @@ extern struct cpufreq_governor cpufreq_gov_HYPER;
 #elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_YANKDEMAND)
 extern struct cpufreq_governor cpufreq_gov_yankdemand;
 #define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_yankdemand)
+#elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_BLUACTIVE)
+extern struct cpufreq_governor cpufreq_gov_bluactive;
+#define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_bluactive)
+#elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_OPTIMAX)
+extern struct cpufreq_governor cpufreq_gov_optimax;
+#define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_optimax)
 #endif
 
 /*********************************************************************
