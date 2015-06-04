@@ -29,8 +29,8 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/platform_device.h>
-#include <mach/socinfo.h>
 #include <mach/cpufreq.h>
+#include <mach/socinfo.h>
 #include <mach/msm_bus.h>
 
 #include "acpuclock.h"
@@ -166,7 +166,6 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 	struct cpufreq_freqs freqs;
 	struct cpu_freq *limit = &per_cpu(cpu_freq_info, policy->cpu);
 	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
-	struct cpufreq_frequency_table *table;
 
 	if (limit->limits_init) {
 		if (new_freq > limit->allowed_max) {
@@ -196,17 +195,10 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 			new_freq = policy->min;
 		if (new_freq > policy->max)
 			new_freq = policy->max;
-
-		if (new_freq == policy->cur)
-			return 0;
 	}
+	if (new_freq == policy->cur)
+		return 0;
 #endif
-
-	/* limits applied above must be in cpufreq table */
-	table = cpufreq_frequency_get_table(policy->cpu);
-	if (cpufreq_frequency_table_target(policy, table, new_freq,
-		CPUFREQ_RELATION_H, &index))
-		return -EINVAL;
 
 	freqs.old = policy->cur;
 	freqs.new = new_freq;
@@ -382,10 +374,6 @@ int msm_cpufreq_set_freq_limits(uint32_t cpu, uint32_t min, uint32_t max)
 }
 EXPORT_SYMBOL(msm_cpufreq_set_freq_limits);
 
-#ifdef CONFIG_LOW_CPUCLOCKS
-#define LOW_CPUCLOCKS_FREQ_MIN	81000
-#endif
-
 static int msm_cpufreq_init(struct cpufreq_policy *policy)
 {
 	int cur_freq;
@@ -415,28 +403,16 @@ static int msm_cpufreq_init(struct cpufreq_policy *policy)
 
 	if (cpufreq_frequency_table_cpuinfo(policy, table)) {
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
-#ifdef CONFIG_LOW_CPUCLOCKS
-		policy->cpuinfo.min_freq = LOW_CPUCLOCKS_FREQ_MIN;
-#else
 		policy->cpuinfo.min_freq = CONFIG_MSM_CPU_FREQ_MIN;
-#endif
 		policy->cpuinfo.max_freq = CONFIG_MSM_CPU_FREQ_MAX;
 #endif
 	}
 #ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
-#ifdef CONFIG_LOW_CPUCLOCKS
-	policy->min = LOW_CPUCLOCKS_FREQ_MIN;
-#else
 	policy->min = CONFIG_MSM_CPU_FREQ_MIN;
-#endif
 	policy->max = CONFIG_MSM_CPU_FREQ_MAX;
 #else
-	policy->max = 1890000;
-#ifdef CONFIG_LOW_CPUCLOCKS
-	policy->min = LOW_CPUCLOCKS_FREQ_MIN;
-#else
-	policy->min = 384000;
-#endif
+	policy->min = MIN_FREQ_LIMIT;
+	policy->max = MAX_FREQ_LIMIT;
 #endif
 
 #ifdef CONFIG_SEC_DVFS

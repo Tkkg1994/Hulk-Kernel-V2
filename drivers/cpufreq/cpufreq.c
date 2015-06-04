@@ -921,7 +921,7 @@ static ssize_t show(struct kobject *kobj, struct attribute *attr, char *buf)
 		goto unlock;
 
 	if (!down_read_trylock(&cpufreq_rwsem))
-		goto unlock;
+		goto exit;
 
 	if (lock_policy_rwsem_read(policy->cpu) < 0)
 		goto up_read;
@@ -935,9 +935,9 @@ static ssize_t show(struct kobject *kobj, struct attribute *attr, char *buf)
 
 up_read:
 	up_read(&cpufreq_rwsem);
-
 unlock:
 	put_online_cpus();
+exit:
 	return ret;
 }
 
@@ -1554,9 +1554,9 @@ static int __cpufreq_remove_dev_finish(struct device *dev,
 	unsigned long flags;
 	struct cpufreq_policy *policy;
 
-	write_lock_irqsave(&cpufreq_driver_lock, flags);
+	read_lock_irqsave(&cpufreq_driver_lock, flags);
 	policy = per_cpu(cpufreq_cpu_data, cpu);
-	write_unlock_irqrestore(&cpufreq_driver_lock, flags);
+	read_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
 	if (!policy) {
 		pr_debug("%s: No cpu_data found\n", __func__);
@@ -1723,16 +1723,11 @@ EXPORT_SYMBOL(cpufreq_quick_get_max);
 
 static unsigned int __cpufreq_get(unsigned int cpu)
 {
-	struct cpufreq_policy *policy;
+	struct cpufreq_policy *policy = per_cpu(cpufreq_cpu_data, cpu);
 	unsigned int ret_freq = 0;
-	unsigned long flags;
 
 	if (!cpufreq_driver->get)
 		return ret_freq;
-
-	read_lock_irqsave(&cpufreq_driver_lock, flags);
-	policy = per_cpu(cpufreq_cpu_data, cpu);
-	read_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
 	ret_freq = cpufreq_driver->get(cpu);
 
@@ -1760,16 +1755,10 @@ static unsigned int __cpufreq_get(unsigned int cpu)
  */
 unsigned int cpufreq_get(unsigned int cpu)
 {
-	struct cpufreq_policy *policy;
 	unsigned int ret_freq = 0;
-	unsigned long flags;
 
 	if (cpufreq_disabled() || !cpufreq_driver)
 		return -ENOENT;
-
-	read_lock_irqsave(&cpufreq_driver_lock, flags);
-	policy = per_cpu(cpufreq_cpu_data, cpu);
-	read_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
 	if (!down_read_trylock(&cpufreq_rwsem))
 		return 0;
@@ -2283,7 +2272,6 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 		new_policy->min, new_policy->max);
 
 	memcpy(&new_policy->cpuinfo, &policy->cpuinfo, sizeof(policy->cpuinfo));
-
 
 	if (new_policy->min > policy->user_policy.max
 		|| new_policy->max < policy->user_policy.min)

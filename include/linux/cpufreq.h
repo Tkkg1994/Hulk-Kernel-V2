@@ -438,6 +438,17 @@ static inline unsigned int cpufreq_quick_get_max(unsigned int cpu)
 }
 #endif
 
+#ifdef CONFIG_LOW_CPUCLOCKS
+#define MIN_FREQ_LIMIT	378000
+#else
+#define MIN_FREQ_LIMIT	384000
+#endif
+#ifdef CONFIG_CPU_OVERCLOCK
+#define MAX_FREQ_LIMIT	2214000
+#else
+#define MAX_FREQ_LIMIT	1890000
+#endif
+
 #ifdef CONFIG_SEC_DVFS
 enum {
 	BOOT_CPU = 0,
@@ -445,9 +456,6 @@ enum {
 
 int get_max_freq(void);
 int get_min_freq(void);
-
-#define MAX_FREQ_LIMIT		get_max_freq() /* 1512000 */
-#define MIN_FREQ_LIMIT		get_min_freq() /* 384000 */
 
 #define MIN_TOUCH_LIMIT		1134000
 #define MIN_TOUCH_HIGH_LIMIT		1890000
