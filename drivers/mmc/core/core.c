@@ -58,10 +58,10 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/mmc.h>
 
+static void mmc_clk_scaling(struct mmc_host *host, bool from_wq);
+
 /* If the device is not responding */
 #define MMC_CORE_TIMEOUT_MS	(10 * 60 * 1000) /* 10 minute timeout */
-
-static void mmc_clk_scaling(struct mmc_host *host, bool from_wq);
 
 /*
  * Background operations can take a long time, depending on the housekeeping
@@ -418,7 +418,7 @@ void mmc_start_bkops(struct mmc_card *card, bool from_exception)
 	int err;
 
 	BUG_ON(!card);
-	if (!card->ext_csd.bkops_en || !(card->host->caps2 & MMC_CAP2_INIT_BKOPS))
+	if (!card->ext_csd.bkops_en)
 		return;
 
 	if ((card->bkops_info.cancel_delayed_work) && !from_exception) {
@@ -937,7 +937,6 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 			 */
 			return NULL;
 		}
-
 		/*
 		 * Check BKOPS urgency for each R1 response
 		 */
@@ -2607,15 +2606,6 @@ int mmc_set_blocklen(struct mmc_card *card, unsigned int blocklen)
 }
 EXPORT_SYMBOL(mmc_set_blocklen);
 
-static void mmc_hw_reset_for_init(struct mmc_host *host)
-{
-	if (!(host->caps & MMC_CAP_HW_RESET) || !host->ops->hw_reset)
-		return;
-	mmc_host_clk_hold(host);
-	host->ops->hw_reset(host);
-	mmc_host_clk_release(host);
-}
-
 int mmc_set_blockcount(struct mmc_card *card, unsigned int blockcount,
 			bool is_rel_write)
 {
@@ -2630,6 +2620,15 @@ int mmc_set_blockcount(struct mmc_card *card, unsigned int blockcount,
 }
 EXPORT_SYMBOL(mmc_set_blockcount);
 
+static void mmc_hw_reset_for_init(struct mmc_host *host)
+{
+	if (!(host->caps & MMC_CAP_HW_RESET) || !host->ops->hw_reset)
+		return;
+	mmc_host_clk_hold(host);
+	host->ops->hw_reset(host);
+	mmc_host_clk_release(host);
+}
+
 int mmc_can_reset(struct mmc_card *card)
 {
 	u8 rst_n_function;
@@ -2637,7 +2636,7 @@ int mmc_can_reset(struct mmc_card *card)
 	if (mmc_card_sdio(card))
 		return 0;
 
-	if (mmc_card_mmc(card) && (card->host->caps & MMC_CAP_HW_RESET)) {
+	if (mmc_card_mmc(card)) {
 		rst_n_function = card->ext_csd.rst_n_function;
 		if ((rst_n_function & EXT_CSD_RST_N_EN_MASK) !=
 		    EXT_CSD_RST_N_ENABLED)
@@ -2654,6 +2653,9 @@ static int mmc_do_hw_reset(struct mmc_host *host, int check)
 	if (!host->bus_ops->power_restore)
 		return -EOPNOTSUPP;
 
+	if (!(host->caps & MMC_CAP_HW_RESET))
+		return -EOPNOTSUPP;
+
 	if (!card)
 		return -EINVAL;
 
@@ -2663,10 +2665,10 @@ static int mmc_do_hw_reset(struct mmc_host *host, int check)
 	mmc_host_clk_hold(host);
 	mmc_set_clock(host, host->f_init);
 
-	if (mmc_card_sd(card) && host->ops->hw_reset)
-		host->ops->hw_reset(host);
-	else
+	if (mmc_card_sd(card))
 		mmc_power_cycle(host);
+	else if (host->ops->hw_reset)
+		host->ops->hw_reset(host);
 
 	/* If the reset has happened, then a status command will fail */
 	if (check) {
@@ -3231,6 +3233,7 @@ void mmc_rescan(struct work_struct *work)
  out:
 	if (extend_wakelock)
 		wake_lock_timeout(&host->detect_wake_lock, HZ / 2);
+
 	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
 }
@@ -3629,6 +3632,7 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 		spin_lock_irqsave(&host->lock, flags);
 		host->rescan_disable = 1;
 		spin_unlock_irqrestore(&host->lock, flags);
+
 		/*
 		 * In some cases, the detect work might be scheduled
 		 * just before rescan_disable is set to true.
@@ -3673,7 +3677,6 @@ int mmc_pm_notify(struct notifier_block *notify_block,
 
 	default:
 		return -EINVAL;
-
 	}
 
 	return 0;
