@@ -183,7 +183,7 @@ static void sdhci_reset(struct sdhci_host *host, u8 mask)
 	/* hw clears the bit when it's done */
 	while (sdhci_readb(host, SDHCI_SOFTWARE_RESET) & mask) {
 		if (timeout == 0) {
-			printk(KERN_ERR "%s: Reset 0x%x never completed.\n",
+			pr_err("%s: Reset 0x%x never completed.\n",
 				mmc_hostname(host->mmc), (int)mask);
 			sdhci_dumpregs(host);
 			return;
@@ -952,7 +952,7 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 
 	while (sdhci_readl(host, SDHCI_PRESENT_STATE) & mask) {
 		if (timeout == 0) {
-			printk(KERN_ERR "%s: Controller never released "
+			pr_err("%s: Controller never released "
 				"inhibit bit(s).\n", mmc_hostname(host->mmc));
 			sdhci_dumpregs(host);
 			cmd->error = -EIO;
@@ -974,7 +974,7 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 	sdhci_set_transfer_mode(host, cmd);
 
 	if ((cmd->flags & MMC_RSP_136) && (cmd->flags & MMC_RSP_BUSY)) {
-		printk(KERN_ERR "%s: Unsupported response type!\n",
+		pr_err("%s: Unsupported response type!\n",
 			mmc_hostname(host->mmc));
 		cmd->error = -EINVAL;
 		tasklet_schedule(&host->finish_tasklet);
@@ -1124,7 +1124,7 @@ static void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 	while (!((clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL))
 		& SDHCI_CLOCK_INT_STABLE)) {
 		if (timeout == 0) {
-			printk(KERN_ERR "%s: Internal clock never "
+			pr_err("%s: Internal clock never "
 				"stabilised.\n", mmc_hostname(host->mmc));
 			sdhci_dumpregs(host);
 			return;
@@ -1847,9 +1847,9 @@ static void sdhci_tasklet_card(unsigned long param)
 
 	if (!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT)) {
 		if (host->mrq) {
-			printk(KERN_ERR "%s: Card removed during transfer!\n",
+			pr_err("%s: Card removed during transfer!\n",
 				mmc_hostname(host->mmc));
-			printk(KERN_ERR "%s: Resetting controller.\n",
+			pr_err("%s: Resetting controller.\n",
 				mmc_hostname(host->mmc));
 
 			sdhci_reset(host, SDHCI_RESET_CMD);
@@ -1936,7 +1936,7 @@ static void sdhci_timeout_timer(unsigned long data)
 	spin_lock_irqsave(&host->lock, flags);
 
 	if (host->mrq) {
-		printk(KERN_ERR "%s: Timeout waiting for hardware "
+		pr_err("%s: Timeout waiting for hardware "
 			"interrupt.\n", mmc_hostname(host->mmc));
 		sdhci_dumpregs(host);
 
@@ -1982,7 +1982,7 @@ static void sdhci_cmd_irq(struct sdhci_host *host, u32 intmask)
 	BUG_ON(intmask == 0);
 
 	if (!host->cmd) {
-		printk(KERN_ERR "%s: Got command interrupt 0x%08x even "
+		pr_err("%s: Got command interrupt 0x%08x even "
 			"though no command operation was in progress.\n",
 			mmc_hostname(host->mmc), (unsigned)intmask);
 		sdhci_dumpregs(host);
@@ -2082,7 +2082,7 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 			}
 		}
 
-		printk(KERN_ERR "%s: Got data interrupt 0x%08x even "
+		pr_err("%s: Got data interrupt 0x%08x even "
 			"though no data operation was in progress.\n",
 			mmc_hostname(host->mmc), (unsigned)intmask);
 		sdhci_dumpregs(host);
@@ -2099,7 +2099,7 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 			!= MMC_BUS_TEST_R)
 		host->data->error = -EILSEQ;
 	else if (intmask & SDHCI_INT_ADMA_ERROR) {
-		printk(KERN_ERR "%s: ADMA error\n", mmc_hostname(host->mmc));
+		pr_err("%s: ADMA error\n", mmc_hostname(host->mmc));
 		sdhci_show_adma_error(host);
 		host->data->error = -EIO;
 	}
@@ -2214,7 +2214,7 @@ again:
 	intmask &= ~SDHCI_INT_ERROR;
 
 	if (intmask & SDHCI_INT_BUS_POWER) {
-		printk(KERN_ERR "%s: Card is consuming too much power!\n",
+		pr_err("%s: Card is consuming too much power!\n",
 			mmc_hostname(host->mmc));
 		sdhci_writel(host, SDHCI_INT_BUS_POWER, SDHCI_INT_STATUS);
 	}
@@ -2227,7 +2227,7 @@ again:
 	intmask &= ~SDHCI_INT_CARD_INT;
 
 	if (intmask) {
-		printk(KERN_ERR "%s: Unexpected interrupt 0x%08x.\n",
+		pr_err("%s: Unexpected interrupt 0x%08x.\n",
 			mmc_hostname(host->mmc), intmask);
 		sdhci_dumpregs(host);
 		unexpected |= intmask;
@@ -2404,7 +2404,7 @@ int sdhci_add_host(struct sdhci_host *host)
 	host->version = (host->version & SDHCI_SPEC_VER_MASK)
 				>> SDHCI_SPEC_VER_SHIFT;
 	if (host->version > SDHCI_SPEC_300) {
-		printk(KERN_ERR "%s: Unknown controller version (%d). "
+		pr_err("%s: Unknown controller version (%d). "
 			"You may experience problems.\n", mmc_hostname(mmc),
 			host->version);
 	}
@@ -2697,7 +2697,7 @@ int sdhci_add_host(struct sdhci_host *host)
 		mmc->ocr_avail_mmc &= host->ocr_avail_mmc;
 
 	if (mmc->ocr_avail == 0) {
-		printk(KERN_ERR "%s: Hardware doesn't report any "
+		pr_err("%s: Hardware doesn't report any "
 			"support voltages.\n", mmc_hostname(mmc));
 		return -ENODEV;
 	}
@@ -2846,7 +2846,7 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 		host->flags |= SDHCI_DEVICE_DEAD;
 
 		if (host->mrq) {
-			printk(KERN_ERR "%s: Controller removed during "
+			pr_err("%s: Controller removed during "
 				" transfer!\n", mmc_hostname(host->mmc));
 
 			host->mrq->cmd->error = -ENOMEDIUM;
