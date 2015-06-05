@@ -158,6 +158,10 @@ enum {
 module_param(perdev_minors, int, 0444);
 MODULE_PARM_DESC(perdev_minors, "Minors numbers to allocate per device");
 
+static inline int mmc_blk_part_switch(struct mmc_card *card,
+				      struct mmc_blk_data *md);
+static int get_card_status(struct mmc_card *card, u32 *status, int retries);
+
 static inline void mmc_blk_clear_packed(struct mmc_queue_req *mqrq)
 {
 	mqrq->packed_cmd = MMC_PACKED_NONE;
@@ -322,13 +326,33 @@ num_wr_reqs_to_start_packing_store(struct device *dev,
 {
 	int value;
 	struct mmc_blk_data *md = mmc_blk_get(dev_to_disk(dev));
+	struct mmc_card *card = md->queue.card;
+	int ret = count;
+
+	if (!card) {
+		ret = -EINVAL;
+		goto exit;
+	}
 
 	sscanf(buf, "%d", &value);
-	if (value >= 0)
-		md->queue.num_wr_reqs_to_start_packing = value;
 
+	if (value >= 0) {
+		md->queue.num_wr_reqs_to_start_packing =
+		    min_t(int, value, (int)card->ext_csd.max_packed_writes);
+
+		pr_debug("%s: trigger to pack: new value = %d",
+			mmc_hostname(card->host),
+			md->queue.num_wr_reqs_to_start_packing);
+	} else {
+		pr_err("%s: value %d is not valid. old value remains = %d",
+			mmc_hostname(card->host), value,
+			md->queue.num_wr_reqs_to_start_packing);
+		ret = -EINVAL;
+	}
+
+exit:
 	mmc_blk_put(md);
-	return count;
+	return ret;
 }
 
 static ssize_t
@@ -533,42 +557,36 @@ out:
 	return ERR_PTR(err);
 }
 
-struct scatterlist *mmc_blk_get_sg(struct mmc_card *card,
-     unsigned char *buf, int *sg_len, int size)
+static int ioctl_rpmb_card_status_poll(struct mmc_card *card, u32 *status,
+				       u32 retries_max)
 {
-	struct scatterlist *sg;
-	struct scatterlist *sl;
-	int total_sec_cnt, sec_cnt;
-	int max_seg_size, len;
+	int err;
+	u32 retry_count = 0;
 
-	total_sec_cnt = size;
-	max_seg_size = card->host->max_seg_size;
-	len = (size - 1 + max_seg_size) / max_seg_size;
-	sl = kmalloc(sizeof(struct scatterlist) * len, GFP_KERNEL);
+	if (!status || !retries_max)
+		return -EINVAL;
 
-	if (!sl) {
-		return NULL;
-	}
-	sg = (struct scatterlist *)sl;
-	sg_init_table(sg, len);
+	do {
+		err = get_card_status(card, status, 5);
+		if (err)
+			break;
 
-	while (total_sec_cnt) {
-		if (total_sec_cnt < max_seg_size)
-			sec_cnt = total_sec_cnt;
-		else
-			sec_cnt = max_seg_size;
-			sg_set_page(sg, virt_to_page(buf), sec_cnt, offset_in_page(buf));
-			buf = buf + sec_cnt;
-			total_sec_cnt = total_sec_cnt - sec_cnt;
-			if (total_sec_cnt == 0)
-				break;
-			sg = sg_next(sg);
-	}
+		if (!R1_STATUS(*status) &&
+				(R1_CURRENT_STATE(*status) != R1_STATE_PRG))
+			break; /* RPMB programming operation complete */
 
-	if (sg)
-		sg_mark_end(sg);
-	*sg_len = len;
-	return sl;
+		/*
+		 * Rechedule to give the MMC device a chance to continue
+		 * processing the previous command without being polled too
+		 * frequently.
+		 */
+		usleep_range(1000, 5000);
+	} while (++retry_count < retries_max);
+
+	if (retry_count == retries_max)
+		err = -EPERM;
+
+	return err;
 }
 
 static int mmc_blk_ioctl_cmd(struct block_device *bdev,
@@ -580,8 +598,8 @@ static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 	struct mmc_command cmd = {0};
 	struct mmc_data data = {0};
 	struct mmc_request mrq = {NULL};
-	struct scatterlist *sg = 0;
-	int err=0;
+	struct scatterlist sg;
+	int err;
 
 	/*
 	 * The caller must have CAP_SYS_RAWIO, and must be calling this on the
@@ -612,13 +630,12 @@ static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 	cmd.flags = idata->ic.flags;
 
 	if (idata->buf_bytes) {
-		int len;
+		data.sg = &sg;
+		data.sg_len = 1;
 		data.blksz = idata->ic.blksz;
 		data.blocks = idata->ic.blocks;
-		
-		sg = mmc_blk_get_sg(card, idata->buf, &len, idata->buf_bytes);
-		data.sg = sg;
-		data.sg_len = len;
+
+		sg_init_one(data.sg, idata->buf, idata->buf_bytes);
 
 		if (idata->ic.write_flag)
 			data.flags = MMC_DATA_WRITE;
@@ -652,6 +669,10 @@ static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 
 	mmc_rpm_hold(card->host, &card->dev);
 	mmc_claim_host(card->host);
+
+	err = mmc_blk_part_switch(card, md);
+	if (err)
+		goto cmd_rel_host;
 
 	if (idata->ic.is_acmd) {
 		err = mmc_app_cmd(card->host, card);
@@ -2742,13 +2763,13 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
 				mmc_blk_rw_rq_prep(mq_rq, card,
 						disable_multi, mq);
 				mmc_start_req(card->host,
-					&mq_rq->mmc_active, NULL);
+						&mq_rq->mmc_active, NULL);
 			} else {
 				if (!mq_rq->packed_retries)
 					goto cmd_abort;
 				mmc_blk_packed_hdr_wrq_prep(mq_rq, card, mq);
 				mmc_start_req(card->host,
-					&mq_rq->mmc_active, NULL);
+						&mq_rq->mmc_active, NULL);
 			}
 		}
 	} while (ret);
@@ -2798,17 +2819,17 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	struct mmc_host *host = card->host;
 	unsigned long flags;
 
-	if (req && !mq->mqrq_prev->req) {
-		mmc_rpm_hold(host, &card->dev);
-		/* claim host only for the first request */
-		mmc_claim_host(card->host);
-
 #ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
 	if (mmc_bus_needs_resume(card->host)) {
 		mmc_resume_bus(card->host);
 		mmc_blk_set_blksize(md, card);
 	}
 #endif
+
+	if (req && !mq->mqrq_prev->req) {
+		mmc_rpm_hold(host, &card->dev);
+		/* claim host only for the first request */
+		mmc_claim_host(card->host);
 		if (card->ext_csd.bkops_en)
 			mmc_stop_bkops(card);
 	}

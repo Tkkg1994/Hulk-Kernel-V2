@@ -242,6 +242,7 @@ enum mmc_blk_status {
 	MMC_BLK_NEW_REQUEST,
 	MMC_BLK_URGENT,
 	MMC_BLK_URGENT_DONE,
+	MMC_BLK_NO_REQ_TO_STOP,
 };
 
 /* The number of MMC physical partitions.  These consist of:
