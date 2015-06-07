@@ -297,27 +297,27 @@ struct mmc_host {
 #define MMC_CAP2_BROKEN_VOLTAGE	(1 << 7)	/* Use the broken voltage */
 #define MMC_CAP2_DETECT_ON_ERR	(1 << 8)	/* On I/O err check card removal */
 #define MMC_CAP2_HC_ERASE_SZ	(1 << 9)	/* High-capacity erase size */
-#define MMC_CAP2_CD_ACTIVE_HIGH (1 << 10) /* Card-detect signal active high */
-
-#define MMC_CAP2_PACKED_RD	(1 << 10)	/* Allow packed read */
-#define MMC_CAP2_PACKED_WR	(1 << 11)	/* Allow packed write */
+#define MMC_CAP2_CD_ACTIVE_HIGH	(1 << 10)	/* Card-detect signal active high */
+#define MMC_CAP2_RO_ACTIVE_HIGH	(1 << 11)	/* Write-protect signal active high */
+#define MMC_CAP2_PACKED_RD	(1 << 12)	/* Allow packed read */
+#define MMC_CAP2_PACKED_WR	(1 << 13)	/* Allow packed write */
 #define MMC_CAP2_PACKED_CMD	(MMC_CAP2_PACKED_RD | \
 				 MMC_CAP2_PACKED_WR) /* Allow packed commands */
-#define MMC_CAP2_PACKED_WR_CONTROL (1 << 12) /* Allow write packing control */
+#define MMC_CAP2_PACKED_WR_CONTROL (1 << 14)	/* Allow write packing control */
 
-#define MMC_CAP2_SANITIZE	(1 << 13)	/* Support Sanitize */
-#define MMC_CAP2_INIT_BKOPS	(1 << 15)	/* Need to set BKOPS_EN */
-#define MMC_CAP2_CLK_SCALE	(1 << 16)	/* Allow dynamic clk scaling */
-#define MMC_CAP2_ADAPT_PACKED	(1 << 17) 	/*  Disable packed write adaptively */
-#define MMC_CAP2_STOP_REQUEST	(1 << 18)	/* Allow stop ongoing request */
+#define MMC_CAP2_SANITIZE	(1 << 15)	/* Support Sanitize */
+#define MMC_CAP2_INIT_BKOPS	(1 << 16)	/* Need to set BKOPS_EN */
+#define MMC_CAP2_CLK_SCALE	(1 << 17)	/* Allow dynamic clk scaling */
+#define MMC_CAP2_ADAPT_PACKED	(1 << 18) 	/*  Disable packed write adaptively */
+#define MMC_CAP2_STOP_REQUEST	(1 << 19)	/* Allow stop ongoing request */
 /* Use runtime PM framework provided by MMC core */
-#define MMC_CAP2_CORE_RUNTIME_PM (1 << 19)
+#define MMC_CAP2_CORE_RUNTIME_PM (1 << 20)
 /* Allows Asynchronous SDIO irq while card is in 4-bit mode */
-#define MMC_CAP2_ASYNC_SDIO_IRQ_4BIT_MODE (1 << 20)
+#define MMC_CAP2_ASYNC_SDIO_IRQ_4BIT_MODE (1 << 21)
 
-#define MMC_CAP2_HS400_1_8V	(1 << 21)        /* can support */
-#define MMC_CAP2_HS400_1_2V	(1 << 22)        /* can support */
-#define MMC_CAP2_CORE_PM	(1 << 23)       /* use PM framework */
+#define MMC_CAP2_HS400_1_8V	(1 << 22)        /* can support */
+#define MMC_CAP2_HS400_1_2V	(1 << 23)        /* can support */
+#define MMC_CAP2_CORE_PM	(1 << 24)       /* use PM framework */
 #define MMC_CAP2_HS400		(MMC_CAP2_HS400_1_8V | \
 				 MMC_CAP2_HS400_1_2V)
 #define MMC_CAP2_DRIVER_TYPE_4	(1 << 31)	/* Host supports eMMC Driver Type 4 */
