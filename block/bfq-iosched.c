@@ -69,6 +69,7 @@
 #include <linux/ioprio.h>
 #include "bfq.h"
 #include "blk.h"
+#include "blk-cgroup.h"
 
 /* Max number of dispatches in one round of service. */
 static const int bfq_quantum = 4;
