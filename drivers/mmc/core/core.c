@@ -2440,15 +2440,6 @@ static int mmc_do_erase(struct mmc_card *card, unsigned int from,
 	nr = to - from + 1;
 	trace_mmc_blk_erase_start(arg, fr, nr);
 
-	u32 *resp = card->raw_csd;
-
-	/* For WriteProtection */
-	if (UNSTUFF_BITS(resp, 12, 2)) {
-		pr_err("eMMC set Write Protection mode, Can't be written or erased.");
-		err = -EIO;
-		goto out;
-	}
-
 	/*
 	 * qty is used to calculate the erase timeout which depends on how many
 	 * erase groups (or allocation units in SD terminology) are affected.

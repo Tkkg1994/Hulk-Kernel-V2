@@ -79,8 +79,8 @@ static int cprm_ake_retry_flag;
 #define mmc_req_rel_wr(req)	(((req->cmd_flags & REQ_FUA) || \
 				  (req->cmd_flags & REQ_META)) && \
 				  (rq_data_dir(req) == WRITE))
-#define PACKED_CMD_VER		0x01
-#define PACKED_CMD_WR		0x02
+#define PACKED_CMD_VER	0x01
+#define PACKED_CMD_WR	0x02
 #define PACKED_TRIGGER_MAX_ELEMENTS	5000
 
 #define MMC_BLK_MAX_RETRIES 5 /* max # of retries before aborting a command */
@@ -1510,6 +1510,7 @@ static int mmc_blk_issue_secdiscard_rq(struct mmc_queue *mq,
 		arg = MMC_SECURE_TRIM1_ARG;
 	else
 		arg = MMC_SECURE_ERASE_ARG;
+
 retry:
 	if (card->quirks & MMC_QUIRK_INAND_CMD38) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
@@ -2266,7 +2267,6 @@ static void mmc_blk_write_packing_control(struct mmc_queue *mq,
 	if (mq->num_of_potential_packed_wr_reqs >
 			mq->num_wr_reqs_to_start_packing)
 		mq->wr_packing_enabled = true;
-
 }
 
 struct mmc_wr_pack_stats *mmc_blk_get_packed_statistics(struct mmc_card *card)
@@ -2968,11 +2968,6 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	clear_bit(MMC_QUEUE_NEW_REQUEST, &mq->flags);
 	clear_bit(MMC_QUEUE_URGENT_REQUEST, &mq->flags);
 	if (cmd_flags & REQ_DISCARD) {
-		/* complete ongoing async transfer before issuing sanitize */
-		if (card->host && card->host->areq)
-			mmc_blk_issue_rw_rq(mq, NULL);
-		ret = mmc_blk_issue_sanitize_rq(mq, req);
-	} else if (cmd_flags & REQ_DISCARD) {
 		/* complete ongoing async transfer before issuing discard */
 		if (card->host->areq)
 			mmc_blk_issue_rw_rq(mq, NULL);
@@ -3112,7 +3107,12 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 	snprintf(md->disk->disk_name, sizeof(md->disk->disk_name),
 		 "mmcblk%d%s", md->name_idx, subname ? subname : "");
 
-	blk_queue_logical_block_size(md->queue.queue, 512);
+	if (mmc_card_mmc(card))
+		blk_queue_logical_block_size(md->queue.queue,
+					     card->ext_csd.data_sector_size);
+	else
+		blk_queue_logical_block_size(md->queue.queue, 512);
+
 	set_capacity(md->disk, size);
 
 	card->bkops_info.size_percentage_to_queue_delayed_work = percentage;
