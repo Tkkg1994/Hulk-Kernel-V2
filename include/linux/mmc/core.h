@@ -96,6 +96,8 @@ struct mmc_command {
  */
 
 	unsigned int		cmd_timeout_ms;	/* in milliseconds */
+	/* Set this flag only for sanitize request */
+	bool			sanitize_busy;
 	/* Set this flag only for commands which can be HPIed */
 	bool			ignore_timeout;
 

@@ -80,6 +80,7 @@ static int cprm_ake_retry_flag;
 #define PACKED_TRIGGER_MAX_ELEMENTS	5000
 
 #define MMC_SANITIZE_REQ_TIMEOUT 240000 /* msec */
+#define MMC_EXTRACT_INDEX_FROM_ARG(x) ((x & 0x00FF0000) >> 16)
 #define MMC_BLK_UPDATE_STOP_REASON(stats, reason)			\
 	do {								\
 		if (stats->enabled)					\
@@ -589,6 +590,35 @@ static int ioctl_rpmb_card_status_poll(struct mmc_card *card, u32 *status,
 	return err;
 }
 
+static int ioctl_do_sanitize(struct mmc_card *card)
+{
+        int err;
+
+        if (!(mmc_can_sanitize(card) &&
+              (card->host->caps2 & MMC_CAP2_SANITIZE))) {
+                        pr_warn("%s: %s - SANITIZE is not supported\n",
+                                mmc_hostname(card->host), __func__);
+                        err = -EOPNOTSUPP;
+                        goto out;
+        }
+
+        pr_debug("%s: %s - SANITIZE IN PROGRESS...\n",
+                mmc_hostname(card->host), __func__);
+
+        err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+                                        EXT_CSD_SANITIZE_START, 1,
+                                        MMC_SANITIZE_REQ_TIMEOUT);
+
+        if (err)
+                pr_err("%s: %s - EXT_CSD_SANITIZE_START failed. err=%d\n",
+                       mmc_hostname(card->host), __func__, err);
+
+        pr_debug("%s: %s - SANITIZE COMPLETED\n", mmc_hostname(card->host),
+                                             __func__);
+out:
+        return err;
+}
+
 static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 	struct mmc_ioc_cmd __user *ic_ptr)
 {
@@ -678,6 +708,16 @@ static int mmc_blk_ioctl_cmd(struct block_device *bdev,
 		if (err)
 			goto cmd_rel_host;
 	}
+
+	if (MMC_EXTRACT_INDEX_FROM_ARG(cmd.arg) == EXT_CSD_SANITIZE_START) {
+                err = ioctl_do_sanitize(card);
+
+                if (err)
+                        pr_err("%s: ioctl_do_sanitize() failed. err = %d",
+                               __func__, err);
+
+                goto cmd_rel_host;
+        }
 
 	mmc_wait_for_req(card->host, &mrq);
 
