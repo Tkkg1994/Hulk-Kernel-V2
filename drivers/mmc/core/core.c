@@ -57,9 +57,6 @@
 #include "../host/msm_sdcc.h"
 #endif
 
-#define CREATE_TRACE_POINTS
-#include <trace/events/mmc.h>
-
 /* If the device is not responding */
 #define MMC_CORE_TIMEOUT_MS	(10 * 60 * 1000) /* 10 minute timeout */
 
