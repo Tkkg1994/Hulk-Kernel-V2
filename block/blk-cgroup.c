@@ -567,8 +567,6 @@ struct cftype blkcg_files[] = {
 
 /**
  * blkcg_pre_destroy - cgroup pre_destroy callback
- * @subsys: cgroup subsys
- * blkcg_pre_destroy - cgroup pre_destroy callback
  * @cgroup: cgroup of interest
  *
  * This function is called when @cgroup is about to go away and responsible
