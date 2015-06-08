@@ -302,7 +302,7 @@ static struct throtl_grp *throtl_lookup_create_tg(struct throtl_data *td,
 		/* if %NULL and @q is alive, fall back to root_tg */
 		if (!IS_ERR(blkg))
 			tg = blkg_to_tg(blkg);
-		else if (!blk_queue_dead(q))
+		else if (!blk_queue_dying(q))
 			tg = td_root_tg(td);
 	}
 
@@ -941,6 +941,9 @@ static u64 tg_prfill_cpu_rwstat(struct seq_file *sf,
 	struct throtl_grp *tg = pd_to_tg(pd);
 	struct blkg_rwstat rwstat = { }, tmp;
 	int i, cpu;
+
+	if (tg->stats_cpu == NULL)
+		return 0;
 
 	for_each_possible_cpu(cpu) {
 		struct tg_stats_cpu *sc = per_cpu_ptr(tg->stats_cpu, cpu);

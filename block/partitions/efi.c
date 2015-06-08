@@ -238,7 +238,7 @@ static gpt_entry *alloc_read_gpt_entries(struct parsed_partitions *state,
                 le32_to_cpu(gpt->sizeof_partition_entry);
 	if (!count)
 		return NULL;
-	pte = kzalloc(count, GFP_KERNEL);
+	pte = kmalloc(count, GFP_KERNEL);
 	if (!pte)
 		return NULL;
 
@@ -267,7 +267,7 @@ static gpt_header *alloc_read_gpt_header(struct parsed_partitions *state,
 	gpt_header *gpt;
 	unsigned ssz = bdev_logical_block_size(state->bdev);
 
-	gpt = kzalloc(ssz, GFP_KERNEL);
+	gpt = kmalloc(ssz, GFP_KERNEL);
 	if (!gpt)
 		return NULL;
 
@@ -310,12 +310,20 @@ static int is_gpt_valid(struct parsed_partitions *state, u64 lba,
 		goto fail;
 	}
 
-	/* Check the GUID Partition Table header size */
+	/* Check the GUID Partition Table header size is too big */
 	if (le32_to_cpu((*gpt)->header_size) >
 			bdev_logical_block_size(state->bdev)) {
-		pr_debug("GUID Partition Table Header size is wrong: %u > %u\n",
+		pr_debug("GUID Partition Table Header size is too large: %u > %u\n",
 			le32_to_cpu((*gpt)->header_size),
 			bdev_logical_block_size(state->bdev));
+		goto fail;
+	}
+
+	/* Check the GUID Partition Table header size is too small */
+	if (le32_to_cpu((*gpt)->header_size) < sizeof(gpt_header)) {
+		pr_debug("GUID Partition Table Header size is too small: %u < %zu\n",
+			le32_to_cpu((*gpt)->header_size),
+			sizeof(gpt_header));
 		goto fail;
 	}
 
@@ -385,6 +393,8 @@ static int is_gpt_valid(struct parsed_partitions *state, u64 lba,
  fail:
 	kfree(*gpt);
 	*gpt = NULL;
+	if (!force_gpt)
+		BUG_ON(1);
 	return 0;
 }
 
@@ -541,6 +551,9 @@ static int find_valid_gpt(struct parsed_partitions *state, gpt_header **gpt,
                         read_lba(state, 0, (u8 *) legacymbr,
 				 sizeof (*legacymbr));
                         good_pmbr = is_pmbr_valid(legacymbr);
+			// panic before kfree to check the buffer content
+			if (!good_pmbr && !memcmp(state->pp_buf, " mmcblk0", 8))
+				BUG_ON(1);
                         kfree(legacymbr);
                 }
                 if (!good_pmbr)
@@ -586,6 +599,9 @@ static int find_valid_gpt(struct parsed_partitions *state, gpt_header **gpt,
         }
 
  fail:
+	// panic before kfree to check the buffer content
+	if (!memcmp(state->pp_buf, " mmcblk0", 8))
+		BUG_ON(1);
         kfree(pgpt);
         kfree(agpt);
         kfree(pptes);
@@ -620,7 +636,6 @@ int efi_partition(struct parsed_partitions *state)
 	gpt_entry *ptes = NULL;
 	u32 i;
 	unsigned ssz = bdev_logical_block_size(state->bdev) / 512;
-	u8 unparsed_guid[37];
 
 	if (!find_valid_gpt(state, &gpt, &ptes) || !gpt || !ptes) {
 		kfree(gpt);
@@ -649,11 +664,7 @@ int efi_partition(struct parsed_partitions *state)
 			state->parts[i + 1].flags = ADDPART_FLAG_RAID;
 
 		info = &state->parts[i + 1].info;
-		/* Instead of doing a manual swap to big endian, reuse the
-		 * common ASCII hex format as the interim.
-		 */
-		efi_guid_unparse(&ptes[i].unique_partition_guid, unparsed_guid);
-		part_pack_uuid(unparsed_guid, info->uuid);
+		efi_guid_unparse(&ptes[i].unique_partition_guid, info->uuid);
 
 		/* Naively convert UTF16-LE to 7 bits. */
 		label_max = min(sizeof(info->volname) - 1,

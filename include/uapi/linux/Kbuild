@@ -1,0 +1,11 @@
+# UAPI Header export list
+header-y += mmc/
+
+genhdr-y += version.h
+
+header-y += dm-ioctl.h
+header-y += types.h
+header-y += fs.h
+header-y += sched.h
+header-y += loop.h
+header-y += ioprio.h

@@ -42,7 +42,6 @@ void blk_add_timer(struct request *);
  */
 enum rq_atomic_flags {
 	REQ_ATOM_COMPLETE = 0,
-	REQ_ATOM_URGENT = 1,
 };
 
 /*
@@ -59,20 +58,10 @@ static inline void blk_clear_rq_complete(struct request *rq)
 	clear_bit(REQ_ATOM_COMPLETE, &rq->atomic_flags);
 }
 
-static inline int blk_mark_rq_urgent(struct request *rq)
-{
-	return test_and_set_bit(REQ_ATOM_URGENT, &rq->atomic_flags);
-}
-
-static inline void blk_clear_rq_urgent(struct request *rq)
-{
-	clear_bit(REQ_ATOM_URGENT, &rq->atomic_flags);
-}
-
 /*
  * Internal elevator interface
  */
-#define ELV_ON_HASH(rq)		(!hlist_unhashed(&(rq)->hash))
+#define ELV_ON_HASH(rq) hash_hashed(&(rq)->hash)
 
 void blk_insert_flush(struct request *rq);
 void blk_abort_flushes(struct request_queue *q);
@@ -107,7 +96,7 @@ static inline struct request *__elv_next_request(struct request_queue *q)
 			q->flush_queue_delayed = 1;
 			return NULL;
 		}
-		if (unlikely(blk_queue_dead(q)) ||
+		if (unlikely(blk_queue_bypass(q)) ||
 		    !q->elevator->type->ops.elevator_dispatch_fn(q, 0))
 			return NULL;
 	}
@@ -149,12 +138,13 @@ int attempt_back_merge(struct request_queue *q, struct request *rq);
 int attempt_front_merge(struct request_queue *q, struct request *rq);
 int blk_attempt_req_merge(struct request_queue *q, struct request *rq,
 				struct request *next);
-void blk_recalc_rq_segments(struct request *rq);
 void blk_rq_set_mixed_merge(struct request *rq);
 bool blk_rq_merge_ok(struct request *rq, struct bio *bio);
 int blk_try_merge(struct request *rq, struct bio *bio);
 
 void blk_queue_congestion_threshold(struct request_queue *q);
+
+void __blk_run_queue_uncond(struct request_queue *q);
 
 int blk_dev_init(void);
 
@@ -182,14 +172,13 @@ static inline int queue_congestion_off_threshold(struct request_queue *q)
  *
  *	a) it's attached to a gendisk, and
  *	b) the queue had IO stats enabled when this request was started, and
- *	c) it's a file system request or a discard request
+ *	c) it's a file system request
  */
 static inline int blk_do_io_stat(struct request *rq)
 {
 	return rq->rq_disk &&
 	       (rq->cmd_flags & REQ_IO_STAT) &&
-	       (rq->cmd_type == REQ_TYPE_FS ||
-	        (rq->cmd_flags & REQ_DISCARD));
+		(rq->cmd_type == REQ_TYPE_FS);
 }
 
 /*

@@ -5074,7 +5074,7 @@ static int msmsdcc_sps_init(struct msmsdcc_host *host)
 			   mmc_hostname(host->mmc), rc);
 		goto reg_bam_err;
 	}
-	pr_info("%s: BAM device registered. bam_handle=0x%lx",
+	pr_info("%s: BAM device registered. bam_handle=0x%x",
 		mmc_hostname(host->mmc), host->sps.bam_handle);
 
 	host->sps.src_pipe_index = SPS_SDCC_PRODUCER_PIPE_INDEX;

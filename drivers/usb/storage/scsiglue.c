@@ -192,6 +192,12 @@ static int slave_configure(struct scsi_device *sdev)
 		/* Some devices don't handle VPD pages correctly */
 		sdev->skip_vpd_pages = 1;
 
+		/* Do not attempt to use REPORT SUPPORTED OPERATION CODES */
+		sdev->no_report_opcodes = 1;
+
+		/* Do not attempt to use WRITE SAME */
+		sdev->no_write_same = 1;
+
 		/* Some disks return the total number of blocks in response
 		 * to READ CAPACITY rather than the highest block number.
 		 * If this device makes that mistake, tell the sd driver. */
@@ -211,8 +217,11 @@ static int slave_configure(struct scsi_device *sdev)
 		/*
 		 * Many devices do not respond properly to READ_CAPACITY_16.
 		 * Tell the SCSI layer to try READ_CAPACITY_10 first.
+		 * However some USB 3.0 drive enclosures return capacity
+		 * modulo 2TB. Those must use READ_CAPACITY_16
 		 */
-		sdev->try_rc_10_first = 1;
+		if (!(us->fflags & US_FL_NEEDS_CAP16))
+			sdev->try_rc_10_first = 1;
 
 		/* assume SPC3 or latter devices support sense size > 18 */
 		if (sdev->scsi_level > SCSI_SPC_2)
@@ -243,17 +252,14 @@ static int slave_configure(struct scsi_device *sdev)
 				us->protocol == USB_PR_BULK)
 			us->use_last_sector_hacks = 1;
 
-		/* A few buggy USB-ATA bridges don't understand FUA */
-		if (us->fflags & US_FL_BROKEN_FUA)
-			sdev->broken_fua = 1;
+		/* Check if write cache default on flag is set or not */
+		if (us->fflags & US_FL_WRITE_CACHE)
+			sdev->wce_default_on = 1;
 
-		/*
-		 * This quirk enables sending consecutive TEST_UNIT_READY
-		 * commands in WRITE(10) command processing context. Increase
-		 * the timeout to 60 seconds.
-		 */
-		if (us->fflags & US_FL_TUR_AFTER_WRITE)
-			blk_queue_rq_timeout(sdev->request_queue, (60 * HZ));
+		if (us->sdev_autosuspend_delay >= 0) {
+			sdev->use_rpm_auto = 1;
+			sdev->autosuspend_delay = us->sdev_autosuspend_delay;
+		}
 
 	} else {
 
@@ -445,21 +451,20 @@ void usb_stor_report_bus_reset(struct us_data *us)
  * /proc/scsi/ functions
  ***********************************************************************/
 
+static int write_info(struct Scsi_Host *host, char *buffer, int length)
+{
+	/* if someone is sending us data, just throw it away */
+	return length;
+}
+
 /* we use this macro to help us write into the buffer */
 #undef SPRINTF
-#define SPRINTF(args...) \
-	do { if (pos < buffer+length) pos += sprintf(pos, ## args); } while (0)
+#define SPRINTF(args...) seq_printf(m, ## args)
 
-static int proc_info (struct Scsi_Host *host, char *buffer,
-		char **start, off_t offset, int length, int inout)
+static int show_info (struct seq_file *m, struct Scsi_Host *host)
 {
 	struct us_data *us = host_to_us(host);
-	char *pos = buffer;
 	const char *string;
-
-	/* if someone is sending us data, just throw it away */
-	if (inout)
-		return length;
 
 	/* print the controller name */
 	SPRINTF("   Host scsi%d: usb-storage\n", host->host_no);
@@ -490,28 +495,14 @@ static int proc_info (struct Scsi_Host *host, char *buffer,
 	SPRINTF("    Transport: %s\n", us->transport_name);
 
 	/* show the device flags */
-	if (pos < buffer + length) {
-		pos += sprintf(pos, "       Quirks:");
+	SPRINTF("       Quirks:");
 
 #define US_FLAG(name, value) \
-	if (us->fflags & value) pos += sprintf(pos, " " #name);
+	if (us->fflags & value) seq_printf(m, " " #name);
 US_DO_ALL_FLAGS
 #undef US_FLAG
-
-		*(pos++) = '\n';
-	}
-
-	/*
-	 * Calculate start of next buffer, and return value.
-	 */
-	*start = buffer + offset;
-
-	if ((pos - buffer) < offset)
-		return (0);
-	else if ((pos - buffer - offset) < length)
-		return (pos - buffer - offset);
-	else
-		return (length);
+	seq_putc(m, '\n');
+	return 0;
 }
 
 /***********************************************************************
@@ -556,7 +547,8 @@ struct scsi_host_template usb_stor_host_template = {
 	/* basic userland interface stuff */
 	.name =				"usb-storage",
 	.proc_name =			"usb-storage",
-	.proc_info =			proc_info,
+	.show_info =			show_info,
+	.write_info =			write_info,
 	.info =				host_info,
 
 	/* command interface -- queued only */

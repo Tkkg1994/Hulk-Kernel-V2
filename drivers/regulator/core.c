@@ -2608,13 +2608,13 @@ static void regulator_bulk_enable_async(void *data, async_cookie_t cookie)
 int regulator_bulk_enable(int num_consumers,
 			  struct regulator_bulk_data *consumers)
 {
-	LIST_HEAD(async_domain);
+	ASYNC_DOMAIN_EXCLUSIVE(async_domain);
 	int i;
 	int ret = 0;
 
 	for (i = 0; i < num_consumers; i++)
 		async_schedule_domain(regulator_bulk_enable_async,
-				      &consumers[i], &async_domain);
+					      &consumers[i], &async_domain);
 
 	async_synchronize_full_domain(&async_domain);
 

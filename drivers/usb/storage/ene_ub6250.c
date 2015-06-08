@@ -52,7 +52,7 @@ MODULE_FIRMWARE(MS_RW_FIRMWARE);
 		    vendorName, productName, useProtocol, useTransport, \
 		    initFunction, flags) \
 { USB_DEVICE_VER(id_vendor, id_product, bcdDeviceMin, bcdDeviceMax), \
-	.driver_info = (flags)|(USB_US_TYPE_STOR<<24) }
+	.driver_info = (flags)}
 
 static struct usb_device_id ene_ub6250_usb_ids[] = {
 #	include "unusual_ene_ub6250.h"
@@ -1928,10 +1928,11 @@ static int ene_load_bincode(struct us_data *us, unsigned char flag)
 		usb_stor_dbg(us, "load firmware %s failed\n", fw_name);
 		goto nofw;
 	}
-	buf = kmemdup(sd_fw->data, sd_fw->size, GFP_KERNEL);
+	buf = kmalloc(sd_fw->size, GFP_KERNEL);
 	if (buf == NULL)
 		goto nofw;
 
+	memcpy(buf, sd_fw->data, sd_fw->size);
 	memset(bcb, 0, sizeof(struct bulk_cb_wrap));
 	bcb->Signature = cpu_to_le32(US_BULK_CB_SIGN);
 	bcb->DataTransferLength = sd_fw->size;

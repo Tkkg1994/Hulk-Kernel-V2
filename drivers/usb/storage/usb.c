@@ -114,7 +114,7 @@ MODULE_PARM_DESC(quirks, "supplemental list of device IDs and their quirks");
 
 #define COMPLIANT_DEV	UNUSUAL_DEV
 
-#define USUAL_DEV(use_protocol, use_transport, use_type) \
+#define USUAL_DEV(use_protocol, use_transport) \
 { \
 	.useProtocol = use_protocol,	\
 	.useTransport = use_transport,	\
@@ -137,7 +137,7 @@ static struct us_unusual_dev us_unusual_dev_list[] = {
 };
 
 static struct us_unusual_dev for_dynamic_ids =
-		USUAL_DEV(USB_SC_SCSI, USB_PR_BULK, 0);
+		USUAL_DEV(USB_SC_SCSI, USB_PR_BULK);
 
 #undef UNUSUAL_DEV
 #undef COMPLIANT_DEV
@@ -473,7 +473,7 @@ static void adjust_quirks(struct us_data *us)
 			US_FL_CAPACITY_OK | US_FL_IGNORE_RESIDUE |
 			US_FL_SINGLE_LUN | US_FL_NO_WP_DETECT |
 			US_FL_NO_READ_DISC_INFO | US_FL_NO_READ_CAPACITY_16 |
-			US_FL_INITIAL_READ10);
+			US_FL_INITIAL_READ10 | US_FL_WRITE_CACHE);
 
 	p = quirks;
 	while (*p) {
@@ -529,6 +529,9 @@ static void adjust_quirks(struct us_data *us)
 		case 'o':
 			f |= US_FL_CAPACITY_OK;
 			break;
+		case 'p':
+			f |= US_FL_WRITE_CACHE;
+			break;
 		case 'r':
 			f |= US_FL_IGNORE_RESIDUE;
 			break;
@@ -561,7 +564,7 @@ static int get_device_info(struct us_data *us, const struct usb_device_id *id,
 	us->protocol = (unusual_dev->useTransport == USB_PR_DEVICE) ?
 			idesc->bInterfaceProtocol :
 			unusual_dev->useTransport;
-	us->fflags = USB_US_ORIG_FLAGS(id->driver_info);
+	us->fflags = id->driver_info;
 	adjust_quirks(us);
 
 	if (us->fflags & US_FL_IGNORE_DEVICE) {
@@ -742,6 +745,28 @@ static int get_pipes(struct us_data *us)
 	return 0;
 }
 
+/* Initialize SCSI device auto-suspend timeout here */
+static void usb_stor_set_scsi_autosuspend(struct us_data *us)
+{
+	struct usb_device *udev = us->pusb_dev;
+	struct usb_host_config *config = udev->actconfig;
+	struct usb_host_interface *intf;
+	int i;
+
+	/*
+	 * Some USB UICC devices has Mass storage interface along
+	 * with CCID interface.  These cards are inserted all the
+	 * time.  Enable SCSI auto-suspend for such devices.
+	 */
+	for (i = 0; i < config->desc.bNumInterfaces; i++) {
+		intf = config->interface[i]->cur_altsetting;
+		if (intf->desc.bInterfaceClass == USB_CLASS_CSCID) {
+			us->sdev_autosuspend_delay = 2000; /* msec */
+			return;
+		}
+	}
+}
+
 /* Initialize all the dynamic resources we need */
 static int usb_stor_acquire_resources(struct us_data *us)
 {
@@ -920,7 +945,6 @@ int usb_stor_probe1(struct us_data **pus,
 	host->max_cmd_len = 16;
 	host->sg_tablesize = usb_stor_sg_tablesize(intf);
 	*pus = us = host_to_us(host);
-	memset(us, 0, sizeof(struct us_data));
 	mutex_init(&(us->dev_mutex));
 	us_set_lock_class(&us->dev_mutex, intf);
 	init_completion(&us->cmnd_ready);
@@ -972,6 +996,9 @@ int usb_stor_probe2(struct us_data *us)
 	if (us->fflags & US_FL_SINGLE_LUN)
 		us->max_lun = 0;
 
+	if (!(us->fflags & US_FL_SCM_MULT_TARG))
+		us_to_host(us)->max_id = 1;
+
 	/* Find the endpoints and calculate pipe values */
 	result = get_pipes(us);
 	if (result)
@@ -988,6 +1015,10 @@ int usb_stor_probe2(struct us_data *us)
 	result = usb_stor_acquire_resources(us);
 	if (result)
 		goto BadDevice;
+
+	us->sdev_autosuspend_delay = -1;
+	usb_stor_set_scsi_autosuspend(us);
+
 	snprintf(us->scsi_name, sizeof(us->scsi_name), "usb-storage %s",
 					dev_name(&us->pusb_intf->dev));
 	result = scsi_add_host(us_to_host(us), dev);
@@ -1035,13 +1066,10 @@ static int storage_probe(struct usb_interface *intf,
 	int size;
 
 	/*
-	 * If libusual is configured, let it decide whether a standard
-	 * device should be handled by usb-storage or by ub.
 	 * If the device isn't standard (is handled by a subdriver
 	 * module) then don't accept it.
 	 */
-	if (usb_usual_check_type(id, USB_US_TYPE_STOR) ||
-			usb_usual_ignore_device(intf))
+	if (usb_usual_ignore_device(intf))
 		return -ENXIO;
 
 	/*
@@ -1072,10 +1100,6 @@ static int storage_probe(struct usb_interface *intf,
 	return result;
 }
 
-/***********************************************************************
- * Initialization and registration
- ***********************************************************************/
-
 static struct usb_driver usb_storage_driver = {
 	.name =		"usb-storage",
 	.probe =	storage_probe,
@@ -1090,32 +1114,4 @@ static struct usb_driver usb_storage_driver = {
 	.soft_unbind =	1,
 };
 
-static int __init usb_stor_init(void)
-{
-	int retval;
-
-	pr_info("Initializing USB Mass Storage driver...\n");
-
-	/* register the driver, return usb_register return code if error */
-	retval = usb_register(&usb_storage_driver);
-	if (retval == 0) {
-		pr_info("USB Mass Storage support registered\n");
-		usb_usual_set_present(USB_US_TYPE_STOR);
-	}
-	return retval;
-}
-
-static void __exit usb_stor_exit(void)
-{
-	/* Deregister the driver
-	 * This will cause disconnect() to be called for each
-	 * attached unit
-	 */
-	pr_info("Deregistering USB Mass Storage driver...\n");
-	usb_deregister(&usb_storage_driver) ;
-
-	usb_usual_clear_present(USB_US_TYPE_STOR);
-}
-
-module_init(usb_stor_init);
-module_exit(usb_stor_exit);
+module_usb_driver(usb_storage_driver);

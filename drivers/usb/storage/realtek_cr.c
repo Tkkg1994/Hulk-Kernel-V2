@@ -105,8 +105,9 @@ struct rts51x_chip {
 	int status_len;
 
 	u32 flag;
-#ifdef CONFIG_REALTEK_AUTOPM
 	struct us_data *us;
+
+#ifdef CONFIG_REALTEK_AUTOPM
 	struct timer_list rts51x_suspend_timer;
 	unsigned long timer_expires;
 	int pwr_state;
@@ -172,7 +173,7 @@ static int init_realtek_cr(struct us_data *us);
 		    initFunction, flags) \
 {\
 	USB_DEVICE_VER(id_vendor, id_product, bcdDeviceMin, bcdDeviceMax), \
-	.driver_info = (flags)|(USB_US_TYPE_STOR<<24)\
+	.driver_info = (flags) \
 }
 
 static const struct usb_device_id realtek_cr_ids[] = {
@@ -455,7 +456,7 @@ static int rts51x_check_status(struct us_data *us, u8 lun)
 	u8 buf[16];
 
 	retval = rts51x_read_status(us, lun, buf, 16, &(chip->status_len));
-	if (retval < 0)
+	if (retval != STATUS_SUCCESS)
 		return -EIO;
 
 	usb_stor_dbg(us, "chip->status_len = %d\n", chip->status_len);
@@ -853,7 +854,7 @@ static void rts51x_invoke_transport(struct scsi_cmnd *srb, struct us_data *us)
 		} else {
 			usb_stor_dbg(us, "NOT working scsi, not SS\n");
 			chip->proto_handler_backup(srb, us);
-			/* Check wether card is plugged in */
+			/* Check whether card is plugged in */
 			if (srb->cmnd[0] == TEST_UNIT_READY) {
 				if (srb->result == SAM_STAT_GOOD) {
 					SET_LUN_READY(chip, srb->device->lun);
@@ -933,13 +934,10 @@ static int realtek_cr_autosuspend_setup(struct us_data *us)
 
 static void realtek_cr_destructor(void *extra)
 {
-	struct rts51x_chip *chip = (struct rts51x_chip *)extra;
-	struct us_data *us;
+	struct rts51x_chip *chip = extra;
 
 	if (!chip)
 		return;
-
-	us = chip->us;
 
 #ifdef CONFIG_REALTEK_AUTOPM
 	if (ss_en) {
@@ -991,6 +989,7 @@ static int init_realtek_cr(struct us_data *us)
 	us->extra = chip;
 	us->extra_destructor = realtek_cr_destructor;
 	us->max_lun = chip->max_lun = rts51x_get_max_lun(us);
+	chip->us = us;
 
 	usb_stor_dbg(us, "chip->max_lun = %d\n", chip->max_lun);
 
@@ -1013,10 +1012,8 @@ static int init_realtek_cr(struct us_data *us)
 			SET_AUTO_DELINK(chip);
 	}
 #ifdef CONFIG_REALTEK_AUTOPM
-	if (ss_en) {
-		chip->us = us;
+	if (ss_en)
 		realtek_cr_autosuspend_setup(us);
-	}
 #endif
 
 	usb_stor_dbg(us, "chip->flag = 0x%x\n", chip->flag);
