@@ -463,7 +463,7 @@ static inline void mmc_part_add(struct mmc_card *card, unsigned int size,
 	card->nr_parts++;
 }
 
-static inline bool mmc_large_sec(struct mmc_card *card)
+static inline bool mmc_large_sector(struct mmc_card *card)
 {
 	return card->ext_csd.data_sector_size == 4096;
 }
@@ -701,11 +701,6 @@ extern void mmc_fixup_device(struct mmc_card *card,
 extern struct mmc_wr_pack_stats *mmc_blk_get_packed_statistics(
 			struct mmc_card *card);
 extern void mmc_blk_init_packed_statistics(struct mmc_card *card);
-
-extern struct mmc_wr_pack_stats *mmc_blk_get_packed_statistics(
-			struct mmc_card *card);
-extern void mmc_blk_init_packed_statistics(struct mmc_card *card);
-
 extern void mmc_blk_disable_wr_packing(struct mmc_queue *mq);
 extern int mmc_send_pon(struct mmc_card *card);
 

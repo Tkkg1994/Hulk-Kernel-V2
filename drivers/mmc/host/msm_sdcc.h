@@ -2,7 +2,7 @@
  *  linux/drivers/mmc/host/msmsdcc.h - QCT MSM7K SDC Controller
  *
  *  Copyright (C) 2008 Google, All Rights Reserved.
- *  Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -206,6 +206,7 @@
 	MCI_DATATIMEOUTMASK|MCI_TXUNDERRUNMASK|MCI_RXOVERRUNMASK|	\
 	MCI_CMDRESPENDMASK|MCI_CMDSENTMASK|MCI_DATAENDMASK|		\
 	MCI_PROGDONEMASK|MCI_AUTOCMD19TIMEOUTMASK)
+
 #define MCI_IRQ_PIO 	\
 	(MCI_RXDATAAVLBLMASK | MCI_TXDATAAVLBLMASK | 	\
 	MCI_RXFIFOEMPTYMASK | MCI_TXFIFOEMPTYMASK | MCI_RXFIFOFULLMASK |\
@@ -226,8 +227,6 @@
 
 /* Set the request timeout to 10secs */
 #define MSM_MMC_REQ_TIMEOUT	10000 /* msecs */
-
-extern struct class *sec_class;	/* Sysfs about SD Card Detection */
 
 /*
  * Controller HW limitations
@@ -425,7 +424,6 @@ struct msmsdcc_host {
 	struct mutex clk_mutex;
 	bool pending_resume;
 	unsigned int idle_tout;			/* Timeout in msecs */
-	bool pending_dpsm_reset;
 	bool enforce_pio_mode;
 	bool print_pm_stats;
 	struct msmsdcc_msm_bus_vote msm_bus_vote;
@@ -480,8 +478,6 @@ struct msmsdcc_host {
 #define is_testbus_debug(h) ((h)->hw_caps & MSMSDCC_TESTBUS_DEBUG)
 #define is_sdhci_supported(h) ((h)->hw_caps & MSMSDCC_SDHCI_MODE_SUPPORTED)
 
-extern unsigned int system_rev;
-
 /* Set controller capabilities based on version */
 static inline void set_default_hw_caps(struct msmsdcc_host *host)
 {
@@ -509,9 +505,9 @@ static inline void set_default_hw_caps(struct msmsdcc_host *host)
 			| MSMSDCC_AUTO_CMD19;
 
 	if ((step == 0x18) && (minor >= 3)) {
+		host->hw_caps |= MSMSDCC_AUTO_CMD21;
 		/* Version 0x06000018 need hard reset on errors */
 		host->hw_caps &= ~MSMSDCC_SOFT_RESET;
-		host->hw_caps |= MSMSDCC_AUTO_CMD21;
 	}
 
 	if (step >= 0x2b) /* SDCC v4 2.1.0 and greater */

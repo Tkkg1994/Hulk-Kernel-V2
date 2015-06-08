@@ -80,11 +80,25 @@ static int CPRM_CMD_SecureRW(struct mmc_card *card,
 	cmd.arg = card->rca << 16;
 	cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC;
 
+	//kishore
+	mmc_rpm_hold(card->host, &card->dev);
+	mmc_claim_host(card->host);
+	
 	err = mmc_wait_for_cmd(card->host, &cmd, 0);
 	if (err)
+	{
+		printk("CPRM mmc_wait_for_cmd fail = %d ERROR\n", err);
+		mmc_release_host(card->host);
+		mmc_rpm_release(card->host, &card->dev);
 		return (u32)-1;
+	}
 	if (!mmc_host_is_spi(card->host) && !(cmd.resp[0] & R1_APP_CMD))
+	{
+		printk("CPRM mmc_host_is_spi fail ERROR\n");
+		mmc_release_host(card->host);
+		mmc_rpm_release(card->host, &card->dev);
 		return (u32)-1;
+	}
 
 	printk("CPRM_CMD_SecureRW: 1, command : %d\n", command);
 
@@ -101,7 +115,6 @@ static int CPRM_CMD_SecureRW(struct mmc_card *card,
 
 	memset(&data, 0, sizeof(struct mmc_data));
 
-	data.timeout_ns = 100000000;
 	data.timeout_clks = 0;
 	data.blksz = length;
 	data.blocks = 1;
@@ -109,6 +122,8 @@ static int CPRM_CMD_SecureRW(struct mmc_card *card,
 	data.sg = &sg;
 	data.sg_len = 1;
 
+	mmc_set_data_timeout(&data, card);
+	printk("CPRM_CMD_SecureRW: timeout (msec) : %d\n", data.timeout_ns/1000000);
 	stop.opcode = MMC_STOP_TRANSMISSION;
 	stop.arg = 0;
 	stop.flags = MMC_RSP_R1B | MMC_CMD_AC;
@@ -129,8 +144,16 @@ static int CPRM_CMD_SecureRW(struct mmc_card *card,
 
 	printk(KERN_DEBUG"CPRM_CMD_SecureRW: 3\n");
 
+
+	
+	
 	mmc_wait_for_req(card->host, &mrq);
 
+	//kishore
+	mmc_release_host(card->host);
+	mmc_rpm_release(card->host, &card->dev);
+	
+	
 	printk(KERN_DEBUG"CPRM_CMD_SecureRW: 4\n");
 
 	i = 0;
@@ -190,7 +213,7 @@ static int CPRM_CMD_SecureMultiRW(struct mmc_card *card,
 	if (!mmc_host_is_spi(card->host) && !(cmd.resp[0] & R1_APP_CMD))
 		return (u32)-1;
 
-	printk(KERN_DEBUG"CPRM_CMD_SecureRW: 1\n");
+	printk(KERN_DEBUG"CPRM_CMD_SecureMultiRW: 1\n");
 
 	memset(&cmd, 0, sizeof(struct mmc_command));
 
@@ -205,8 +228,7 @@ static int CPRM_CMD_SecureMultiRW(struct mmc_card *card,
 
 	memset(&data, 0, sizeof(struct mmc_data));
 
-		data.timeout_ns = 100000000;
-		data.timeout_clks = 0;
+	data.timeout_clks = 0;
 	data.blksz = 512;
 	data.blocks = (length + 511) / 512;
 
@@ -214,6 +236,8 @@ static int CPRM_CMD_SecureMultiRW(struct mmc_card *card,
 	data.sg = &sg;
 	data.sg_len = 1;
 
+	mmc_set_data_timeout(&data, card);
+	printk("CPRM_CMD_SecureMultiRW: timeout (msec) : %d\n", data.timeout_ns/1000000);
 	stop.opcode = MMC_STOP_TRANSMISSION;
 	stop.arg = 0;
 	stop.flags = MMC_RSP_R1B | MMC_CMD_AC;
@@ -225,7 +249,7 @@ static int CPRM_CMD_SecureMultiRW(struct mmc_card *card,
 	mrq.stop = &stop;
 
 
-	printk(KERN_DEBUG "CPRM_CMD_SecureRW: 2\n");
+	printk(KERN_DEBUG "CPRM_CMD_SecureMultiRW: 2\n");
 
 	sg_init_one(&sg, buff, length);
 
@@ -234,11 +258,11 @@ static int CPRM_CMD_SecureMultiRW(struct mmc_card *card,
 		sg_copy_from_buffer(&sg, data.sg_len, buff, length);
 		local_irq_restore(flags);
 	}
-	printk(KERN_DEBUG "CPRM_CMD_SecureRW: 3\n");
+	printk(KERN_DEBUG "CPRM_CMD_SecureMultiRW: 3\n");
 
 	mmc_wait_for_req(card->host, &mrq);
 
-	printk(KERN_DEBUG "CPRM_CMD_SecureRW: 4\n");
+	printk(KERN_DEBUG "CPRM_CMD_SecureMultiRW: 4\n");
 
 	if (cmd.error) {
 		printk(KERN_DEBUG "%s]cmd.error=%d\n", __func__, cmd.error);
@@ -251,7 +275,7 @@ static int CPRM_CMD_SecureMultiRW(struct mmc_card *card,
 	}
 
 	err = mmc_wait_busy(card);
-	printk(KERN_DEBUG "CPRM_CMD_SecureRW: 5\n");
+	printk(KERN_DEBUG "CPRM_CMD_SecureMultiRW: 5\n");
 
 	if (dir == MMC_DATA_READ) {
 		local_irq_save(flags);

@@ -25,6 +25,8 @@
 #include "mmc_ops.h"
 #include "sd_ops.h"
 
+extern unsigned int system_rev;
+
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
 	0,		0,		0,		0
@@ -129,6 +131,7 @@ static int mmc_decode_cid(struct mmc_card *card)
 		card->cid.prod_name[3]	= UNSTUFF_BITS(resp, 72, 8);
 		card->cid.prod_name[4]	= UNSTUFF_BITS(resp, 64, 8);
 		card->cid.prod_name[5]	= UNSTUFF_BITS(resp, 56, 8);
+		card->cid.prv		= UNSTUFF_BITS(resp, 48, 8);
 		card->cid.serial	= UNSTUFF_BITS(resp, 16, 32);
 		card->cid.month		= UNSTUFF_BITS(resp, 12, 4);
 		card->cid.year		= UNSTUFF_BITS(resp, 8, 4) + 1997;
@@ -272,7 +275,7 @@ static void mmc_select_card_type(struct mmc_card *card)
 {
 	struct mmc_host *host = card->host;
 	u8 card_type = card->ext_csd.raw_card_type & EXT_CSD_CARD_TYPE_MASK;
-	unsigned int caps = host->caps, caps2 = host->caps2;
+	u32 caps = host->caps, caps2 = host->caps2;
 	unsigned int hs_max_dtr = 0;
 
 	if (card_type & EXT_CSD_CARD_TYPE_26)
@@ -362,9 +365,8 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	}
 
 	card->ext_csd.rev = ext_csd[EXT_CSD_REV];
-	if (card->ext_csd.rev > 7)
-	{
-			pr_err("%s: unrecognised EXT_CSD revision %d\n",
+	if (card->ext_csd.rev > 7) {
+		pr_err("%s: unrecognised EXT_CSD revision %d\n",
 			mmc_hostname(card->host), card->ext_csd.rev);
 		err = -EINVAL;
 		goto out;
@@ -391,6 +393,7 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 
 	card->ext_csd.raw_card_type = ext_csd[EXT_CSD_CARD_TYPE];
 	mmc_select_card_type(card);
+
 
 	card->ext_csd.raw_s_a_timeout = ext_csd[EXT_CSD_S_A_TIMEOUT];
 	card->ext_csd.raw_erase_timeout_mult =
@@ -537,6 +540,13 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 	}
 
 	if (card->ext_csd.rev >= 5) {
+		/* enable packed configuration for Toshiba eMMC */
+		if (card->cid.manfid == 0x11) {
+			pr_info("Enabling Packed WR for the Toshiba eMMC\n");
+			card->host->caps2 |= MMC_CAP2_PACKED_WR;
+			card->host->caps2 |= MMC_CAP2_PACKED_WR_CONTROL;
+		}
+
 		/* check whether the eMMC card supports HPI */
 		if ((ext_csd[EXT_CSD_HPI_FEATURES] & 0x1) &&
 				!(card->quirks & MMC_QUIRK_BROKEN_HPI)) {
@@ -560,12 +570,11 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		if ((ext_csd[EXT_CSD_BKOPS_SUPPORT] & 0x1) &&
 		    card->ext_csd.hpi) {
 			card->ext_csd.bkops = 1;
-			card->ext_csd.bkops_en = ext_csd[EXT_CSD_BKOPS_EN] & 0x1;
+			card->ext_csd.bkops_en = ext_csd[EXT_CSD_BKOPS_EN];
 			card->ext_csd.raw_bkops_status =
 				ext_csd[EXT_CSD_BKOPS_STATUS];
-			if (!(card->host->caps2 & MMC_CAP2_INIT_BKOPS)) {
-				card->ext_csd.bkops_en = 0; 
-			} else if (!card->ext_csd.bkops_en) {
+			if (!card->ext_csd.bkops_en &&
+				card->host->caps2 & MMC_CAP2_INIT_BKOPS) {
 				err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 					EXT_CSD_BKOPS_EN, 1, 0);
 				if (err)
@@ -586,7 +595,7 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		 * RPMB regions are defined in multiples of 128K.
 		 */
 		card->ext_csd.raw_rpmb_size_mult = ext_csd[EXT_CSD_RPMB_MULT];
-		if (ext_csd[EXT_CSD_RPMB_MULT]) {
+		if (ext_csd[EXT_CSD_RPMB_MULT] && mmc_host_cmd23(card->host)) {
 			mmc_part_add(card, ext_csd[EXT_CSD_RPMB_MULT] << 17,
 				EXT_CSD_PART_CONFIG_ACC_RPMB,
 				"rpmb", 0, false,
@@ -636,16 +645,7 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		card->ext_csd.raw_driver_strength =
 			ext_csd[EXT_CSD_DRIVER_STRENGTH];
 	} else {
-		/*
-		 * enable discard feature if emmc is 4.41+ Toshiba eMMC 19nm
-		 * Normally, emmc 4.5 use EXT_CSD[501]
-		*/
-		if ((ext_csd[501] & 0x3F) && (card->cid.manfid == 0x11))
-			card->ext_csd.feature_support |= MMC_DISCARD_FEATURE;
-
-		/* enable discard feature if emmc is 4.41+ moviNand (EXT_CSD_VENDOR_SPECIFIC_FIELD:64)*/
-		if ((ext_csd[64] & 0x1) && (card->cid.manfid == 0x15))
-			card->ext_csd.feature_support |= MMC_DISCARD_FEATURE;
+		card->ext_csd.data_sector_size = 512;
 	}
 
 	/* eMMC v5.0 or later */
@@ -663,37 +663,6 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 				EXT_CSD_FIRMWARE_VERSION);
 	}
 
-	/* eMMC v4.5 or later */
-	if (card->ext_csd.rev >= 7) {
-		card->ext_csd.firmware_version[0] =
-			ext_csd[EXT_CSD_FIRMWARE_VERSION + 0] << 0 |
-			ext_csd[EXT_CSD_FIRMWARE_VERSION + 1] << 8 |
-			ext_csd[EXT_CSD_FIRMWARE_VERSION + 2] << 16 |
-			ext_csd[EXT_CSD_FIRMWARE_VERSION + 3] << 24;
-		card->ext_csd.firmware_version[1] =
-			ext_csd[EXT_CSD_FIRMWARE_VERSION + 4] << 0 |
-			ext_csd[EXT_CSD_FIRMWARE_VERSION + 5] << 8 |
-			ext_csd[EXT_CSD_FIRMWARE_VERSION + 6] << 16 |
-			ext_csd[EXT_CSD_FIRMWARE_VERSION + 7] << 24;
-		card->ext_csd.device_version =
-			ext_csd[EXT_CSD_DEVICE_VERSION + 0] << 0 |
-			ext_csd[EXT_CSD_DEVICE_VERSION + 1] << 8;
-		card->ext_csd.raw_optimal_trim_size =
-			ext_csd[EXT_CSD_OPTIMAL_TRIM_UNIT_SIZE];
-		card->ext_csd.raw_optimal_write_size =
-			ext_csd[EXT_CSD_OPTIMAL_WRITE_SIZE];
-		card->ext_csd.raw_optimal_read_size =
-			ext_csd[EXT_CSD_OPTIMAL_READ_SIZE];
-		card->ext_csd.pre_eol_info =
-			ext_csd[EXT_CSD_PRE_EOL_INFO];
-		card->ext_csd.dev_life_time_est_a =
-			ext_csd[EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_A];
-		card->ext_csd.dev_life_time_est_b =
-			ext_csd[EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_B];
-		memcpy(card->ext_csd.vendor_health_report,
-		       &ext_csd[EXT_CSD_VENDOR_PROPRIETARY_HEALTH_REPORT],
-		       sizeof(card->ext_csd.vendor_health_report));
-	}
 out:
 	return err;
 }
@@ -715,13 +684,9 @@ static int mmc_compare_ext_csds(struct mmc_card *card, unsigned bus_width)
 	err = mmc_get_ext_csd(card, &bw_ext_csd);
 
 	if (err || bw_ext_csd == NULL) {
-		if (bus_width != MMC_BUS_WIDTH_1)
-			err = -EINVAL;
+		err = -EINVAL;
 		goto out;
 	}
-
-	if (bus_width == MMC_BUS_WIDTH_1)
-		goto out;
 
 	/* only compare read only fields */
 	err = !((card->ext_csd.raw_partition_support ==
@@ -778,12 +743,20 @@ MMC_DEV_ATTR(hwrev, "0x%x\n", card->cid.hwrev);
 MMC_DEV_ATTR(manfid, "0x%06x\n", card->cid.manfid);
 MMC_DEV_ATTR(name, "%s\n", card->cid.prod_name);
 MMC_DEV_ATTR(oemid, "0x%04x\n", card->cid.oemid);
+MMC_DEV_ATTR(prv, "0x%x\n", card->cid.prv);
 MMC_DEV_ATTR(serial, "0x%08x\n", card->cid.serial);
 MMC_DEV_ATTR(enhanced_area_offset, "%llu\n",
 		card->ext_csd.enhanced_area_offset);
 MMC_DEV_ATTR(enhanced_area_size, "%u\n", card->ext_csd.enhanced_area_size);
+MMC_DEV_ATTR(raw_rpmb_size_mult, "%#x\n", card->ext_csd.raw_rpmb_size_mult);
+MMC_DEV_ATTR(rel_sectors, "%#x\n", card->ext_csd.rel_sectors);
 MMC_DEV_ATTR(smart, "0x%016llx\n", card->ext_csd.smart_info);
 MMC_DEV_ATTR(fwdate, "0x%016llx\n", card->ext_csd.fwdate);
+MMC_DEV_ATTR(hpi_support, "%d\n", card->ext_csd.hpi);
+MMC_DEV_ATTR(hpi_enable, "%d\n", card->ext_csd.hpi_en);
+MMC_DEV_ATTR(hpi_command, "%d\n", card->ext_csd.hpi_cmd);
+MMC_DEV_ATTR(bkops_support, "%d\n", card->ext_csd.bkops);
+MMC_DEV_ATTR(bkops_enable, "%d\n", card->ext_csd.bkops_en);
 MMC_DEV_ATTR(caps, "0x%08x\n", (unsigned int)(card->host->caps));
 MMC_DEV_ATTR(caps2, "0x%08x\n", card->host->caps2);
 MMC_DEV_ATTR(erase_type, "MMC_CAP_ERASE %s, type %s, SECURE %s, Sanitize %s\n",
@@ -827,11 +800,19 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_manfid.attr,
 	&dev_attr_name.attr,
 	&dev_attr_oemid.attr,
+	&dev_attr_prv.attr,
 	&dev_attr_serial.attr,
 	&dev_attr_enhanced_area_offset.attr,
 	&dev_attr_enhanced_area_size.attr,
+	&dev_attr_raw_rpmb_size_mult.attr,
+	&dev_attr_rel_sectors.attr,
 	&dev_attr_smart.attr,
 	&dev_attr_fwdate.attr,
+	&dev_attr_hpi_support.attr,
+	&dev_attr_hpi_enable.attr,
+	&dev_attr_hpi_command.attr,
+	&dev_attr_bkops_support.attr,
+	&dev_attr_bkops_enable.attr,
 	&dev_attr_caps.attr,
 	&dev_attr_caps2.attr,
 	&dev_attr_erase_type.attr,
@@ -1849,10 +1830,13 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		}
 	}
 
-	if ((host->caps2 & MMC_CAP2_PACKED_WR &&
-			card->ext_csd.max_packed_writes > 0) ||
-	    (host->caps2 & MMC_CAP2_PACKED_RD &&
-			card->ext_csd.max_packed_reads > 0)) {
+	/*
+	 * The mandatory minimum values are defined for packed command.
+	 * read: 5, write: 3
+	 */
+	if (card->ext_csd.max_packed_writes >= 3 &&
+	    card->ext_csd.max_packed_reads >= 5 &&
+	    host->caps2 & MMC_CAP2_PACKED_CMD) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 				EXT_CSD_EXP_EVENTS_CTRL,
 				EXT_CSD_PACKED_EVENT_EN,
@@ -2056,33 +2040,23 @@ static int mmc_suspend(struct mmc_host *host)
 	BUG_ON(!host);
 	BUG_ON(!host->card);
 
+	if (!mmc_try_claim_host(host))
+		return -EBUSY;
+
 	/*
 	 * Disable clock scaling before suspend and enable it after resume so
 	 * as to avoid clock scaling decisions kicking in during this window.
 	 */
 	mmc_disable_clk_scaling(host);
 
-	mmc_claim_host(host);
-
 	err = mmc_cache_ctrl(host, 0);
 	if (err)
 		goto out;
 
 	if (mmc_card_can_sleep(host))
-	{       
-		if ((!strcmp(mmc_hostname(host), "mmc0")) && (host->card->cid.manfid == 0x45))
-			mmc_switch(host->card, EXT_CSD_CMD_SET_NORMAL,
-				EXT_CSD_BUS_WIDTH, EXT_CSD_BUS_WIDTH_1, 0);
 		err = mmc_card_sleep(host);
-	}
 	else if (!mmc_host_is_spi(host))
-	{
-		if ((!strcmp(mmc_hostname(host), "mmc0")) && (host->card->cid.manfid == 0x45))
-			mmc_switch(host->card, EXT_CSD_CMD_SET_NORMAL,
-				EXT_CSD_BUS_WIDTH, EXT_CSD_BUS_WIDTH_1, 0);
-		mmc_deselect_cards(host);
-	}
-
+		err = mmc_deselect_cards(host);
 	host->card->state &= ~(MMC_STATE_HIGHSPEED | MMC_STATE_HIGHSPEED_200);
 
 out:

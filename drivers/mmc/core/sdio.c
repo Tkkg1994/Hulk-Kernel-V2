@@ -162,10 +162,7 @@ static int sdio_read_cccr(struct mmc_card *card, u32 ocr)
 			if (ret)
 				goto out;
 
-			if (card->host->caps &
-				(MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25 |
-				 MMC_CAP_UHS_SDR50 | MMC_CAP_UHS_SDR104 |
-				 MMC_CAP_UHS_DDR50)) {
+			if (mmc_host_uhs(card->host)) {
 				if (data & SDIO_UHS_DDR50)
 					card->sw_caps.sd3_bus_mode
 						|= SD_MODE_UHS_DDR50;
@@ -240,6 +237,12 @@ static int sdio_enable_wide(struct mmc_card *card)
 	if (ret)
 		return ret;
 
+	if ((ctrl & SDIO_BUS_WIDTH_MASK) == SDIO_BUS_WIDTH_RESERVED)
+		pr_warning("%s: SDIO_CCCR_IF is invalid: 0x%02x\n",
+			   mmc_hostname(card->host), ctrl);
+
+	/* set as 4-bit bus width */
+	ctrl &= ~SDIO_BUS_WIDTH_MASK;
 	if (card->host->caps & MMC_CAP_8_BIT_DATA)
 		ctrl |= SDIO_BUS_WIDTH_8BIT;
 	else if (card->host->caps & MMC_CAP_4_BIT_DATA)
@@ -697,7 +700,7 @@ try_again:
 	/*
 	 * If the host and card support UHS-I mode request the card
 	 * to switch to 1.8V signaling level.  No 1.8v signalling if
-	 * UHS mode is not enabled to maintain compatibilty and some
+	 * UHS mode is not enabled to maintain compatibility and some
 	 * systems that claim 1.8v signalling in fact do not support
 	 * it.
 	 */
@@ -926,8 +929,10 @@ static void mmc_sdio_detect(struct mmc_host *host)
 	/* Make sure card is powered before detecting it */
 	if (host->caps & MMC_CAP_POWER_OFF_CARD) {
 		err = pm_runtime_get_sync(&host->card->dev);
-		if (err < 0)
+		if (err < 0) {
+			pm_runtime_put_noidle(&host->card->dev);
 			goto out;
+		}
 	}
 
 	mmc_claim_host(host);
@@ -1032,7 +1037,7 @@ static int mmc_sdio_resume(struct mmc_host *host)
 	}
 
 	if (!err && host->sdio_irqs)
-		mmc_signal_sdio_irq(host);
+		wake_up_process(host->sdio_irq_thread);
 	mmc_release_host(host);
 
 	/*

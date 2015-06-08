@@ -164,9 +164,6 @@ static int mmc_bus_resume(struct device *dev)
 		ret = drv->resume(card);
 	return ret;
 }
-#else
-#define mmc_bus_suspend NULL
-#define mmc_bus_resume NULL
 #endif
 
 #ifdef CONFIG_PM_RUNTIME
@@ -314,8 +311,7 @@ static void mmc_release_card(struct device *dev)
 
 	sdio_free_common_cis(card);
 
-	if (card->info)
-		kfree(card->info);
+	kfree(card->info);
 
 	kfree(card);
 }

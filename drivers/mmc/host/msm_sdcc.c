@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2007 Google Inc,
  *  Copyright (C) 2003 Deep Blue Solutions, Ltd, All Rights Reserved.
- *  Copyright (c) 2009-2013, The Linux Foundation. All rights reserved.
+ *  Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -203,7 +203,7 @@ static inline unsigned short msmsdcc_get_nr_sg(struct msmsdcc_host *host)
 	unsigned short ret = NR_SG;
 
 	if (is_sps_mode(host)) {
-		ret = SPS_MAX_DESCS / 32;
+		ret = SPS_MAX_DESCS;
 	} else { /* DMA or PIO mode */
 		if (NR_SG > MAX_NR_SG_DMA_PIO)
 			ret = MAX_NR_SG_DMA_PIO;
@@ -501,10 +501,6 @@ static void msmsdcc_reset_dpsm(struct msmsdcc_host *host)
 	if (is_wait_for_tx_rx_active(host)) {
 		ktime_t start = ktime_get();
 
-		writel_relaxed(readl_relaxed(host->base + MMCICLOCK)
-			| (1 << 17), host->base + MMCICLOCK);
-		msmsdcc_sync_reg_wr(host);
-
 		while (readl_relaxed(host->base + MMCISTATUS) &
 				(MCI_TXACTIVE | MCI_RXACTIVE)) {
 			/*
@@ -520,14 +516,9 @@ static void msmsdcc_reset_dpsm(struct msmsdcc_host *host)
 					& MCI_TXACTIVE ? "TX" : "RX");
 				msmsdcc_dump_sdcc_state(host);
 				msmsdcc_reset_and_restore(host);
-				host->pending_dpsm_reset = false;
 				goto out;
 			}
 		}
-		writel_relaxed(readl_relaxed(host->base + MMCICLOCK)
-				& ~(1 << 17), host->base + MMCICLOCK);
-		msmsdcc_sync_reg_wr(host);
-
 	}
 
 no_polling:
@@ -1259,8 +1250,8 @@ msmsdcc_start_command_deferred(struct msmsdcc_host *host,
 
 	/* Check if AUTO CMD19/CMD21 is required or not? */
 	if (host->tuning_needed && (cmd->mrq->data &&
-		(cmd->mrq->data->flags & MMC_DATA_READ)) &&
-		(host->en_auto_cmd19 || host->en_auto_cmd21)) {
+	    (cmd->mrq->data->flags & MMC_DATA_READ)) &&
+	    (host->en_auto_cmd19 || host->en_auto_cmd21)) {
 		/*
 		 * For open ended block read operation (without CMD23),
 		 * AUTO_CMD19/AUTO_CMD21 bit should be set while sending
@@ -1477,7 +1468,6 @@ msmsdcc_data_err(struct msmsdcc_host *host, struct mmc_data *data,
 			else
 				data->error = -ETIMEDOUT;
 		}
-
 		/* In case of DATA CRC/timeout error, execute tuning again */
 #if defined(CONFIG_BCM4334) || defined(CONFIG_BCM4334_MODULE)
 		if (host->tuning_needed&&!host->tuning_in_progress&&(host->pdev->id!=4))
@@ -2307,14 +2297,15 @@ msmsdcc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	 * starting new request.
 	 */
 	if (host->tuning_needed && !host->tuning_in_progress &&
-		!host->tuning_done) {
+	    !host->tuning_done) {
 		pr_debug("%s: %s: execute_tuning for timing mode = %d\n",
-			mmc_hostname(mmc), __func__, host->mmc->ios.timing);
-
+			 mmc_hostname(mmc), __func__, host->mmc->ios.timing);
 		if (host->mmc->ios.timing == MMC_TIMING_UHS_SDR104)
-			msmsdcc_execute_tuning(mmc, MMC_SEND_TUNING_BLOCK);
+			msmsdcc_execute_tuning(mmc,
+					       MMC_SEND_TUNING_BLOCK);
 		else if (host->mmc->ios.timing == MMC_TIMING_MMC_HS200)
-			msmsdcc_execute_tuning(mmc, MMC_SEND_TUNING_BLOCK_HS200);
+			msmsdcc_execute_tuning(mmc,
+					       MMC_SEND_TUNING_BLOCK_HS200);
 	}
 
 	if (host->eject) {
@@ -2367,7 +2358,6 @@ msmsdcc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	}
 
 	msmsdcc_request_start(host, mrq);
-
 	spin_unlock_irqrestore(&host->lock, flags);
 	return;
 
@@ -4317,7 +4307,6 @@ static int msmsdcc_execute_tuning(struct mmc_host *mmc, u32 opcode)
 		goto out;
 	}
 
-/*	phase = 0; */
 	is_tuning_all_phases = !(host->mmc->card &&
 		(host->saved_tuning_phase != INVALID_TUNING_PHASE));
 retry:
@@ -4401,7 +4390,7 @@ kfree:
 out:
 	spin_lock_irqsave(&host->lock, flags);
 	host->tuning_in_progress = 0;
-	if (!rc || (host->pdev->id == 3))
+	if (!rc)
 		host->tuning_done = true;
 	spin_unlock_irqrestore(&host->lock, flags);
 exit:
@@ -5085,7 +5074,7 @@ static int msmsdcc_sps_init(struct msmsdcc_host *host)
 			   mmc_hostname(host->mmc), rc);
 		goto reg_bam_err;
 	}
-	pr_info("%s: BAM device registered. bam_handle=0x%x",
+	pr_info("%s: BAM device registered. bam_handle=0x%lx",
 		mmc_hostname(host->mmc), host->sps.bam_handle);
 
 	host->sps.src_pipe_index = SPS_SDCC_PRODUCER_PIPE_INDEX;
@@ -5347,11 +5336,7 @@ static void msmsdcc_dump_sdcc_state(struct msmsdcc_host *host)
 	/* Now dump SDCC registers. Don't print FIFO registers */
 	if (atomic_read(&host->clks_on)) {
 		msmsdcc_print_regs("SDCC-CORE", host->base,
-				host->core_memres->start, 28);
-		msmsdcc_print_regs("SDCC-DML", host->dml_base,
-				host->dml_memres->start, 20);
-		msmsdcc_print_regs("SDCC-BAM", host->bam_base,
-				host->bam_memres->start, 20);
+				   host->core_memres->start, 28);
 		pr_err("%s: MCI_TEST_INPUT = 0x%.8x\n",
 			mmc_hostname(host->mmc),
 			readl_relaxed(host->base + MCI_TEST_INPUT));
@@ -5878,15 +5863,9 @@ static struct mmc_platform_data *msmsdcc_populate_pdata(struct device *dev)
 		goto err;
 	}
 
-	/*
-	 * Some devices might not use vdd. if qcom,not-use-vdd exists
-	 * skip the parse the vdd
-	 */
-	if (of_property_read_bool(np, "qcom,not-use-vdd") != true) {
-		if (msmsdcc_dt_parse_vreg_info(dev,
-				&pdata->vreg_data->vdd_data, "vdd"))
-			goto err;
-	}
+	if (msmsdcc_dt_parse_vreg_info(dev,
+			&pdata->vreg_data->vdd_data, "vdd"))
+		goto err;
 
 	if (msmsdcc_dt_parse_vreg_info(dev,
 			&pdata->vreg_data->vdd_io_data, "vdd-io"))
@@ -5939,48 +5918,6 @@ err:
 	return NULL;
 }
 
-/* SYSFS about SD Card Detection by soonil.lim */
-
-static struct device *t_flash_detect_dev;
-
-static ssize_t t_flash_detect_show(struct device *dev,
-				   struct device_attribute *attr, char *buf)
-{
-	struct mmc_host *mmc = dev_get_drvdata(dev);
-
-#if defined(CONFIG_MACH_SERRANO)
-	if (mmc->card) {
-		printk(KERN_DEBUG "sdcc3: card inserted.\n");
-		return sprintf(buf, "Insert\n");
-	} else {
-		printk(KERN_DEBUG "sdcc3: card removed.\n");
-		return sprintf(buf, "Remove\n");
-
-	}
-#else
-	struct msmsdcc_host *host = mmc_priv(mmc);
-	unsigned int detect;
-
-	
-	if (host->plat->status_gpio)
-		detect = gpio_get_value(host->plat->status_gpio);
-	else {
-		pr_info("%s : External  SD detect pin Error\n", __func__);
-		return sprintf(buf, "Error\n");
-	}
-
-	pr_info("%s : detect = %d.\n", __func__, detect);
-	if (!detect) {
-		printk(KERN_DEBUG "sdcc3: card inserted.\n");
-		return sprintf(buf, "Insert\n");
-	} else {
-		printk(KERN_DEBUG "sdcc3: card removed.\n");
-		return sprintf(buf, "Remove\n");
-	}
-#endif
-}
-
-static DEVICE_ATTR(status, 0444, t_flash_detect_show, NULL);
 static int
 msmsdcc_probe(struct platform_device *pdev)
 {
@@ -6265,10 +6202,6 @@ msmsdcc_probe(struct platform_device *pdev)
 		mmc->caps |= (MMC_CAP_SET_XPC_330 | MMC_CAP_SET_XPC_300 |
 				MMC_CAP_SET_XPC_180);
 
-
-	/* packed write */
-	mmc->caps2 |= plat->packed_write;
-
 	mmc->max_current_180 = msmsdcc_get_vreg_vdd_max_current(host);
 	mmc->max_current_300 = msmsdcc_get_vreg_vdd_max_current(host);
 	mmc->max_current_330 = msmsdcc_get_vreg_vdd_max_current(host);
@@ -6286,12 +6219,6 @@ msmsdcc_probe(struct platform_device *pdev)
 
 	if (plat->is_sdio_al_client)
 		mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY;
-
-	if (plat->built_in)
-	{
-		printk("Set MMC_PM_IGNORE_PM_NOTIFY|MMC_PM_KEEP_POWER\n");
-		mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY | MMC_PM_KEEP_POWER;
-	}
 
 	mmc->max_segs = msmsdcc_get_nr_sg(host);
 	mmc->max_blk_size = MMC_MAX_BLK_SIZE;
@@ -6399,26 +6326,6 @@ msmsdcc_probe(struct platform_device *pdev)
 		pr_err("%s: No card detect facilities available\n",
 		       mmc_hostname(mmc));
 
-/* SYSFS about SD Card Detection by soonil.lim */
-#if defined(CONFIG_MACH_SERRANO)
-	if (t_flash_detect_dev == NULL && (host->pdev->id == 3)) {
-#else
-	if (t_flash_detect_dev == NULL && gpio_is_valid(plat->status_gpio)) {
-#endif
-		printk(KERN_DEBUG "%s : Change sysfs Card Detect\n", __func__);
-
-		t_flash_detect_dev = device_create(sec_class,
-			NULL, 0, NULL, "sdcard");
-		if (IS_ERR(t_flash_detect_dev))
-			pr_err("%s : Failed to create device!\n", __func__);
-
-		if (device_create_file(t_flash_detect_dev,
-			&dev_attr_status) < 0)
-			pr_err("%s : Failed to create device file(%s)!\n",
-			       __func__, dev_attr_status.attr.name);
-
-		dev_set_drvdata(t_flash_detect_dev, mmc);
-	}
 	mmc_set_drvdata(pdev, mmc);
 
 	ret = pm_runtime_set_active(&(pdev)->dev);
@@ -7025,9 +6932,7 @@ static int msmsdcc_runtime_idle(struct device *dev)
 		return 0;
 
 	/* Idle timeout is not configurable for now */
-	/* Disable Runtime PM becasue of potential issues
-	 *pm_schedule_suspend(dev, host->idle_tout);
-	 */
+	pm_schedule_suspend(dev, host->idle_tout);
 
 	return -EAGAIN;
 }
