@@ -33,7 +33,6 @@
 #include <linux/string.h>
 #include <linux/vmalloc.h>
 #include <linux/ratelimit.h>
-#include <linux/show_mem_notifier.h>
 
 #include "zram_drv.h"
 
@@ -49,45 +48,6 @@ static struct zram *zram_devices;
 
 /* Module params (documentation at end) */
 static unsigned int num_devices = 1;
-
-static int zram_show_mem_notifier(struct notifier_block *nb,
-				unsigned long action,
-				void *data)
-{
-	int i;
-
-	if (!zram_devices)
-		return 0;
-
-	for (i = 0; i < num_devices; i++) {
-		struct zram *zram = &zram_devices[i];
-		struct zram_meta *meta = zram->meta;
-
-		if (!down_read_trylock(&zram->init_lock))
-			continue;
-
-		if (zram->init_done) {
-			u64 val;
-			u64 data_size;
-
-			val = zs_get_total_size_bytes(meta->mem_pool);
-			data_size = atomic64_read(&zram->stats.compr_size);
-			pr_info("Zram[%d] mem_used_total = %llu\n", i, val);
-			pr_info("Zram[%d] compr_data_size = %llu\n", i,
-				(unsigned long long)data_size);
-			pr_info("Zram[%d] orig_data_size = %u\n", i,
-				zram->stats.pages_stored);
-		}
-
-		up_read(&zram->init_lock);
-	}
-
-	return 0;
-}
-
-static struct notifier_block zram_show_mem_notifier_block = {
-	.notifier_call = zram_show_mem_notifier
-};
 
 static inline struct zram *dev_to_zram(struct device *dev)
 {

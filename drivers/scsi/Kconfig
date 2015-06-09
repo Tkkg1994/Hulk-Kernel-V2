@@ -42,7 +42,7 @@ config SCSI_DMA
 
 config SCSI_TGT
 	tristate "SCSI target support"
-	depends on SCSI && EXPERIMENTAL
+	depends on SCSI
 	---help---
 	  If you want to use SCSI target mode drivers enable this option.
 	  If you choose M, the module will be called scsi_tgt.
@@ -391,6 +391,7 @@ config BLK_DEV_3W_XXXX_RAID
 config SCSI_HPSA
 	tristate "HP Smart Array SCSI driver"
 	depends on PCI && SCSI
+	select CHECK_SIGNATURE
 	help
 	  This driver supports HP Smart Array Controllers (circa 2009).
 	  It is a SCSI alternative to the cciss driver, which is a block
@@ -443,7 +444,7 @@ config SCSI_ACARD
 
 config SCSI_AHA152X
 	tristate "Adaptec AHA152X/2825 support"
-	depends on ISA && SCSI && !64BIT
+	depends on ISA && SCSI
 	select SCSI_SPI_ATTRS
 	select CHECK_SIGNATURE
 	---help---
@@ -602,6 +603,7 @@ config SCSI_ARCMSR
 
 source "drivers/scsi/megaraid/Kconfig.megaraid"
 source "drivers/scsi/mpt2sas/Kconfig"
+source "drivers/scsi/mpt3sas/Kconfig"
 source "drivers/scsi/ufs/Kconfig"
 
 config SCSI_HPTIOP
@@ -964,7 +966,7 @@ config SCSI_IBMVSCSI
 	  This is the IBM POWER Virtual SCSI Client
 
 	  To compile this driver as a module, choose M here: the
-	  module will be called ibmvscsic.
+	  module will be called ibmvscsi.
 
 config SCSI_IBMVSCSIS
 	tristate "IBM Virtual SCSI Server support"
@@ -1473,8 +1475,8 @@ config SCSI_SYM53C416
 	  module will be called sym53c416.
 
 config SCSI_DC395x
-	tristate "Tekram DC395(U/UW/F) and DC315(U) SCSI support (EXPERIMENTAL)"
-	depends on PCI && SCSI && EXPERIMENTAL
+	tristate "Tekram DC395(U/UW/F) and DC315(U) SCSI support"
+	depends on PCI && SCSI
 	---help---
 	  This driver supports PCI SCSI host adapters based on the ASIC
 	  TRM-S1040 chip, e.g Tekram DC395(U/UW/F) and DC315(U) variants.
@@ -1699,8 +1701,8 @@ config GVP11_SCSI
 	  module will be called gvp11.
 
 config SCSI_A4000T
-	tristate "A4000T NCR53c710 SCSI support (EXPERIMENTAL)"
-	depends on AMIGA && SCSI && EXPERIMENTAL
+	tristate "A4000T NCR53c710 SCSI support"
+	depends on AMIGA && SCSI
 	select SCSI_SPI_ATTRS
 	help
 	  If you have an Amiga 4000T and have SCSI devices connected to the
@@ -1710,8 +1712,8 @@ config SCSI_A4000T
 	  module will be called a4000t.
 
 config SCSI_ZORRO7XX
-	tristate "Zorro NCR53c710 SCSI support (EXPERIMENTAL)"
-	depends on ZORRO && SCSI && EXPERIMENTAL
+	tristate "Zorro NCR53c710 SCSI support"
+	depends on ZORRO && SCSI
 	select SCSI_SPI_ATTRS
 	help
 	  Support for various NCR53c710-based SCSI controllers on Zorro
@@ -1888,12 +1890,13 @@ config SCSI_BFA_FC
 	  be called bfa.
 
 config SCSI_VIRTIO
-	tristate "virtio-scsi support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && VIRTIO
+	tristate "virtio-scsi support"
+	depends on VIRTIO
 	help
           This is the virtual HBA driver for virtio.  If the kernel will
           be used in a virtual machine, say Y or M.
 
+source "drivers/scsi/csiostor/Kconfig"
 
 endif # SCSI_LOWLEVEL
 
