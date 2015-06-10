@@ -41,7 +41,7 @@ static void dump_completed_IO(struct inode * inode)
 	ext4_io_end_t *io, *io0, *io1;
 	unsigned long flags;
 
-	if (list_empty(&EXT4_I(inode)->i_completed_io_list)){
+	if (hlist_empty(&EXT4_I(inode)->i_completed_io_list)){
 		ext4_debug("inode %lu completed_io list is empty\n", inode->i_ino);
 		return;
 	}
@@ -85,7 +85,7 @@ int ext4_flush_completed_IO(struct inode *inode)
 
 	dump_completed_IO(inode);
 	spin_lock_irqsave(&ei->i_completed_io_lock, flags);
-	while (!list_empty(&ei->i_completed_io_list)){
+	while (!hlist_empty(&ei->i_completed_io_list)){
 		io = list_entry(ei->i_completed_io_list.next,
 				ext4_io_end_t, list);
 		list_del_init(&io->list);
@@ -137,7 +137,7 @@ static int ext4_sync_parent(struct inode *inode)
 		ext4_clear_inode_state(inode, EXT4_STATE_NEWENTRY);
 		dentry = NULL;
 		spin_lock(&inode->i_lock);
-		if (!list_empty(&inode->i_dentry)) {
+		if (!hlist_empty(&inode->i_dentry)) {
 			dentry = list_first_entry(&inode->i_dentry,
 						  struct dentry, d_u.d_alias);
 			dget(dentry);
@@ -232,7 +232,7 @@ int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 
 	if (!journal) {
 		ret = __sync_inode(inode, datasync);
-		if (!ret && !list_empty(&inode->i_dentry))
+		if (!ret && !hlist_empty(&inode->i_dentry))
 			ret = ext4_sync_parent(inode);
 		goto out;
 	}

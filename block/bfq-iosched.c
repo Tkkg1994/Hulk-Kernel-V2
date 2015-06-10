@@ -657,7 +657,7 @@ static void bfq_add_to_burst(struct bfq_data *bfqd, struct bfq_queue *bfqq)
 		 * We can now mark all queues in the burst list as
 		 * belonging to a large burst.
 		 */
-		hlist_for_each_entry(bfqq_item, n, &bfqd->burst_list,
+		hlist_for_each_entry(bfqq_item, &bfqd->burst_list,
 				     burst_list_node)
 		        bfq_mark_bfqq_in_large_burst(bfqq_item);
 		bfq_mark_bfqq_in_large_burst(bfqq);

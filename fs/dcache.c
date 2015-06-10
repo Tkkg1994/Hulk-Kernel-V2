@@ -703,7 +703,7 @@ struct dentry *d_find_alias(struct inode *inode)
 {
 	struct dentry *de = NULL;
 
-	if (!list_empty(&inode->i_dentry)) {
+	if (!hlist_empty(&inode->i_dentry)) {
 		spin_lock(&inode->i_lock);
 		de = __d_find_alias(inode, 0);
 		spin_unlock(&inode->i_lock);
@@ -995,7 +995,6 @@ void shrink_dcache_for_umount(struct super_block *sb)
 	}
 }
 
-
 /*
  * Search for at least 1 mount point in the dentry's subdirs.
  * We descend to the next level whenever the d_subdirs
@@ -1059,7 +1058,7 @@ ascend:
 		spin_unlock(&child->d_lock);
 		spin_lock(&this_parent->d_lock);
 
-		/* might go back up the wrong parent if we have had a rename */
+		/* might go back up the wrong parent if we have had a rename. */
 		if (!locked && read_seqretry(&rename_lock, seq))
 			goto rename_retry;
 		next = child->d_child.next;
@@ -1099,7 +1098,7 @@ rename_retry_unlocked:
 EXPORT_SYMBOL(have_submounts);
 
 /*
- * Search the dentry child list for the specified parent,
+ * Search the dentry child list of the specified parent,
  * and move any unused dentries to the end of the unused
  * list for prune_dcache(). We descend to the next level
  * whenever the d_subdirs list is non-empty and continue
@@ -1185,7 +1184,7 @@ ascend:
 		spin_unlock(&child->d_lock);
 		spin_lock(&this_parent->d_lock);
 
-		/* might go back up the wrong parent if we have had a rename */
+		/* might go back up the wrong parent if we have had a rename. */
 		if (!locked && read_seqretry(&rename_lock, seq))
 			goto rename_retry;
 		/* go into the first sibling still alive */
@@ -1372,7 +1371,7 @@ static void __d_instantiate(struct dentry *dentry, struct inode *inode)
 	if (inode) {
 		if (unlikely(IS_AUTOMOUNT(inode)))
 			dentry->d_flags |= DCACHE_NEED_AUTOMOUNT;
-		hlist_add(&dentry->d_u.d_alias, &inode->i_dentry);
+		hlist_add_head(&dentry->d_u.d_alias, &inode->i_dentry);
 	}
 	dentry->d_inode = inode;
 	dentry_rcuwalk_barrier(dentry);
@@ -1504,7 +1503,7 @@ static struct dentry * __d_find_any_alias(struct inode *inode)
 
 	if (hlist_empty(&inode->i_dentry))
 		return NULL;
-	alias = hlist_first_entry(inode->i_dentry.first, struct dentry, d_u.d_alias);
+	alias = hlist_entry(inode->i_dentry.first, struct dentry, d_u.d_alias);
 	__dget(alias);
 	return alias;
 }
@@ -1986,7 +1985,7 @@ int d_validate(struct dentry *dentry, struct dentry *dparent)
 	struct dentry *child;
 
 	spin_lock(&dparent->d_lock);
-	hlist_for_each_entry(child, &dparent->d_subdirs, d_child) {
+	list_for_each_entry(child, &dparent->d_subdirs, d_child) {
 		if (dentry == child) {
 			spin_lock_nested(&dentry->d_lock, DENTRY_D_LOCK_NESTED);
 			__dget_dlock(dentry);
@@ -2345,7 +2344,7 @@ out_err:
  */
 static void __d_materialise_dentry(struct dentry *dentry, struct dentry *anon)
 {
-	struct dentry *dparent, *aparent;
+	struct dentry *dparent;
 
 	dentry_lock_for_move(anon, dentry);
 
@@ -2353,24 +2352,14 @@ static void __d_materialise_dentry(struct dentry *dentry, struct dentry *anon)
 	write_seqcount_begin(&anon->d_seq);
 
 	dparent = dentry->d_parent;
-	aparent = anon->d_parent;
 
 	switch_names(dentry, anon);
 	swap(dentry->d_name.hash, anon->d_name.hash);
 
-	dentry->d_parent = (aparent == anon) ? dentry : aparent;
-	list_del(&dentry->d_child);
-	if (!IS_ROOT(dentry))
-		list_add(&dentry->d_child, &dentry->d_parent->d_subdirs);
-	else
-		INIT_LIST_HEAD(&dentry->d_child);
-
-	anon->d_parent = (dparent == dentry) ? anon : dparent;
-	list_del(&anon->d_child);
-	if (!IS_ROOT(anon))
-		list_add(&anon->d_child, &anon->d_parent->d_subdirs);
-	else
-		INIT_LIST_HEAD(&anon->d_child);
+	dentry->d_parent = dentry;
+	list_del_init(&dentry->d_child);
+	anon->d_parent = dparent;
+	list_move(&anon->d_child, &dparent->d_subdirs);
 
 	write_seqcount_end(&dentry->d_seq);
 	write_seqcount_end(&anon->d_seq);
@@ -2932,7 +2921,7 @@ ascend:
 		spin_unlock(&child->d_lock);
 		spin_lock(&this_parent->d_lock);
 
-		/* might go back up the wrong parent if we have had a rename */
+		/* might go back up the wrong parent if we have had a rename. */
 		if (!locked && read_seqretry(&rename_lock, seq))
 			goto rename_retry;
 		next = child->d_child.next;
