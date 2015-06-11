@@ -1720,6 +1720,7 @@ void bnx2x_sp_event(struct bnx2x_fastpath *fp, union eth_rx_cqe *rr_cqe)
 	DP(BNX2X_MSG_SP, "bp->cq_spq_left %x\n", atomic_read(&bp->cq_spq_left));
 
 	return;
+}
 
 void bnx2x_update_rx_prod(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 			u16 bd_prod, u16 rx_comp_prod, u16 rx_sge_prod)
@@ -4555,7 +4556,6 @@ static inline void bnx2x_handle_rx_mode_eqe(struct bnx2x *bp)
 }
 
 static inline struct bnx2x_queue_sp_obj *bnx2x_cid_to_q_obj(
-{
 	struct bnx2x *bp, u32 cid)
 {
 	DP(BNX2X_MSG_SP, "retrieving fp from cid %d\n", cid);

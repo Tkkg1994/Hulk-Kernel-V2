@@ -856,99 +856,10 @@ static int core_alua_do_transition_tg_pt(
 	atomic_set(&tg_pt_gp->tg_pt_gp_alua_access_state, new_state);
 
 	pr_debug("Successful %s ALUA transition TG PT Group: %s ID: %hu"
-<<<<<<< HEAD
 		" from primary access state %s to %s\n", (explict) ? "explict" :
 		"implict", config_item_name(&tg_pt_gp->tg_pt_gp_group.cg_item),
 		tg_pt_gp->tg_pt_gp_id, core_alua_dump_state(old_state),
 		core_alua_dump_state(new_state));
-=======
-		" from primary access state %s to %s\n", (explicit) ? "explicit" :
-		"implicit", config_item_name(&tg_pt_gp->tg_pt_gp_group.cg_item),
-		tg_pt_gp->tg_pt_gp_id,
-		core_alua_dump_state(tg_pt_gp->tg_pt_gp_alua_previous_state),
-		core_alua_dump_state(tg_pt_gp->tg_pt_gp_alua_pending_state));
-	spin_lock(&dev->t10_alua.tg_pt_gps_lock);
-	atomic_dec(&tg_pt_gp->tg_pt_gp_ref_cnt);
-	smp_mb__after_atomic();
-	spin_unlock(&dev->t10_alua.tg_pt_gps_lock);
-
-	if (tg_pt_gp->tg_pt_gp_transition_complete)
-		complete(tg_pt_gp->tg_pt_gp_transition_complete);
-}
-
-static int core_alua_do_transition_tg_pt(
-	struct t10_alua_tg_pt_gp *tg_pt_gp,
-	int new_state,
-	int explicit)
-{
-	struct se_device *dev = tg_pt_gp->tg_pt_gp_dev;
-	DECLARE_COMPLETION_ONSTACK(wait);
-
-	/* Nothing to be done here */
-	if (atomic_read(&tg_pt_gp->tg_pt_gp_alua_access_state) == new_state)
-		return 0;
-
-	if (new_state == ALUA_ACCESS_STATE_TRANSITION)
-		return -EAGAIN;
-
-	/*
-	 * Flush any pending transitions
-	 */
-	if (!explicit && tg_pt_gp->tg_pt_gp_implicit_trans_secs &&
-	    atomic_read(&tg_pt_gp->tg_pt_gp_alua_access_state) ==
-	    ALUA_ACCESS_STATE_TRANSITION) {
-		/* Just in case */
-		tg_pt_gp->tg_pt_gp_alua_pending_state = new_state;
-		tg_pt_gp->tg_pt_gp_transition_complete = &wait;
-		flush_delayed_work(&tg_pt_gp->tg_pt_gp_transition_work);
-		wait_for_completion(&wait);
-		tg_pt_gp->tg_pt_gp_transition_complete = NULL;
-		return 0;
-	}
-
-	/*
-	 * Save the old primary ALUA access state, and set the current state
-	 * to ALUA_ACCESS_STATE_TRANSITION.
-	 */
-	tg_pt_gp->tg_pt_gp_alua_previous_state =
-		atomic_read(&tg_pt_gp->tg_pt_gp_alua_access_state);
-	tg_pt_gp->tg_pt_gp_alua_pending_state = new_state;
-
-	atomic_set(&tg_pt_gp->tg_pt_gp_alua_access_state,
-			ALUA_ACCESS_STATE_TRANSITION);
-	tg_pt_gp->tg_pt_gp_alua_access_status = (explicit) ?
-				ALUA_STATUS_ALTERED_BY_EXPLICIT_STPG :
-				ALUA_STATUS_ALTERED_BY_IMPLICIT_ALUA;
-
-	/*
-	 * Check for the optional ALUA primary state transition delay
-	 */
-	if (tg_pt_gp->tg_pt_gp_trans_delay_msecs != 0)
-		msleep_interruptible(tg_pt_gp->tg_pt_gp_trans_delay_msecs);
-
-	/*
-	 * Take a reference for workqueue item
-	 */
-	spin_lock(&dev->t10_alua.tg_pt_gps_lock);
-	atomic_inc(&tg_pt_gp->tg_pt_gp_ref_cnt);
-	smp_mb__after_atomic();
-	spin_unlock(&dev->t10_alua.tg_pt_gps_lock);
-
-	if (!explicit && tg_pt_gp->tg_pt_gp_implicit_trans_secs) {
-		unsigned long transition_tmo;
-
-		transition_tmo = tg_pt_gp->tg_pt_gp_implicit_trans_secs * HZ;
-		queue_delayed_work(tg_pt_gp->tg_pt_gp_dev->tmr_wq,
-				   &tg_pt_gp->tg_pt_gp_transition_work,
-				   transition_tmo);
-	} else {
-		tg_pt_gp->tg_pt_gp_transition_complete = &wait;
-		queue_delayed_work(tg_pt_gp->tg_pt_gp_dev->tmr_wq,
-				   &tg_pt_gp->tg_pt_gp_transition_work, 0);
-		wait_for_completion(&wait);
-		tg_pt_gp->tg_pt_gp_transition_complete = NULL;
-	}
->>>>>>> 4e857c5... arch: Mass conversion of smp_mb__*()
 
 	return 0;
 }
@@ -999,14 +910,9 @@ int core_alua_do_port_transition(
 		core_alua_do_transition_tg_pt(l_tg_pt_gp, l_port, l_nacl,
 					md_buf, new_state, explict);
 		atomic_dec(&lu_gp->lu_gp_ref_cnt);
-<<<<<<< HEAD
-		smp_mb__after_atomic_dec();
+		smp_mb__after_atomic();
 		kfree(md_buf);
 		return 0;
-=======
-		smp_mb__after_atomic();
-		return rc;
->>>>>>> 4e857c5... arch: Mass conversion of smp_mb__*()
 	}
 	/*
 	 * For all other LU groups aside from 'default_lu_gp', walk all of
@@ -1049,13 +955,8 @@ int core_alua_do_port_transition(
 				nacl = NULL;
 			}
 			atomic_inc(&tg_pt_gp->tg_pt_gp_ref_cnt);
-<<<<<<< HEAD
-			smp_mb__after_atomic_inc();
-			spin_unlock(&su_dev->t10_alua.tg_pt_gps_lock);
-=======
 			smp_mb__after_atomic();
-			spin_unlock(&dev->t10_alua.tg_pt_gps_lock);
->>>>>>> 4e857c5... arch: Mass conversion of smp_mb__*()
+			spin_unlock(&su_dev->t10_alua.tg_pt_gps_lock);
 			/*
 			 * core_alua_do_transition_tg_pt() will always return
 			 * success.
@@ -1065,13 +966,7 @@ int core_alua_do_port_transition(
 
 			spin_lock(&su_dev->t10_alua.tg_pt_gps_lock);
 			atomic_dec(&tg_pt_gp->tg_pt_gp_ref_cnt);
-<<<<<<< HEAD
-			smp_mb__after_atomic_dec();
-=======
 			smp_mb__after_atomic();
-			if (rc)
-				break;
->>>>>>> 4e857c5... arch: Mass conversion of smp_mb__*()
 		}
 		spin_unlock(&su_dev->t10_alua.tg_pt_gps_lock);
 
@@ -1088,14 +983,9 @@ int core_alua_do_port_transition(
 		core_alua_dump_state(new_state));
 
 	atomic_dec(&lu_gp->lu_gp_ref_cnt);
-<<<<<<< HEAD
-	smp_mb__after_atomic_dec();
+	smp_mb__after_atomic();
 	kfree(md_buf);
 	return 0;
-=======
-	smp_mb__after_atomic();
-	return rc;
->>>>>>> 4e857c5... arch: Mass conversion of smp_mb__*()
 }
 
 /*

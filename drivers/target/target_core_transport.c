@@ -2058,24 +2058,8 @@ static inline unsigned long long transport_lba_64(unsigned char *cdb)
 	__v1 = (cdb[2] << 24) | (cdb[3] << 16) | (cdb[4] << 8) | cdb[5];
 	__v2 = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
 
-<<<<<<< HEAD
 	return ((unsigned long long)__v2) | (unsigned long long)__v1 << 32;
 }
-=======
-	/*
-	 * Check for the existence of HEAD_OF_QUEUE, and if true return 1
-	 * to allow the passed struct se_cmd list of tasks to the front of the list.
-	 */
-	switch (cmd->sam_task_attr) {
-	case MSG_HEAD_TAG:
-		pr_debug("Added HEAD_OF_QUEUE for CDB: 0x%02x, "
-			 "se_ordered_id: %u\n",
-			 cmd->t_task_cdb[0], cmd->se_ordered_id);
-		return false;
-	case MSG_ORDERED_TAG:
-		atomic_inc(&dev->dev_ordered_sync);
-		smp_mb__after_atomic();
->>>>>>> 4e857c5... arch: Mass conversion of smp_mb__*()
 
 /*
  * For VARIABLE_LENGTH_CDB w/ 32 byte extended CDBs
@@ -2139,14 +2123,8 @@ static inline int transport_execute_task_attr(struct se_cmd *cmd)
 		/*
 		 * For SIMPLE and UNTAGGED Task Attribute commands
 		 */
-<<<<<<< HEAD
-		atomic_inc(&cmd->se_dev->simple_cmds);
-		smp_mb__after_atomic_inc();
-=======
 		atomic_inc(&dev->simple_cmds);
-		smp_mb__after_atomic();
-		break;
->>>>>>> 4e857c5... arch: Mass conversion of smp_mb__*()
+		smp_mb__after_atomic_inc();
 	}
 	/*
 	 * Otherwise if one or more outstanding ORDERED task attribute exist,
@@ -4788,13 +4766,7 @@ void transport_send_task_abort(struct se_cmd *cmd)
 	if (cmd->data_direction == DMA_TO_DEVICE) {
 		if (cmd->se_tfo->write_pending_status(cmd) != 0) {
 			cmd->transport_state |= CMD_T_ABORTED;
-<<<<<<< HEAD
-			smp_mb__after_atomic_inc();
-=======
-			cmd->se_cmd_flags |= SCF_SEND_DELAYED_TAS;
 			smp_mb__after_atomic();
-			return;
->>>>>>> 4e857c5... arch: Mass conversion of smp_mb__*()
 		}
 	}
 	cmd->scsi_status = SAM_STAT_TASK_ABORTED;

@@ -3454,16 +3454,10 @@ static int core_scsi3_emulate_pro_register_and_move(
 			pr_err("core_scsi3_tpg_depend_item() failed"
 				" for dest_se_tpg\n");
 			atomic_dec(&dest_se_tpg->tpg_pr_ref_count);
-<<<<<<< HEAD
-			smp_mb__after_atomic_dec();
+			smp_mb__after_atomic();
 			core_scsi3_put_pr_reg(pr_reg);
 			cmd->scsi_sense_reason = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
 			return -EINVAL;
-=======
-			smp_mb__after_atomic();
-			ret = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
-			goto out_put_pr_reg;
->>>>>>> 4e857c5... arch: Mass conversion of smp_mb__*()
 		}
 
 		spin_lock(&dev->se_port_lock);
