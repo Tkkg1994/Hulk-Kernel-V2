@@ -60,6 +60,7 @@ struct proc_dir_entry {
 	struct proc_dir_entry *next, *parent, *subdir;
 	void *data;
 	read_proc_t *read_proc;
+	write_proc_t *write_proc;
 	atomic_t count;		/* use count */
 	atomic_t in_use;	/* number of callers into module in progress; */
 			/* negative -> it's going away RSN */

@@ -180,6 +180,29 @@ __proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 	return retval;
 }
 
+static ssize_t
+proc_file_write(struct file *file, const char __user *buffer,
+		size_t count, loff_t *ppos)
+{
+	struct proc_dir_entry *pde = PDE(file_inode(file));
+	ssize_t rv = -EIO;
+
+	if (pde->write_proc) {
+		spin_lock(&pde->pde_unload_lock);
+		if (!pde->proc_fops) {
+			spin_unlock(&pde->pde_unload_lock);
+			return rv;
+		}
+		pde->pde_users++;
+		spin_unlock(&pde->pde_unload_lock);
+
+		/* FIXME: does this routine need ppos?  probably... */
+		rv = pde->write_proc(file, buffer, count, pde->data);
+		pde_users_dec(pde);
+	}
+	return rv;
+}
+
 static int proc_notify_change(struct dentry *dentry, struct iattr *iattr)
 {
 	struct inode *inode = dentry->d_inode;
@@ -471,6 +494,7 @@ static const struct file_operations proc_dir_operations = {
 	.llseek			= generic_file_llseek,
 	.read			= generic_read_dir,
 	.readdir		= proc_readdir,
+	.write			= proc_file_write,
 };
 
 /*
