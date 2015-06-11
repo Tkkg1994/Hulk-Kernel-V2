@@ -138,9 +138,9 @@ cradle_sensing_show(struct device *dev, struct device_attribute *attr, char *buf
 }
 
 static struct device_attribute cradle_device_attrs[] = {
-	__ATTR(carkit,  S_IRUGO | S_IWUSR, cradle_carkit_show, NULL),
-	__ATTR(pouch, S_IRUGO | S_IWUSR, cradle_pouch_show, NULL),
-	__ATTR(sensing,  S_IRUGO | S_IWUSR, cradle_sensing_show, NULL),
+	__ATTR(carkit,  S_IRUGO, cradle_carkit_show, NULL),
+	__ATTR(pouch, S_IRUGO, cradle_pouch_show, NULL),
+	__ATTR(sensing,  S_IRUGO, cradle_sensing_show, NULL),
 };
 
 static ssize_t cradle_print_name(struct switch_dev *sdev, char *buf)
