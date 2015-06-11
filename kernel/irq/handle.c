@@ -10,6 +10,7 @@
  *
  */
 
+#include <linux/export.h>
 #include <linux/irq.h>
 #include <linux/random.h>
 #include <linux/sched.h>
@@ -44,6 +45,7 @@ irqreturn_t no_action(int cpl, void *dev_id)
 {
 	return IRQ_NONE;
 }
+EXPORT_SYMBOL_GPL(no_action);
 
 static void warn_no_thread(unsigned int irq, struct irqaction *action)
 {
