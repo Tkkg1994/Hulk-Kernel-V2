@@ -1389,7 +1389,6 @@ static struct irqaction *__free_irq(unsigned int irq, void *dev_id)
 	if (!desc->action) {
 		irq_shutdown(desc);
 		irq_release_resources(desc);
-	}
 
 		/* Explicitly mask the interrupt */
 		if (desc->irq_data.chip->irq_mask)
