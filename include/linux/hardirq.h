@@ -130,6 +130,8 @@ extern bool synchronize_hardirq(unsigned int irq);
 # define synchronize_irq(irq)	barrier()
 #endif
 
+struct task_struct;
+
 #if !defined(CONFIG_VIRT_CPU_ACCOUNTING) && !defined(CONFIG_IRQ_TIME_ACCOUNTING)
 static inline void account_system_vtime(struct task_struct *tsk)
 {
