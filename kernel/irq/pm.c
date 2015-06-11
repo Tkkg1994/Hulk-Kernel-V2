@@ -29,9 +29,12 @@ void irq_pm_install_action(struct irq_desc *desc, struct irqaction *action)
 
 	if (action->flags & IRQF_NO_SUSPEND)
 		desc->no_suspend_depth++;
+	else if (action->flags & IRQF_COND_SUSPEND)
+		desc->cond_suspend_depth++;
 
 	WARN_ON_ONCE(desc->no_suspend_depth &&
-		     desc->no_suspend_depth != desc->nr_actions);
+		     (desc->no_suspend_depth +
+			desc->cond_suspend_depth) != desc->nr_actions);
 }
 
 /*
@@ -47,6 +50,8 @@ void irq_pm_remove_action(struct irq_desc *desc, struct irqaction *action)
 
 	if (action->flags & IRQF_NO_SUSPEND)
 		desc->no_suspend_depth--;
+	else if (action->flags & IRQF_COND_SUSPEND)
+		desc->cond_suspend_depth--;
 }
 
 static bool suspend_device_irq(struct irq_desc *desc, int irq)
@@ -79,9 +84,13 @@ static bool suspend_device_irq(struct irq_desc *desc, int irq)
  * for this purpose.
  *
  * So we disable all interrupts and mark them IRQS_SUSPENDED except
- * for those which are unused and those which are marked as not
+ * for those which are unused, those which are marked as not
  * suspendable via an interrupt request with the flag IRQF_NO_SUSPEND
- * set.
+ * set and those which are marked as active wakeup sources.
+ *
+ * The active wakeup sources are handled by the flow handler entry
+ * code which checks for the IRQD_WAKEUP_ARMED flag, suspends the
+ * interrupt and notifies the pm core about the wakeup.
  */
 void suspend_device_irqs(void)
 {
@@ -125,7 +134,7 @@ static void resume_irqs(bool want_early)
 	struct irq_desc *desc;
 	int irq;
 
-	for_each_irq_desc_reverse(irq, desc) {
+	for_each_irq_desc(irq, desc) {
 		unsigned long flags;
 		bool is_early = desc->action &&
 			desc->action->flags & IRQF_EARLY_RESUME;
