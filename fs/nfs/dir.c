@@ -1519,16 +1519,7 @@ out:
 	nfs_set_verifier(dentry, nfs_save_change_attribute(dir));
 	return res;
 no_open:
-<<<<<<< HEAD
 	return nfs_lookup(dir, dentry, nd);
-=======
-	res = nfs_lookup(dir, dentry, 0);
-	err = PTR_ERR(res);
-	if (IS_ERR(res))
-		goto out;
-
-	return finish_no_open(file, res);
->>>>>>> 00cd8dd... stop passing nameidata to ->lookup()
 }
 
 static int nfs_open_revalidate(struct dentry *dentry, struct nameidata *nd)
