@@ -1654,7 +1654,7 @@ static ssize_t es325_route_status_show(struct device *dev,
     }
     return rc;
 }
-static DEVICE_ATTR(route_status, 0644, es325_route_status_show, NULL);
+static DEVICE_ATTR(route_status, 0444, es325_route_status_show, NULL);
 /* /sys/devices/platform/msm_slim_ctrl.1/es325-codec-gen0/route_status */
 
 static ssize_t es325_route_config_show(struct device *dev,
@@ -1860,7 +1860,7 @@ static ssize_t es325_fw_version_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "FW Version = %s\n",verbuf);
 }
 
-static DEVICE_ATTR(fw_version, 0644, es325_fw_version_show, NULL);
+static DEVICE_ATTR(fw_version, 0444, es325_fw_version_show, NULL);
 /* /sys/devices/platform/msm_slim_ctrl.1/es325-codec-gen0/fw_version */
 
 static ssize_t es325_txhex_show(struct device *dev,
@@ -1927,7 +1927,7 @@ static ssize_t es325_clock_on_show(struct device *dev,
 
 	return snprintf(buf, PAGE_SIZE, "clk_status: %s\n", status);
 }
-static DEVICE_ATTR(clock_on, 0644, es325_clock_on_show, NULL);
+static DEVICE_ATTR(clock_on, 0444, es325_clock_on_show, NULL);
 /* /sys/devices/platform/msm_slim_ctrl.1/es325-codec-gen0/clock_on_status */
 
 static ssize_t es325_slim_ch_show(struct device *dev,
@@ -1948,7 +1948,7 @@ static ssize_t es325_slim_ch_show(struct device *dev,
 
 	return length;
 }
-static DEVICE_ATTR(slim_ch_status, 0644, es325_slim_ch_show, NULL);
+static DEVICE_ATTR(slim_ch_status, 0444, es325_slim_ch_show, NULL);
 /* /sys/devices/platform/msm_slim_ctrl.1/es325-codec-gen0/slim_ch_status */
 
 static ssize_t es325_reg_show(struct device *dev,
@@ -2012,7 +2012,7 @@ static ssize_t es325_cmd_reg_show(struct device *dev,
 
 	return length;
 }
-static DEVICE_ATTR(es325_cmd_reg, 0644, es325_cmd_reg_show, NULL);
+static DEVICE_ATTR(es325_cmd_reg, 0444, es325_cmd_reg_show, NULL);
 /* /sys/devices/platform/msm_slim_ctrl.1/es325-codec-gen0/es325_cmd_reg */
 
 #define ES325_FW_LOAD_BUF_SZ 4
@@ -2283,7 +2283,7 @@ es325_firmware_store(struct device *dev, struct device_attribute *attr,
 
     return count;
 }
-static DEVICE_ATTR(firmware, 0644, NULL, es325_firmware_store);
+static DEVICE_ATTR(firmware, 0220, NULL, es325_firmware_store);
 
 static int es325_sleep(struct es325_priv *es325)
 {
