@@ -1467,16 +1467,16 @@ static ssize_t sec_keypad_enable_store(struct device *dev,
 static DEVICE_ATTR(keypad_enable, S_IRUGO|S_IWUSR, sec_keypad_enable_show,
 	      sec_keypad_enable_store);
 static DEVICE_ATTR(touchkey_firm_update_status,
-		S_IRUGO | S_IWUSR | S_IWGRP, touchkey_firm_status_show, NULL);
+		S_IRUGO, touchkey_firm_status_show, NULL);
 static DEVICE_ATTR(touchkey_firm_version_panel, S_IRUGO,
 				touch_version_read, NULL);
 static DEVICE_ATTR(touchkey_firm_version_phone, S_IRUGO,
 				touch_version_show, NULL);
 static DEVICE_ATTR(touchkey_firm_update, S_IRUGO | S_IWUSR | S_IWGRP,
 				touch_update_read, touch_update_write);
-static DEVICE_ATTR(brightness, S_IRUGO | S_IWUSR | S_IWGRP,
+static DEVICE_ATTR(brightness, S_IWUSR | S_IWGRP,
 				NULL, touch_led_control);
-static DEVICE_ATTR(touch_sensitivity, S_IRUGO | S_IWUSR | S_IWGRP,
+static DEVICE_ATTR(touch_sensitivity, S_IWUSR | S_IWGRP,
 				NULL, touch_sensitivity_control);
 static DEVICE_ATTR(touchkey_menu, S_IRUGO, touchkey_menu_show, NULL);
 static DEVICE_ATTR(touchkey_raw_data0, S_IRUGO, touchkey_raw_data0_show, NULL);
@@ -1490,21 +1490,21 @@ static DEVICE_ATTR(touchkey_raw_data2, S_IRUGO, touchkey_raw_data2_show, NULL);
 static DEVICE_ATTR(touchkey_idac2, S_IRUGO, touchkey_idac2_show, NULL);
 #endif
 static DEVICE_ATTR(touchkey_threshold, S_IRUGO, touchkey_threshold_show, NULL);
-static DEVICE_ATTR(touchkey_autocal_start, S_IRUGO | S_IWUSR | S_IWGRP,
+static DEVICE_ATTR(touchkey_autocal_start, S_IWUSR | S_IWGRP,
 				NULL, touch_autocal_testmode);
-static DEVICE_ATTR(autocal_enable, S_IRUGO | S_IWUSR | S_IWGRP, NULL,
+static DEVICE_ATTR(autocal_enable, S_IWUSR | S_IWGRP, NULL,
 		   autocalibration_enable);
-static DEVICE_ATTR(autocal_stat, S_IRUGO | S_IWUSR | S_IWGRP,
+static DEVICE_ATTR(autocal_stat, S_IRUGO,
 		   autocalibration_status, NULL);
 static DEVICE_ATTR(touchkey_brightness_level, S_IRUGO | S_IWUSR | S_IWGRP,
 				brightness_level_show, brightness_control);
 #if defined(CONFIG_GLOVE_TOUCH)
-static DEVICE_ATTR(glove_mode, S_IRUGO | S_IWUSR | S_IWGRP, NULL,
+static DEVICE_ATTR(glove_mode, S_IWUSR | S_IWGRP, NULL,
 		   glove_mode_enable);
 #endif
 
 #ifdef TKEY_FLIP_MODE
-static DEVICE_ATTR(flip_mode, S_IRUGO | S_IWUSR | S_IWGRP, NULL,
+static DEVICE_ATTR(flip_mode, S_IWUSR | S_IWGRP, NULL,
 		   flip_cover_mode_enable);
 #endif
 

@@ -171,7 +171,7 @@ static DEVICE_ATTR(name,  S_IRUGO, pressure_name_show, NULL);
 static DEVICE_ATTR(eeprom_check, S_IRUGO, eeprom_check_show, NULL);
 static DEVICE_ATTR(calibration,  S_IRUGO | S_IWUSR | S_IWGRP,
 	pressure_cabratioin_show, pressure_cabratioin_store);
-static DEVICE_ATTR(sea_level_pressure, S_IRUGO | S_IWUSR | S_IWGRP,
+static DEVICE_ATTR(sea_level_pressure, S_IWUSR | S_IWGRP,
 	NULL, sea_level_pressure_store);
 
 static struct device_attribute *pressure_attrs[] = {

@@ -316,7 +316,7 @@ static ssize_t key_state_onoff_show(struct device *dev,
 	return snprintf(buf, 4, "%d\n", value);
 }
 
-static DEVICE_ATTR(key_state, 0664 , key_state_onoff_show,
+static DEVICE_ATTR(key_state, 0444 , key_state_onoff_show,
 	NULL);
 static ssize_t earjack_state_onoff_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
@@ -330,7 +330,7 @@ static ssize_t earjack_state_onoff_show(struct device *dev,
 	return snprintf(buf, 4, "%d\n", value);
 }
 
-static DEVICE_ATTR(state, 0664 , earjack_state_onoff_show,
+static DEVICE_ATTR(state, 0444 , earjack_state_onoff_show,
 	NULL);
 
 static ssize_t reselect_jack_show(struct device *dev,
