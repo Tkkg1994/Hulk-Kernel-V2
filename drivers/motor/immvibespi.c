@@ -312,7 +312,7 @@ static ssize_t pwm_max_show(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(pwm_max, S_IRUGO | S_IWUSR,
+static DEVICE_ATTR(pwm_max, S_IRUGO,
                    pwm_max_show, NULL);
 
 static ssize_t pwm_min_show(struct device *dev,
@@ -326,7 +326,7 @@ static ssize_t pwm_min_show(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(pwm_min, S_IRUGO | S_IWUSR,
+static DEVICE_ATTR(pwm_min, S_IRUGO,
                    pwm_min_show, NULL);
 
 static ssize_t pwm_default_show(struct device *dev,
@@ -340,7 +340,7 @@ static ssize_t pwm_default_show(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(pwm_default, S_IRUGO | S_IWUSR,
+static DEVICE_ATTR(pwm_default, S_IRUGO,
                    pwm_default_show, NULL);
 
 static ssize_t pwm_threshold_show(struct device *dev,
@@ -354,7 +354,7 @@ static ssize_t pwm_threshold_show(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(pwm_threshold, S_IRUGO | S_IWUSR,
+static DEVICE_ATTR(pwm_threshold, S_IRUGO,
                    pwm_threshold_show, NULL);
 
 static ssize_t pwm_value_show(struct device *dev, struct device_attribute *attr,

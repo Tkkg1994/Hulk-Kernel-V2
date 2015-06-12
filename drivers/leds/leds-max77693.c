@@ -320,7 +320,7 @@ static ssize_t max77693_flash(struct device *dev,
 	return ret;
 }
 
-static DEVICE_ATTR(rear_flash, S_IWUSR|S_IWGRP|S_IROTH,
+static DEVICE_ATTR(rear_flash, S_IWUSR|S_IWGRP,
 	NULL, max77693_flash);
 
 static int max77693_led_probe(struct platform_device *pdev)
