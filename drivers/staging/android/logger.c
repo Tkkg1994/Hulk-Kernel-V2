@@ -35,9 +35,6 @@
 static char klog_buf[256];
 #endif
 
-#ifndef CONFIG_LOGCAT_SIZE
-#define CONFIG_LOGCAT_SIZE 256
-#endif
 /*
  * struct logger_log - represents a specific log, such as 'main' or 'radio'
  *
