@@ -14,206 +14,12 @@
 #include <linux/compat.h>
 #include <linux/mount.h>
 #include <linux/file.h>
+#include <linux/blkdev.h>
 #include <asm/uaccess.h>
 #include "ext4_jbd2.h"
 #include "ext4.h"
-#include "ext4_extents.h"
 
 #define MAX_32_NUM ((((unsigned long long) 1) << 32) - 1)
-
-/**
- * Swap memory between @a and @b for @len bytes.
- *
- * @a:          pointer to first memory area
- * @b:          pointer to second memory area
- * @len:        number of bytes to swap
- *
- */
-static void memswap(void *a, void *b, size_t len)
-{
-	unsigned char *ap, *bp;
-	unsigned char tmp;
-
-	ap = (unsigned char *)a;
-	bp = (unsigned char *)b;
-	while (len-- > 0) {
-		tmp = *ap;
-		*ap = *bp;
-		*bp = tmp;
-		ap++;
-		bp++;
-	}
-}
-
-/**
- * Swap i_data and associated attributes between @inode1 and @inode2.
- * This function is used for the primary swap between inode1 and inode2
- * and also to revert this primary swap in case of errors.
- *
- * Therefore you have to make sure, that calling this method twice
- * will revert all changes.
- *
- * @inode1:     pointer to first inode
- * @inode2:     pointer to second inode
- */
-static void swap_inode_data(struct inode *inode1, struct inode *inode2)
-{
-	loff_t isize;
-	struct ext4_inode_info *ei1;
-	struct ext4_inode_info *ei2;
-
-	ei1 = EXT4_I(inode1);
-	ei2 = EXT4_I(inode2);
-
-	memswap(&inode1->i_flags, &inode2->i_flags, sizeof(inode1->i_flags));
-	memswap(&inode1->i_version, &inode2->i_version,
-		  sizeof(inode1->i_version));
-	memswap(&inode1->i_blocks, &inode2->i_blocks,
-		  sizeof(inode1->i_blocks));
-	memswap(&inode1->i_bytes, &inode2->i_bytes, sizeof(inode1->i_bytes));
-	memswap(&inode1->i_atime, &inode2->i_atime, sizeof(inode1->i_atime));
-	memswap(&inode1->i_mtime, &inode2->i_mtime, sizeof(inode1->i_mtime));
-
-	memswap(ei1->i_data, ei2->i_data, sizeof(ei1->i_data));
-	memswap(&ei1->i_flags, &ei2->i_flags, sizeof(ei1->i_flags));
-	memswap(&ei1->i_disksize, &ei2->i_disksize, sizeof(ei1->i_disksize));
-	ext4_es_remove_extent(inode1, 0, EXT_MAX_BLOCKS);
-	ext4_es_remove_extent(inode2, 0, EXT_MAX_BLOCKS);
-	ext4_es_lru_del(inode1);
-	ext4_es_lru_del(inode2);
-
-	isize = i_size_read(inode1);
-	i_size_write(inode1, i_size_read(inode2));
-	i_size_write(inode2, isize);
-}
-
-/**
- * Swap the information from the given @inode and the inode
- * EXT4_BOOT_LOADER_INO. It will basically swap i_data and all other
- * important fields of the inodes.
- *
- * @sb:         the super block of the filesystem
- * @inode:      the inode to swap with EXT4_BOOT_LOADER_INO
- *
- */
-static long swap_inode_boot_loader(struct super_block *sb,
-				struct inode *inode)
-{
-	handle_t *handle;
-	int err;
-	struct inode *inode_bl;
-	struct ext4_inode_info *ei;
-	struct ext4_inode_info *ei_bl;
-	struct ext4_sb_info *sbi;
-
-	if (inode->i_nlink != 1 || !S_ISREG(inode->i_mode)) {
-		err = -EINVAL;
-		goto swap_boot_out;
-	}
-
-	if (!inode_owner_or_capable(inode) || !capable(CAP_SYS_ADMIN)) {
-		err = -EPERM;
-		goto swap_boot_out;
-	}
-
-	sbi = EXT4_SB(sb);
-	ei = EXT4_I(inode);
-
-	inode_bl = ext4_iget(sb, EXT4_BOOT_LOADER_INO);
-	if (IS_ERR(inode_bl)) {
-		err = PTR_ERR(inode_bl);
-		goto swap_boot_out;
-	}
-	ei_bl = EXT4_I(inode_bl);
-
-	filemap_flush(inode->i_mapping);
-	filemap_flush(inode_bl->i_mapping);
-
-	/* Protect orig inodes against a truncate and make sure,
-	 * that only 1 swap_inode_boot_loader is running. */
-	ext4_inode_double_lock(inode, inode_bl);
-
-	truncate_inode_pages(&inode->i_data, 0);
-	truncate_inode_pages(&inode_bl->i_data, 0);
-
-	/* Wait for all existing dio workers */
-	ext4_inode_block_unlocked_dio(inode);
-	ext4_inode_block_unlocked_dio(inode_bl);
-	inode_dio_wait(inode);
-	inode_dio_wait(inode_bl);
-
-	handle = ext4_journal_start(inode_bl, EXT4_HT_MOVE_EXTENTS, 2);
-	if (IS_ERR(handle)) {
-		err = -EINVAL;
-		goto journal_err_out;
-	}
-
-	/* Protect extent tree against block allocations via delalloc */
-	ext4_double_down_write_data_sem(inode, inode_bl);
-
-	if (inode_bl->i_nlink == 0) {
-		/* this inode has never been used as a BOOT_LOADER */
-		set_nlink(inode_bl, 1);
-		i_uid_write(inode_bl, 0);
-		i_gid_write(inode_bl, 0);
-		inode_bl->i_flags = 0;
-		ei_bl->i_flags = 0;
-		inode_bl->i_version = 1;
-		i_size_write(inode_bl, 0);
-		inode_bl->i_mode = S_IFREG;
-		if (EXT4_HAS_INCOMPAT_FEATURE(sb,
-					      EXT4_FEATURE_INCOMPAT_EXTENTS)) {
-			ext4_set_inode_flag(inode_bl, EXT4_INODE_EXTENTS);
-			ext4_ext_tree_init(handle, inode_bl);
-		} else
-			memset(ei_bl->i_data, 0, sizeof(ei_bl->i_data));
-	}
-
-	swap_inode_data(inode, inode_bl);
-
-	inode->i_ctime = inode_bl->i_ctime = ext4_current_time(inode);
-
-	spin_lock(&sbi->s_next_gen_lock);
-	inode->i_generation = sbi->s_next_generation++;
-	inode_bl->i_generation = sbi->s_next_generation++;
-	spin_unlock(&sbi->s_next_gen_lock);
-
-	ext4_discard_preallocations(inode);
-
-	err = ext4_mark_inode_dirty(handle, inode);
-	if (err < 0) {
-		ext4_warning(inode->i_sb,
-			"couldn't mark inode #%lu dirty (err %d)",
-			inode->i_ino, err);
-		/* Revert all changes: */
-		swap_inode_data(inode, inode_bl);
-	} else {
-		err = ext4_mark_inode_dirty(handle, inode_bl);
-		if (err < 0) {
-			ext4_warning(inode_bl->i_sb,
-				"couldn't mark inode #%lu dirty (err %d)",
-				inode_bl->i_ino, err);
-			/* Revert all changes: */
-			swap_inode_data(inode, inode_bl);
-			ext4_mark_inode_dirty(handle, inode);
-		}
-	}
-
-	ext4_journal_stop(handle);
-
-	ext4_double_up_write_data_sem(inode, inode_bl);
-
-journal_err_out:
-	ext4_inode_resume_unlocked_dio(inode);
-	ext4_inode_resume_unlocked_dio(inode_bl);
-
-	ext4_inode_double_unlock(inode, inode_bl);
-
-	iput(inode_bl);
-
-swap_boot_out:
-	return err;
-}
 
 long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
@@ -278,8 +84,17 @@ long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			if (!capable(CAP_SYS_RESOURCE))
 				goto flags_out;
 		}
-		if ((flags ^ oldflags) & EXT4_EXTENTS_FL)
+		if (oldflags & EXT4_EXTENTS_FL) {
+			/* We don't support clearning extent flags */
+			if (!(flags & EXT4_EXTENTS_FL)) {
+				err = -EOPNOTSUPP;
+				goto flags_out;
+			}
+		} else if (flags & EXT4_EXTENTS_FL) {
+			/* migrate the file */
 			migrate = 1;
+			flags &= ~EXT4_EXTENTS_FL;
+		}
 
 		if (flags & EXT4_EOFBLOCKS_FL) {
 			/* we don't support adding EOFBLOCKS flag */
@@ -290,7 +105,7 @@ long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		} else if (oldflags & EXT4_EOFBLOCKS_FL)
 			ext4_truncate(inode);
 
-		handle = ext4_journal_start(inode, EXT4_HT_INODE, 1);
+		handle = ext4_journal_start(inode, 1);
 		if (IS_ERR(handle)) {
 			err = PTR_ERR(handle);
 			goto flags_out;
@@ -323,13 +138,8 @@ flags_err:
 			err = ext4_change_inode_journal_flag(inode, jflag);
 		if (err)
 			goto flags_out;
-		if (migrate) {
-			if (flags & EXT4_EXTENTS_FL)
-				err = ext4_ext_migrate(inode);
-			else
-				err = ext4_ind_migrate(inode);
-		}
-
+		if (migrate)
+			err = ext4_ext_migrate(inode);
 flags_out:
 		mutex_unlock(&inode->i_mutex);
 		mnt_drop_write_file(filp);
@@ -364,7 +174,7 @@ flags_out:
 		}
 
 		mutex_lock(&inode->i_mutex);
-		handle = ext4_journal_start(inode, EXT4_HT_INODE, 1);
+		handle = ext4_journal_start(inode, 1);
 		if (IS_ERR(handle)) {
 			err = PTR_ERR(handle);
 			goto unlock_out;
@@ -424,7 +234,7 @@ group_extend_out:
 
 	case EXT4_IOC_MOVE_EXT: {
 		struct move_extent me;
-		struct fd donor;
+		struct file *donor_filp;
 		int err;
 
 		if (!(filp->f_mode & FMODE_READ) ||
@@ -436,11 +246,11 @@ group_extend_out:
 			return -EFAULT;
 		me.moved_len = 0;
 
-		donor = fdget(me.donor_fd);
-		if (!donor.file)
+		donor_filp = fget(me.donor_fd);
+		if (!donor_filp)
 			return -EBADF;
 
-		if (!(donor.file->f_mode & FMODE_WRITE)) {
+		if (!(donor_filp->f_mode & FMODE_WRITE)) {
 			err = -EBADF;
 			goto mext_out;
 		}
@@ -449,15 +259,14 @@ group_extend_out:
 			       EXT4_FEATURE_RO_COMPAT_BIGALLOC)) {
 			ext4_msg(sb, KERN_ERR,
 				 "Online defrag not supported with bigalloc");
-			err = -EOPNOTSUPP;
-			goto mext_out;
+			return -EOPNOTSUPP;
 		}
 
 		err = mnt_want_write_file(filp);
 		if (err)
 			goto mext_out;
 
-		err = ext4_move_extents(filp, donor.file, me.orig_start,
+		err = ext4_move_extents(filp, donor_filp, me.orig_start,
 					me.donor_start, me.len, &me.moved_len);
 		mnt_drop_write_file(filp);
 
@@ -465,7 +274,7 @@ group_extend_out:
 				 &me, sizeof(me)))
 			err = -EFAULT;
 mext_out:
-		fdput(donor);
+		fput(donor_filp);
 		return err;
 	}
 
@@ -504,9 +313,6 @@ mext_out:
 		if (err == 0)
 			err = err2;
 		mnt_drop_write_file(filp);
-		if (!err && ext4_has_group_desc_csum(sb) &&
-		    test_opt(sb, INIT_INODE_TABLE))
-			err = ext4_register_li_request(sb, input.group);
 group_add_out:
 		ext4_resize_end(sb);
 		return err;
@@ -548,23 +354,10 @@ group_add_out:
 		return err;
 	}
 
-	case EXT4_IOC_SWAP_BOOT:
-	{
-		int err;
-		if (!(filp->f_mode & FMODE_WRITE))
-			return -EBADF;
-		err = mnt_want_write_file(filp);
-		if (err)
-			return err;
-		err = swap_inode_boot_loader(sb, inode);
-		mnt_drop_write_file(filp);
-		return err;
-	}
-
 	case EXT4_IOC_RESIZE_FS: {
 		ext4_fsblk_t n_blocks_count;
+		struct super_block *sb = inode->i_sb;
 		int err = 0, err2 = 0;
-		ext4_group_t o_group = EXT4_SB(sb)->s_groups_count;
 
 		if (EXT4_HAS_RO_COMPAT_FEATURE(sb,
 			       EXT4_FEATURE_RO_COMPAT_BIGALLOC)) {
@@ -573,16 +366,31 @@ group_add_out:
 			return -EOPNOTSUPP;
 		}
 
+		if (EXT4_HAS_INCOMPAT_FEATURE(sb,
+			       EXT4_FEATURE_INCOMPAT_META_BG)) {
+			ext4_msg(sb, KERN_ERR,
+				 "Online resizing not (yet) supported with meta_bg");
+			return -EOPNOTSUPP;
+		}
+
 		if (copy_from_user(&n_blocks_count, (__u64 __user *)arg,
 				   sizeof(__u64))) {
 			return -EFAULT;
+		}
+
+		if (n_blocks_count > MAX_32_NUM &&
+		    !EXT4_HAS_INCOMPAT_FEATURE(sb,
+					       EXT4_FEATURE_INCOMPAT_64BIT)) {
+			ext4_msg(sb, KERN_ERR,
+				 "File system only supports 32-bit block numbers");
+			return -EOPNOTSUPP;
 		}
 
 		err = ext4_resize_begin(sb);
 		if (err)
 			return err;
 
-		err = mnt_want_write_file(filp);
+		err = mnt_want_write(filp->f_path.mnt);
 		if (err)
 			goto resizefs_out;
 
@@ -594,15 +402,43 @@ group_add_out:
 		}
 		if (err == 0)
 			err = err2;
-		mnt_drop_write_file(filp);
-		if (!err && (o_group > EXT4_SB(sb)->s_groups_count) &&
-		    ext4_has_group_desc_csum(sb) &&
-		    test_opt(sb, INIT_INODE_TABLE))
-			err = ext4_register_li_request(sb, o_group);
-
+		mnt_drop_write(filp->f_path.mnt);
 resizefs_out:
 		ext4_resize_end(sb);
 		return err;
+	}
+
+	case FSECTRIM:
+	{
+		struct request_queue *q = bdev_get_queue(sb->s_bdev);
+		struct fstrim_range range;
+		int ret = 0;
+
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
+		if (!blk_queue_discard(q))
+			return -EOPNOTSUPP;
+
+		if (EXT4_HAS_RO_COMPAT_FEATURE(sb,
+				   EXT4_FEATURE_RO_COMPAT_BIGALLOC)) {
+			ext4_msg(sb, KERN_ERR,
+				 "FSECTRIM not supported with bigalloc");
+			return -EOPNOTSUPP;
+		}
+
+		if (copy_from_user(&range, (struct fstrim_range __user *)arg,
+			sizeof(range)))
+			return -EFAULT;
+
+		range.minlen = max((unsigned int)range.minlen,
+				   q->limits.discard_granularity);
+
+		ret =  blkdev_issue_discard(sb->s_bdev, range.start, range.len, GFP_NOFS, 1);
+		if (ret < 0)
+			return ret;
+
+		return 0;
 	}
 
 	case FITRIM:
@@ -616,6 +452,13 @@ resizefs_out:
 
 		if (!blk_queue_discard(q))
 			return -EOPNOTSUPP;
+
+		if (EXT4_HAS_RO_COMPAT_FEATURE(sb,
+			       EXT4_FEATURE_RO_COMPAT_BIGALLOC)) {
+			ext4_msg(sb, KERN_ERR,
+				 "FITRIM not supported with bigalloc");
+			return -EOPNOTSUPP;
+		}
 
 		if (copy_from_user(&range, (struct fstrim_range __user *)arg,
 		    sizeof(range)))
