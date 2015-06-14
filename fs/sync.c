@@ -105,9 +105,6 @@ static void fdatawait_one_bdev(struct block_device *bdev, void *arg)
 {
 	filemap_fdatawait(bdev->bd_inode->i_mapping);
 }
-#ifdef CONFIG_DYNAMIC_FSYNC
-EXPORT_SYMBOL_GPL(sync_filesystems);
-#endif
 
 /*
  * Sync everything. We start by waking flusher threads so that most of
@@ -252,17 +249,9 @@ SYSCALL_DEFINE1(syncfs, int, fd)
  */
 int vfs_fsync_range(struct file *file, loff_t start, loff_t end, int datasync)
 {
-#ifdef CONFIG_DYNAMIC_FSYNC
-	if (likely(dyn_fsync_active && !power_suspend_active))
-		return 0;
-	else {
-#endif
 	if (!file->f_op || !file->f_op->fsync)
 		return -EINVAL;
 	return file->f_op->fsync(file, start, end, datasync);
-#ifdef CONFIG_DYNAMIC_FSYNC
-	}
-#endif
 }
 EXPORT_SYMBOL(vfs_fsync_range);
 
