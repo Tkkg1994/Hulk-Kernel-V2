@@ -1008,7 +1008,7 @@ errout:
 	return NULL;
 }
 
-static struct dentry *ext3_lookup(struct inode * dir, struct dentry *dentry, unsigned int flags)
+static struct dentry *ext3_lookup(struct inode * dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct inode * inode;
 	struct ext3_dir_entry_2 * de;

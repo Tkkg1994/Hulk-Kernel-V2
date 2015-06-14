@@ -349,7 +349,7 @@ static void logfs_set_name(struct logfs_disk_dentry *dd, struct qstr *name)
 }
 
 static struct dentry *logfs_lookup(struct inode *dir, struct dentry *dentry,
-		unsigned int flags)
+		struct nameidata *nd)
 {
 	struct page *page;
 	struct logfs_disk_dentry *dd;

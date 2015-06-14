@@ -291,7 +291,7 @@ static int omfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 }
 
 static struct dentry *omfs_lookup(struct inode *dir, struct dentry *dentry,
-				  unsigned int flags)
+				  struct nameidata *nd)
 {
 	struct buffer_head *bh;
 	struct inode *inode = NULL;

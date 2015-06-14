@@ -192,7 +192,7 @@ static int dbg_check_name(const struct ubifs_info *c,
 #endif
 
 static struct dentry *ubifs_lookup(struct inode *dir, struct dentry *dentry,
-				   unsigned int flags)
+				   struct nameidata *nd)
 {
 	int err;
 	union ubifs_key key;
