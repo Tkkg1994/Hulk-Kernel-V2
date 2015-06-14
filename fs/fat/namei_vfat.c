@@ -772,7 +772,7 @@ error:
 }
 
 static int vfat_create(struct inode *dir, struct dentry *dentry, umode_t mode,
-		       bool excl)
+		       struct nameidata *nd)
 {
 	struct super_block *sb = dir->i_sb;
 	struct inode *inode;

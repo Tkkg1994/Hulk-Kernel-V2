@@ -618,7 +618,7 @@ static int ocfs2_mkdir(struct inode *dir,
 static int ocfs2_create(struct inode *dir,
 			struct dentry *dentry,
 			umode_t mode,
-			bool excl)
+			struct nameidata *nd)
 {
 	int ret;
 

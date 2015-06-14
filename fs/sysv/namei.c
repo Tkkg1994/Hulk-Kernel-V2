@@ -80,7 +80,7 @@ static int sysv_mknod(struct inode * dir, struct dentry * dentry, umode_t mode, 
 	return err;
 }
 
-static int sysv_create(struct inode * dir, struct dentry * dentry, umode_t mode, bool excl)
+static int sysv_create(struct inode * dir, struct dentry * dentry, umode_t mode, struct nameidata *nd)
 {
 	return sysv_mknod(dir, dentry, mode, 0);
 }
