@@ -1283,10 +1283,8 @@ unsigned long do_mmap_pgoff(struct file *file,
 	vma->vm_pgoff = pgoff;
 
 	if (file) {
-		region->vm_file = file;
-		get_file(file);
-		vma->vm_file = file;
-		get_file(file);
+		region->vm_file = get_file(file);
+		vma->vm_file = get_file(file);
 	}
 
 	down_write(&nommu_region_sem);
