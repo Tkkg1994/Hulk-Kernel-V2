@@ -1087,8 +1087,7 @@ static inline ssize_t do_tty_write(
 		cond_resched();
 	}
 	if (written) {
-		struct inode *inode = file->f_path.dentry->d_inode;
-		tty_update_time(&inode->i_mtime);
+		tty_update_time(&file_inode(file)->i_mtime);
 		ret = written;
 	}
 out:
@@ -1143,12 +1142,11 @@ void tty_write_message(struct tty_struct *tty, char *msg)
 static ssize_t tty_write(struct file *file, const char __user *buf,
 						size_t count, loff_t *ppos)
 {
-	struct inode *inode = file->f_path.dentry->d_inode;
 	struct tty_struct *tty = file_tty(file);
  	struct tty_ldisc *ld;
 	ssize_t ret;
 
-	if (tty_paranoia_check(tty, inode, "tty_write"))
+	if (tty_paranoia_check(tty, file_inode(file), "tty_write"))
 		return -EIO;
 	if (!tty || !tty->ops->write ||
 		(test_bit(TTY_IO_ERROR, &tty->flags)))
@@ -1172,10 +1170,8 @@ ssize_t redirected_tty_write(struct file *file, const char __user *buf,
 	struct file *p = NULL;
 
 	spin_lock(&redirect_lock);
-	if (redirect) {
-		get_file(redirect);
-		p = redirect;
-	}
+	if (redirect)
+		p = get_file(redirect);
 	spin_unlock(&redirect_lock);
 
 	if (p) {
