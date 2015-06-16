@@ -159,16 +159,6 @@ read_block_bitmap(struct super_block *sb, unsigned int block_group)
 	return bh;
 }
 
-static void release_blocks(struct super_block *sb, int count)
-{
-	if (count) {
-		struct ext2_sb_info *sbi = EXT2_SB(sb);
-
-		percpu_counter_add(&sbi->s_freeblocks_counter, count);
-		sb->s_dirt = 1;
-	}
-}
-
 static void group_adjust_blocks(struct super_block *sb, int group_no,
 	struct ext2_group_desc *desc, struct buffer_head *bh, int count)
 {
@@ -180,7 +170,6 @@ static void group_adjust_blocks(struct super_block *sb, int group_no,
 		free_blocks = le16_to_cpu(desc->bg_free_blocks_count);
 		desc->bg_free_blocks_count = cpu_to_le16(free_blocks + count);
 		spin_unlock(sb_bgl_lock(sbi, group_no));
-		sb->s_dirt = 1;
 		mark_buffer_dirty(bh);
 	}
 }
@@ -570,8 +559,11 @@ do_more:
 	}
 error_return:
 	brelse(bitmap_bh);
-	release_blocks(sb, freed);
-	dquot_free_block_nodirty(inode, freed);
+	if (freed) {
+		percpu_counter_add(&sbi->s_freeblocks_counter, freed);
+		dquot_free_block_nodirty(inode, freed);
+		mark_inode_dirty(inode);
+	}
 }
 
 /**
@@ -1241,10 +1233,6 @@ ext2_fsblk_t ext2_new_blocks(struct inode *inode, ext2_fsblk_t goal,
 
 	*errp = -ENOSPC;
 	sb = inode->i_sb;
-	if (!sb) {
-		printk("ext2_new_blocks: nonexistent device");
-		return 0;
-	}
 
 	/*
 	 * Check quota for allocation of this block.
@@ -1418,9 +1406,11 @@ allocated:
 
 	*errp = 0;
 	brelse(bitmap_bh);
-	dquot_free_block_nodirty(inode, *count-num);
-	mark_inode_dirty(inode);
-	*count = num;
+	if (num < *count) {
+		dquot_free_block_nodirty(inode, *count-num);
+		mark_inode_dirty(inode);
+		*count = num;
+	}
 	return ret_block;
 
 io_error:
