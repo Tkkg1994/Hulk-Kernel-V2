@@ -605,7 +605,7 @@ static int nfs_read_done(struct rpc_task *task, struct nfs_read_data *data)
 {
 	struct inode *inode = data->header->inode;
 
-	nfs_invalidate_atime(data->inode);
+	nfs_invalidate_atime(inode);
 	if (task->tk_status >= 0) {
 		nfs_refresh_inode(inode, data->res.fattr);
 		/* Emulate the eof flag, which isn't normally needed in NFSv2
