@@ -92,8 +92,7 @@ nope:
 	__brelse(bh);
 }
 
-static void jbd2_commit_block_csum_set(journal_t *j,
-				       struct journal_head *descriptor)
+static void jbd2_commit_block_csum_set(journal_t *j, struct buffer_head *bh)
 {
 	struct commit_header *h;
 	__u32 csum;
@@ -101,12 +100,11 @@ static void jbd2_commit_block_csum_set(journal_t *j,
 	if (!JBD2_HAS_INCOMPAT_FEATURE(j, JBD2_FEATURE_INCOMPAT_CSUM_V2))
 		return;
 
-	h = (struct commit_header *)(jh2bh(descriptor)->b_data);
+	h = (struct commit_header *)(bh->b_data);
 	h->h_chksum_type = 0;
 	h->h_chksum_size = 0;
 	h->h_chksum[0] = 0;
-	csum = jbd2_chksum(j, j->j_csum_seed, jh2bh(descriptor)->b_data,
-			   j->j_blocksize);
+	csum = jbd2_chksum(j, j->j_csum_seed, bh->b_data, j->j_blocksize);
 	h->h_chksum[0] = cpu_to_be32(csum);
 }
 
@@ -150,9 +148,9 @@ static int journal_submit_commit_record(journal_t *journal,
 		tmp->h_chksum_size 	= JBD2_CRC32_CHKSUM_SIZE;
 		tmp->h_chksum[0] 	= cpu_to_be32(crc32_sum);
 	}
-	jbd2_commit_block_csum_set(journal, descriptor);
+	jbd2_commit_block_csum_set(journal, bh);
 
-	JBUFFER_TRACE(descriptor, "submit commit block");
+	BUFFER_TRACE(bh, "submit commit block");
 	lock_buffer(bh);
 	clear_buffer_dirty(bh);
 	set_buffer_uptodate(bh);
@@ -324,7 +322,7 @@ static void write_tag_block(int tag_bytes, journal_block_tag_t *tag,
 }
 
 static void jbd2_descr_block_csum_set(journal_t *j,
-				      struct journal_head *descriptor)
+				      struct buffer_head *bh)
 {
 	struct jbd2_journal_block_tail *tail;
 	__u32 csum;
@@ -332,12 +330,10 @@ static void jbd2_descr_block_csum_set(journal_t *j,
 	if (!JBD2_HAS_INCOMPAT_FEATURE(j, JBD2_FEATURE_INCOMPAT_CSUM_V2))
 		return;
 
-	tail = (struct jbd2_journal_block_tail *)
-			(jh2bh(descriptor)->b_data + j->j_blocksize -
+	tail = (struct jbd2_journal_block_tail *)(bh->b_data + j->j_blocksize -
 			sizeof(struct jbd2_journal_block_tail));
 	tail->t_checksum = 0;
-	csum = jbd2_chksum(j, j->j_csum_seed, jh2bh(descriptor)->b_data,
-			   j->j_blocksize);
+	csum = jbd2_chksum(j, j->j_csum_seed, bh->b_data, j->j_blocksize);
 	tail->t_checksum = cpu_to_be32(csum);
 }
 
@@ -686,7 +682,7 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 		tag = (journal_block_tag_t *) tagp;
 		write_tag_block(tag_bytes, tag, jh2bh(jh)->b_blocknr);
 		tag->t_flags = cpu_to_be16(tag_flag);
-		jbd2_block_tag_csum_set(journal, tag, jh2bh(new_jh),
+		jbd2_block_tag_csum_set(journal, tag, wbuf[bufs],
 					commit_transaction->t_tid);
 		tagp += tag_bytes;
 		space_left -= tag_bytes;

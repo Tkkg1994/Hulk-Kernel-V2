@@ -709,11 +709,7 @@ got_group:
 			continue;
 		}
 
-		if (inode_bitmap_bh) {
-			ext4_handle_release_buffer(handle, inode_bitmap_bh);
-			brelse(inode_bitmap_bh);
-		}
-
+		brelse(inode_bitmap_bh);
 		inode_bitmap_bh = ext4_read_inode_bitmap(sb, group);
 		if (!inode_bitmap_bh)
 			goto fail;
@@ -754,7 +750,6 @@ next_group:
 		if (++group == ngroups)
 			group = 0;
 	}
-	ext4_handle_release_buffer(handle, inode_bitmap_bh);
 	err = -ENOSPC;
 	goto out;
 

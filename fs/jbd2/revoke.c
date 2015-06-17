@@ -639,8 +639,7 @@ static void write_one_revoke_record(journal_t *journal,
 	*offsetp = offset;
 }
 
-static void jbd2_revoke_csum_set(journal_t *j,
-				 struct journal_head *descriptor)
+static void jbd2_revoke_csum_set(journal_t *j, struct buffer_head *bh)
 {
 	struct jbd2_journal_revoke_tail *tail;
 	__u32 csum;
@@ -648,12 +647,10 @@ static void jbd2_revoke_csum_set(journal_t *j,
 	if (!JBD2_HAS_INCOMPAT_FEATURE(j, JBD2_FEATURE_INCOMPAT_CSUM_V2))
 		return;
 
-	tail = (struct jbd2_journal_revoke_tail *)
-			(jh2bh(descriptor)->b_data + j->j_blocksize -
+	tail = (struct jbd2_journal_revoke_tail *)(bh->b_data + j->j_blocksize -
 			sizeof(struct jbd2_journal_revoke_tail));
 	tail->r_checksum = 0;
-	csum = jbd2_chksum(j, j->j_csum_seed, jh2bh(descriptor)->b_data,
-			   j->j_blocksize);
+	csum = jbd2_chksum(j, j->j_csum_seed, bh->b_data, j->j_blocksize);
 	tail->r_checksum = cpu_to_be32(csum);
 }
 
@@ -675,7 +672,7 @@ static void flush_descriptor(journal_t *journal,
 		return;
 	}
 
-	header = (jbd2_journal_revoke_header_t *) descriptor->b_data;
+	header = (jbd2_journal_revoke_header_t *)descriptor->b_data;
 	header->r_count = cpu_to_be32(offset);
 	jbd2_revoke_csum_set(journal, descriptor);
 
