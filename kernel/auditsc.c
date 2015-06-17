@@ -477,7 +477,7 @@ static int audit_compare_uid(kuid_t uid,
 		if (rc)
 			return rc;
 	}
- 
+
 	if (ctx) {
 		list_for_each_entry(n, &ctx->names_list, list) {
 			rc = audit_uid_comparator(uid, f->op, n->uid);
@@ -1155,12 +1155,37 @@ error_path:
 
 EXPORT_SYMBOL(audit_log_task_context);
 
-static void audit_log_task_info(struct audit_buffer *ab, struct task_struct *tsk)
+void audit_log_task_info(struct audit_buffer *ab, struct task_struct *tsk)
 {
+	const struct cred *cred;
 	char name[sizeof(tsk->comm)];
 	struct mm_struct *mm = tsk->mm;
+	char *tty;
+
+	if (!ab)
+		return;
 
 	/* tsk == current */
+	cred = current_cred();
+
+	spin_lock_irq(&tsk->sighand->siglock);
+	if (tsk->signal && tsk->signal->tty && tsk->signal->tty->name)
+		tty = tsk->signal->tty->name;
+	else
+		tty = "(none)";
+	spin_unlock_irq(&tsk->sighand->siglock);
+
+
+	audit_log_format(ab,
+			 " ppid=%ld pid=%d auid=%u uid=%u gid=%u"
+			 " euid=%u suid=%u fsuid=%u"
+			 " egid=%u sgid=%u fsgid=%u ses=%u tty=%s",
+			 sys_getppid(),
+			 tsk->pid,
+			 tsk->loginuid, cred->uid, cred->gid,
+			 cred->euid, cred->suid, cred->fsuid,
+			 cred->egid, cred->sgid, cred->fsgid,
+			 tsk->sessionid, tty);
 
 	get_task_comm(name, tsk);
 	audit_log_format(ab, " comm=");
@@ -1174,6 +1199,7 @@ static void audit_log_task_info(struct audit_buffer *ab, struct task_struct *tsk
 	}
 	audit_log_task_context(ab);
 }
+EXPORT_SYMBOL(audit_log_task_info);
 
 static int audit_log_pid_context(struct audit_context *context, pid_t pid,
 				 kuid_t auid, kuid_t uid, unsigned int sessionid,
@@ -1580,26 +1606,12 @@ static void audit_log_name(struct audit_context *context, struct audit_names *n,
 
 static void audit_log_exit(struct audit_context *context, struct task_struct *tsk)
 {
-	const struct cred *cred;
 	int i, call_panic = 0;
 	struct audit_buffer *ab;
 	struct audit_aux_data *aux;
-	const char *tty;
 	struct audit_names *n;
 
 	/* tsk == current */
-	context->pid = tsk->pid;
-	if (!context->ppid)
-		context->ppid = sys_getppid();
-	cred = current_cred();
-	context->uid   = cred->uid;
-	context->gid   = cred->gid;
-	context->euid  = cred->euid;
-	context->suid  = cred->suid;
-	context->fsuid = cred->fsuid;
-	context->egid  = cred->egid;
-	context->sgid  = cred->sgid;
-	context->fsgid = cred->fsgid;
 	context->personality = tsk->personality;
 
 	if (context->major != 294) /* __NR_setsockopt */
@@ -1616,38 +1628,13 @@ static void audit_log_exit(struct audit_context *context, struct task_struct *ts
 					 (context->return_valid==AUDITSC_SUCCESS)?"yes":"no",
 					 context->return_code);
 
-		spin_lock_irq(&tsk->sighand->siglock);
-		if (tsk->signal && tsk->signal->tty && tsk->signal->tty->name)
-			tty = tsk->signal->tty->name;
-		else
-			tty = "(none)";
-		spin_unlock_irq(&tsk->sighand->siglock);
-
 		audit_log_format(ab,
-			  " a0=%lx a1=%lx a2=%lx a3=%lx items=%d"
-			  " ppid=%d ppcomm=%s pid=%d auid=%u uid=%u gid=%u"
-			  " euid=%u suid=%u fsuid=%u"
-			  " egid=%u sgid=%u fsgid=%u tty=%s ses=%u",
-			  context->argv[0],
-			  context->argv[1],
-			  context->argv[2],
-			  context->argv[3],
-			  context->name_count,
-			  context->ppid,
-			  tsk->parent->comm,
-			  context->pid,
-			  from_kuid(&init_user_ns, tsk->loginuid),
-			  from_kuid(&init_user_ns, context->uid),
-			  from_kgid(&init_user_ns, context->gid),
-			  from_kuid(&init_user_ns, context->euid),
-			  from_kuid(&init_user_ns, context->suid),
-			  from_kuid(&init_user_ns, context->fsuid),
-			  from_kgid(&init_user_ns, context->egid),
-			  from_kgid(&init_user_ns, context->sgid),
-			  from_kgid(&init_user_ns, context->fsgid),
-			  tty,
-			  tsk->sessionid);
-
+				 " a0=%lx a1=%lx a2=%lx a3=%lx items=%d",
+				 context->argv[0],
+				 context->argv[1],
+				 context->argv[2],
+				 context->argv[3],
+				 context->name_count);
 
 		audit_log_task_info(ab, tsk);
 		audit_log_key(ab, context->filterkey);
@@ -1900,28 +1887,21 @@ void __audit_syscall_exit(int success, long return_code)
 	if (!list_empty(&context->killed_trees))
 		audit_kill_trees(&context->killed_trees);
 
-	if (context->previous) {
-		struct audit_context *new_context = context->previous;
-		context->previous  = NULL;
-		audit_free_context(context);
-		tsk->audit_context = new_context;
-	} else {
-		audit_free_names(context);
-		unroll_tree_refs(context, NULL, 0);
-		audit_free_aux(context);
-		context->aux = NULL;
-		context->aux_pids = NULL;
-		context->target_pid = 0;
-		context->target_sid = 0;
-		context->sockaddr_len = 0;
-		context->type = 0;
-		context->fds[0] = -1;
-		if (context->state != AUDIT_RECORD_CONTEXT) {
-			kfree(context->filterkey);
-			context->filterkey = NULL;
-		}
-		tsk->audit_context = context;
+	audit_free_names(context);
+	unroll_tree_refs(context, NULL, 0);
+	audit_free_aux(context);
+	context->aux = NULL;
+	context->aux_pids = NULL;
+	context->target_pid = 0;
+	context->target_sid = 0;
+	context->sockaddr_len = 0;
+	context->type = 0;
+	context->fds[0] = -1;
+	if (context->state != AUDIT_RECORD_CONTEXT) {
+		kfree(context->filterkey);
+		context->filterkey = NULL;
 	}
+	tsk->audit_context = context;
 }
 
 static inline void handle_one(const struct inode *inode)
