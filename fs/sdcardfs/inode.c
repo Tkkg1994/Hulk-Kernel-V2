@@ -49,12 +49,12 @@ void revert_fsids(const struct cred * old_cred)
 }
 
 static int sdcardfs_create(struct inode *dir, struct dentry *dentry,
-			 umode_t mode, struct nameidata *nd)
+				umode_t mode, bool excl)
 {
 	int err = 0;
 	struct dentry *lower_dentry;
 	struct dentry *lower_parent_dentry = NULL;
-	struct path lower_path, saved_path;
+	struct path lower_path;
 	struct sdcardfs_sb_info *sbi = SDCARDFS_SB(dentry->d_sb);
 	const struct cred *saved_cred = NULL;
 
@@ -78,14 +78,10 @@ static int sdcardfs_create(struct inode *dir, struct dentry *dentry,
 	if (err)
 		goto out_unlock;
 
-	pathcpy(&saved_path, &nd->path);
-	pathcpy(&nd->path, &lower_path);
-
 	/* set last 16bytes of mode field to 0664 */
 	mode = (mode & S_IFMT) | 00664; 
-	err = vfs_create(lower_parent_dentry->d_inode, lower_dentry, mode, nd);
+	err = vfs_create(lower_parent_dentry->d_inode, lower_dentry, mode, true);
 
-	pathcpy(&nd->path, &saved_path);
 	if (err)
 		goto out;
 
@@ -419,7 +415,7 @@ static int sdcardfs_rmdir(struct inode *dir, struct dentry *dentry)
 	if(!check_caller_access_to_name(dir, dentry->d_name.name, sbi->options.derive, 1, has_rw)) {
 		printk(KERN_INFO "%s: need to check the caller's gid in packages.list\n" 
 						 "  dentry: %s, task:%s\n",
-						  __func__, dentry->d_name.name, current->comm);
+						 __func__, dentry->d_name.name, current->comm);
 		err = -EACCES;
 		goto out_eacces;
 	}
@@ -520,7 +516,7 @@ static int sdcardfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		!check_caller_access_to_name(new_dir, new_dentry->d_name.name,
 			sbi->options.derive, 1, has_rw)) {
 		printk(KERN_INFO "%s: need to check the caller's gid in packages.list\n" 
-						 "  new dentry: %s, task:%s\n",
+						 "  new_dentry: %s, task:%s\n",
 						 __func__, new_dentry->d_name.name, current->comm);
 		err = -EACCES;
 		goto out_eacces;
@@ -717,10 +713,10 @@ static int sdcardfs_getattr(struct vfsmount *mnt, struct dentry *dentry,
 	parent = dget_parent(dentry);
 	if(!check_caller_access_to_name(parent->d_inode, dentry->d_name.name,
 						sbi->options.derive, 0, 0)) {
-		dput(parent);
 		printk(KERN_INFO "%s: need to check the caller's gid in packages.list\n" 
 						 "  dentry: %s, task:%s\n",
 						 __func__, dentry->d_name.name, current->comm);
+		dput(parent);
 		return -EACCES;
 	}
 	dput(parent);
@@ -856,7 +852,7 @@ const struct inode_operations sdcardfs_symlink_iops = {
 	.getxattr	= sdcardfs_getxattr,
 	.listxattr	= sdcardfs_listxattr,
 	.removexattr = sdcardfs_removexattr,
-#endif // SDCARDFS_XATTR
+#endif // SDCARD_FS_XATTR
 	/* XXX Following operations are implemented, 
 	 *     but FUSE(sdcard) or FAT does not support them
 	 *     These methods are *NOT* perfectly tested. 
@@ -881,7 +877,7 @@ const struct inode_operations sdcardfs_dir_iops = {
 	.getxattr	= sdcardfs_getxattr,
 	.listxattr	= sdcardfs_listxattr,
 	.removexattr = sdcardfs_removexattr,
-#endif // SDCARDFS_XATTR
+#endif // SDCARD_FS_XATTR
 	/* XXX Following operations are implemented, 
 	 *     but FUSE(sdcard) or FAT does not support them
 	 *     These methods are *NOT* perfectly tested. 

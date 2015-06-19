@@ -20,7 +20,7 @@
 
 #include "sdcardfs.h"
 #include "strtok.h"
-#include "hashtable.h"
+#include <linux/hashtable.h>
 #include <linux/syscalls.h>
 #include <linux/kthread.h>
 #include <linux/inotify.h>
@@ -68,9 +68,8 @@ static unsigned int str_hash(void *key) {
 
 static int contain_appid_key(struct packagelist_data *pkgl_dat, void *appid) {
         struct hashtable_entry *hash_cur;
-	struct hlist_node *h_n;
 
-        hash_for_each_possible(pkgl_dat->appid_with_rw,	hash_cur, hlist, (unsigned int)appid, h_n)
+        hash_for_each_possible(pkgl_dat->appid_with_rw,	hash_cur, hlist, (uintptr_t)appid)
                 if (appid == hash_cur->key)
                         return 1;
 	return 0;
@@ -89,8 +88,9 @@ int get_caller_has_rw_locked(void *pkgl_id, derive_t derive) {
 
 	appid = multiuser_get_app_id(current_fsuid());
 	mutex_lock(&pkgl_dat->hashtable_lock);
-	ret = contain_appid_key(pkgl_dat, (void *)appid);
+	ret = contain_appid_key(pkgl_dat, (void *)(uintptr_t)appid);
 	mutex_unlock(&pkgl_dat->hashtable_lock);
+	//printk(KERN_INFO "sdcardfs: %s: appid=%d, ret=%d\n", __func__, (int)appid, ret);
 	return ret;
 }
 
@@ -98,13 +98,12 @@ appid_t get_appid(void *pkgl_id, const char *app_name)
 {
 	struct packagelist_data *pkgl_dat = (struct packagelist_data *)pkgl_id;
 	struct hashtable_entry *hash_cur;
-	struct hlist_node *h_n;
 	unsigned int hash = str_hash((void *)app_name);
 	appid_t ret_id;
 
 	//printk(KERN_INFO "sdcardfs: %s: %s, %u\n", __func__, (char *)app_name, hash);
 	mutex_lock(&pkgl_dat->hashtable_lock);
-	hash_for_each_possible(pkgl_dat->package_to_appid, hash_cur, hlist, hash, h_n) {
+	hash_for_each_possible(pkgl_dat->package_to_appid, hash_cur, hlist, hash) {
 		//printk(KERN_INFO "sdcardfs: %s: %s\n", __func__, (char *)hash_cur->key);
 		if (!strcasecmp(app_name, hash_cur->key)) {
 			ret_id = (appid_t)hash_cur->value;
@@ -174,11 +173,10 @@ int open_flags_to_access_mode(int open_flags) {
 static int insert_str_to_int(struct packagelist_data *pkgl_dat, void *key, int value) {
 	struct hashtable_entry *hash_cur;
 	struct hashtable_entry *new_entry;
-	struct hlist_node *h_n;
 	unsigned int hash = str_hash(key);
 
 	//printk(KERN_INFO "sdcardfs: %s: %s: %d, %u\n", __func__, (char *)key, value, hash);
-	hash_for_each_possible(pkgl_dat->package_to_appid, hash_cur, hlist, hash, h_n) {
+	hash_for_each_possible(pkgl_dat->package_to_appid, hash_cur, hlist, hash) {
 		if (!strcasecmp(key, hash_cur->key)) {
 			hash_cur->value = value;
 			return 0;
@@ -202,11 +200,9 @@ static void remove_str_to_int(struct hashtable_entry *h_entry) {
 static int insert_int_to_null(struct packagelist_data *pkgl_dat, void *key, int value) {
 	struct hashtable_entry *hash_cur;
 	struct hashtable_entry *new_entry;
-	struct hlist_node *h_n;
 
 	//printk(KERN_INFO "sdcardfs: %s: %d: %d\n", __func__, (int)key, value);
-	hash_for_each_possible(pkgl_dat->appid_with_rw,	hash_cur, hlist,
-					(unsigned int)key, h_n) {
+	hash_for_each_possible(pkgl_dat->appid_with_rw,	hash_cur, hlist, (uintptr_t)key) {
 		if (key == hash_cur->key) {
 			hash_cur->value = value;
 			return 0;
@@ -218,7 +214,7 @@ static int insert_int_to_null(struct packagelist_data *pkgl_dat, void *key, int 
 	new_entry->key = key;
 	new_entry->value = value;
 	hash_add(pkgl_dat->appid_with_rw, &new_entry->hlist,
-			(unsigned int)new_entry->key);
+			(uintptr_t)new_entry->key);
 	return 0;
 }
 
@@ -230,13 +226,12 @@ static void remove_int_to_null(struct hashtable_entry *h_entry) {
 static void remove_all_hashentrys(struct packagelist_data *pkgl_dat)
 {
 	struct hashtable_entry *hash_cur;
-	struct hlist_node *h_n;
 	struct hlist_node *h_t;
 	int i;
 
-	hash_for_each_safe(pkgl_dat->package_to_appid, i, h_t, hash_cur, hlist, h_n)
+	hash_for_each_safe(pkgl_dat->package_to_appid, i, h_t, hash_cur, hlist)
 		remove_str_to_int(hash_cur);
-	hash_for_each_safe(pkgl_dat->appid_with_rw, i, h_t, hash_cur, hlist, h_n)
+	hash_for_each_safe(pkgl_dat->appid_with_rw, i, h_t, hash_cur, hlist)
                 remove_int_to_null(hash_cur);
 
 	hash_init(pkgl_dat->package_to_appid);
@@ -294,7 +289,7 @@ static int read_package_list(struct packagelist_data *pkgl_dat) {
 			while (token != NULL) {
 				if (!kstrtoul(token, 10, &ret_gid) &&
 						(ret_gid == pkgl_dat->write_gid)) {
-					ret = insert_int_to_null(pkgl_dat, (void *)appid, 1);
+					ret = insert_int_to_null(pkgl_dat, (void *)(uintptr_t)appid, 1);
 					if (ret) {
 						sys_close(fd);
 						mutex_unlock(&pkgl_dat->hashtable_lock);

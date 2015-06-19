@@ -45,6 +45,9 @@
 #include <linux/ratelimit.h>
 #include "multiuser.h"
 
+/* the file system magic number */
+#define SDCARDFS_SUPER_MAGIC	0xb550ca10
+
 /* the file system name */
 #define SDCARDFS_NAME "sdcardfs"
 
@@ -118,6 +121,8 @@ typedef enum {
 	PERM_ANDROID_DATA,
 	/* This node is "/Android/obb" */
 	PERM_ANDROID_OBB,
+	/* This node is "/Android/media" */
+	PERM_ANDROID_MEDIA,
 	/* This node is "/Android/user" */
 	PERM_ANDROID_USER,
 	/* knox folder */
@@ -170,7 +175,7 @@ extern void sdcardfs_destroy_dentry_cache(void);
 extern int new_dentry_private_data(struct dentry *dentry);
 extern void free_dentry_private_data(struct dentry *dentry);
 extern struct dentry *sdcardfs_lookup(struct inode *dir, struct dentry *dentry,
-				    struct nameidata *nd);
+				    unsigned int flags);
 extern int sdcardfs_interpose(struct dentry *dentry, struct super_block *sb,
 			    struct path *lower_path);
 
@@ -230,13 +235,6 @@ struct sdcardfs_sb_info {
 	void *pkgl_id;
 	char *devpath;
 };
-
-#ifdef SDCARD_FS_XATTR
-extern int sdcardfs_setxattr(struct dentry *dentry, const char *name, const void *value, size_t size, int flags);
-extern ssize_t sdcardfs_getxattr(struct dentry *dentry, const char *name, void *value, size_t size);
-extern ssize_t sdcardfs_listxattr(struct dentry *dentry, char *list, size_t size);
-extern int sdcardfs_removexattr(struct dentry *dentry, const char *name);
-#endif // SDCARD_FS_XATTR
 
 /*
  * inode to private data
@@ -366,6 +364,15 @@ static inline void sdcardfs_put_reset_##pname(const struct dentry *dent) \
 
 SDCARDFS_DENT_FUNC(lower_path) 
 SDCARDFS_DENT_FUNC(orig_path)  
+
+static inline void sdcardfs_copy_lower_path(const struct dentry *dent,
+					struct path *lower_path)
+{
+	spin_lock(&SDCARDFS_D(dent)->lock);
+	pathcpy(lower_path, &SDCARDFS_D(dent)->lower_path);
+	spin_unlock(&SDCARDFS_D(dent)->lock);
+	return;
+}
 
 static inline int has_graft_path(const struct dentry *dent)
 {
@@ -544,9 +551,7 @@ out_nospc:
 	printk_ratelimited(KERN_INFO "statfs.f_bavail : %llu blocks / "
 				     "statfs.f_bsize : %ld bytes / "
 				     "required size : %llu byte\n"
-                                ,statfs.f_bavail, statfs.f_bsize, (u64)size);
-
+				,statfs.f_bavail, statfs.f_bsize, (u64)size);
 	return 0;
 }
-
 #endif	/* not _SDCARDFS_H_ */
