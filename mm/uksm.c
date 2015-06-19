@@ -4672,8 +4672,9 @@ again:
 			struct vm_area_struct *vma;
 
 			anon_vma_lock(anon_vma);
-			list_for_each_entry(vmac, &anon_vma->head,
-					    same_anon_vma) {
+			anon_vma_interval_tree_foreach(vmac, &anon_vma->rb_root,
+						       0, ULONG_MAX) {
+
 				vma = vmac->vma;
 				address = get_rmap_addr(rmap_item);
 
@@ -4736,8 +4737,8 @@ again:
 			struct vm_area_struct *vma;
 
 			anon_vma_lock(anon_vma);
-			list_for_each_entry(vmac, &anon_vma->head,
-					    same_anon_vma) {
+			anon_vma_interval_tree_foreach(vmac, &anon_vma->rb_root,
+						       0, ULONG_MAX) {
 				vma = vmac->vma;
 				address = get_rmap_addr(rmap_item);
 
@@ -4796,8 +4797,8 @@ again:
 			struct vm_area_struct *vma;
 
 			anon_vma_lock(anon_vma);
-			list_for_each_entry(vmac, &anon_vma->head,
-					    same_anon_vma) {
+			anon_vma_interval_tree_foreach(vmac, &anon_vma->rb_root,
+						       0, ULONG_MAX) {
 				vma = vmac->vma;
 				address = get_rmap_addr(rmap_item);
 
@@ -5541,7 +5542,20 @@ int ksm_madvise(struct vm_area_struct *vma, unsigned long start,
 struct page *ksm_does_need_to_copy(struct page *page,
 			struct vm_area_struct *vma, unsigned long address)
 {
+	struct anon_vma *anon_vma = page_anon_vma(page);
 	struct page *new_page;
+
+	if (PageKsm(page)) {
+		if (page_stable_node(page))
+			return page;	/* no need to copy it */
+	} else if (!anon_vma) {
+		return page;		/* no need to copy it */
+	} else if (anon_vma->root == vma->anon_vma->root &&
+		 page->index == linear_page_index(vma, address)) {
+		return page;		/* still no need to copy it */
+	}
+	if (!PageUptodate(page))
+		return page;		/* let do_swap_page report the error */
 
 	new_page = alloc_page_vma(GFP_HIGHUSER_MOVABLE, vma, address);
 	if (new_page) {
@@ -5549,13 +5563,7 @@ struct page *ksm_does_need_to_copy(struct page *page,
 
 		SetPageDirty(new_page);
 		__SetPageUptodate(new_page);
-		SetPageSwapBacked(new_page);
 		__set_page_locked(new_page);
-
-		if (page_evictable(new_page, vma))
-			lru_cache_add_lru(new_page, LRU_ACTIVE_ANON);
-		else
-			add_page_to_unevictable_list(new_page);
 	}
 
 	return new_page;

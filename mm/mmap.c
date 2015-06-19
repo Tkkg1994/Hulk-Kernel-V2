@@ -2466,6 +2466,7 @@ int insert_vm_struct(struct mm_struct *mm, struct vm_area_struct *vma)
 	if ((vma->vm_flags & VM_ACCOUNT) &&
 	     security_vm_enough_memory_mm(mm, vma_pages(vma)))
 		return -ENOMEM;
+
 	vma_link(mm, vma, prev, rb_link, rb_parent);
 	return 0;
 }
@@ -2538,7 +2539,6 @@ struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 				goto out_free_mempol;
 			if (new_vma->vm_file)
 				get_file(new_vma->vm_file);
-			}
 			if (new_vma->vm_ops && new_vma->vm_ops->open)
 				new_vma->vm_ops->open(new_vma);
 			vma_link(mm, new_vma, prev, rb_link, rb_parent);
@@ -2645,6 +2645,7 @@ int install_special_mapping(struct mm_struct *mm,
 	ret = insert_vm_struct(mm, vma);
 	if (ret)
 		goto out;
+
 	mm->total_vm += len >> PAGE_SHIFT;
 
 	perf_event_mmap(vma);

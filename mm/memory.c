@@ -2227,13 +2227,10 @@ int vm_insert_pfn(struct vm_area_struct *vma, unsigned long addr,
 
 	if (addr < vma->vm_start || addr >= vma->vm_end)
 		return -EFAULT;
-	if (track_pfn_vma_new(vma, &pgprot, pfn, PAGE_SIZE))
+	if (track_pfn_insert(vma, &pgprot, pfn))
 		return -EINVAL;
 
 	ret = insert_pfn(vma, addr, pfn, pgprot);
-
-	if (ret)
-		untrack_pfn_vma(vma, pfn, PAGE_SIZE);
 
 	return ret;
 }
@@ -2393,7 +2390,7 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 	} while (pgd++, addr = next, addr != end);
 
 	if (err)
-		untrack_pfn_vma(vma, pfn, PAGE_ALIGN(size));
+		untrack_pfn(vma, pfn, PAGE_ALIGN(size));
 
 	return err;
 }
