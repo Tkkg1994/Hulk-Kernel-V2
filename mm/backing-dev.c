@@ -327,7 +327,7 @@ static unsigned long bdi_longest_inactive(void)
 static void bdi_clear_pending(struct backing_dev_info *bdi)
 {
 	clear_bit(BDI_pending, &bdi->state);
-	smp_mb__after_clear_bit();
+	smp_mb__after_atomic();
 	wake_up_bit(&bdi->state, BDI_pending);
 }
 

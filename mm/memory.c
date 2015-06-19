@@ -155,7 +155,6 @@ static int __init init_zero_pfn(void)
 core_initcall(init_zero_pfn);
 
 
-
 #if defined(SPLIT_RSS_COUNTING)
 
 void sync_mm_rss(struct mm_struct *mm)
@@ -1103,7 +1102,7 @@ int copy_page_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 		 * We do not free on error cases below as remove_vma
 		 * gets called on error from higher level routine
 		 */
-		ret = track_pfn_vma_copy(vma);
+		ret = track_pfn_copy(vma);
 		if (ret)
 			return ret;
 	}
@@ -1358,8 +1357,8 @@ static void unmap_single_vma(struct mmu_gather *tlb,
 	if (end <= vma->vm_start)
 		return;
 
-	if (unlikely(vma->vm_flags & VM_PFNMAP)) {
-		untrack_pfn_vma(vma, 0, 0);
+	if (unlikely(vma->vm_flags & VM_PFNMAP))
+		untrack_pfn(vma, 0, 0);
 
 	if (start != end) {
 		if (unlikely(is_vm_hugetlb_page(vma))) {
