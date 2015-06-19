@@ -1620,8 +1620,15 @@ static struct inode *exfat_iget(struct super_block *sb, loff_t i_pos) {
 	struct exfat_inode_info *info;
 	struct hlist_head *head = sbi->inode_hashtable + exfat_hash(i_pos);
 	struct inode *inode = NULL;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,9,0)
+	struct hlist_node *node;
+
+	spin_lock(&sbi->inode_hash_lock);
+	hlist_for_each_entry(info, node, head, i_hash_fat) {
+#else
 	spin_lock(&sbi->inode_hash_lock);
 	hlist_for_each_entry(info, head, i_hash_fat) {
+#endif
 		CHECK_ERR(info->vfs_inode.i_sb != sb);
 
 		if (i_pos != info->i_pos)
@@ -1815,7 +1822,11 @@ static void exfat_evict_inode(struct inode *inode)
 	}
 
 	invalidate_inode_buffers(inode);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,7,00)
+	end_writeback(inode);
+#else
 	clear_inode(inode);
+#endif
 	exfat_detach(inode);
 
 	remove_inode_hash(inode);
