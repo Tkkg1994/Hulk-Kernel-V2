@@ -290,7 +290,7 @@ MODULE_PARM_DESC(path, "customized firmware image search path with a higher prio
 static noinline_for_stack long fw_file_size(struct file *file)
 {
 	struct kstat st;
-	if (vfs_getattr(file->f_path.mnt, file->f_path.dentry, &st))
+	if (vfs_getattr(&file->f_path, &st))
 		return -1;
 	if (!S_ISREG(st.mode))
 		return -1;
@@ -305,7 +305,7 @@ static bool fw_read_file_contents(struct file *file, struct firmware_buf *fw_buf
 	char *buf;
 
 	size = fw_file_size(file);
-	if (size < 0)
+	if (size <= 0)
 		return false;
 	buf = vmalloc(size);
 	if (!buf)
