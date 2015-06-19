@@ -11,6 +11,7 @@
 
 #include <linux/sched.h>
 #include <linux/proc_fs.h>
+#include <linux/binfmts.h>
 struct  ctl_table_header;
 struct  mempolicy;
 
@@ -159,6 +160,7 @@ struct pde_opener {
 ssize_t __proc_file_read(struct file *, char __user *, size_t, loff_t *);
 extern const struct file_operations proc_file_operations;
 void proc_entry_rundown(struct proc_dir_entry *);
+void pde_users_dec(struct proc_dir_entry *pde);
 
 extern spinlock_t proc_subdir_lock;
 
