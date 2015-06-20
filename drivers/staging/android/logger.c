@@ -73,6 +73,8 @@ static LIST_HEAD(log_list);
  * @log:	The associated log
  * @list:	The associated entry in @logger_log's list
  * @r_off:	The current read head offset.
+ * @r_all:	Reader can read all entries
+ * @r_ver:	Reader ABI version
  *
  * This object lives from open to release, so we don't need additional
  * reference counting. The structure is protected by log->mutex.
