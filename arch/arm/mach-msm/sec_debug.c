@@ -1383,7 +1383,8 @@ int sec_debug_subsys_init(void)
 	strlcpy(secdbg_krait->state, "Init", sizeof(secdbg_krait->state) + 1);
 	secdbg_krait->nr_cpus = CONFIG_NR_CPUS;
 
-	sec_debug_subsys_set_kloginfo(&secdbg_krait->log.idx_paddr,
+	sec_debug_subsys_set_kloginfo(&secdbg_krait->log.first_idx_paddr,
+		&secdbg_krait->log.next_idx_paddr,
 		&secdbg_krait->log.log_paddr, &secdbg_krait->log.size);
 	sec_debug_subsys_set_logger_info(&secdbg_krait->logger_log);
 
