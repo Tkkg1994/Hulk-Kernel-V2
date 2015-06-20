@@ -7496,7 +7496,7 @@ done:
 		if (sk) {
 			if (sock_owned_by_user(sk)) {
 				BT_DBG("backlog sk %p", sk);
-				if (sk_add_backlog(sk, skb))
+				if (sk_add_backlog(sk, skb, sk->sk_rcvbuf))
 					kfree_skb(skb);
 			} else
 				l2cap_data_channel(sk, skb);

@@ -868,7 +868,6 @@ static int create_device(struct zram *zram, int device_id)
 	zram->disk->private_data = zram;
 	snprintf(zram->disk->disk_name, 16, "zram%d", device_id);
 
-	__set_bit(QUEUE_FLAG_FAST, &zram->queue->queue_flags);
 	/* Actual capacity set using syfs (/sys/block/zram<id>/disksize */
 	set_capacity(zram->disk, 0);
 
@@ -948,7 +947,6 @@ static int __init zram_init(void)
 			goto free_devices;
 	}
 
-	show_mem_notifier_register(&zram_show_mem_notifier_block);
 	pr_info("Created %u device(s) ...\n", num_devices);
 
 	return 0;

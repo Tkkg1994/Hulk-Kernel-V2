@@ -120,7 +120,7 @@ static void dump_tasks_info(void)
 		pr_info("[%5d] %5d %5d %8lu %8lu %3u	 %3d	     %5d %s\n",
 		task->pid, task_uid(task), task->tgid,
 		task->mm->total_vm, get_mm_rss(task->mm),
-		task_cpu(task), task->signal->oom_adj,
+		task_cpu(task),
 		task->signal->oom_score_adj, task->comm);
 		task_unlock(task);
 	}
@@ -458,8 +458,8 @@ static int android_oom_handler(struct notifier_block *nb,
 
 	/* show status */
 	pr_warning("%s invoked Android-oom-killer: "
-		"oom_adj=%d, oom_score_adj=%d\n",
-		current->comm, current->signal->oom_adj,
+		"oom_score_adj=%d\n",
+		current->comm,
 		current->signal->oom_score_adj);
 	dump_stack();
 	show_mem(SHOW_MEM_FILTER_NODES);

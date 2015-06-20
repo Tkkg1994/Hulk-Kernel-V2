@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/vmalloc.h>
+#include <linux/aio.h>
 #include "logger.h"
 #include "logger_interface.h"
 
@@ -781,9 +782,70 @@ static const struct file_operations logger_fops = {
 	.release = logger_release,
 };
 
+#ifdef CONFIG_SEC_DEBUG 
+/* Use the old way because the new logger gets log buffers by means of vmalloc().
+    getlog tool considers that log buffers lie on physically contiguous memory area. */
+    
 /*
- * Log size must be a power of two, greater than LOGGER_ENTRY_MAX_LEN,
- * and less than LONG_MAX minus LOGGER_ENTRY_MAX_LEN.
+ * Defines a log structure with name 'NAME' and a size of 'SIZE' bytes, which
+ * must be a power of two, and greater than
+ * (LOGGER_ENTRY_MAX_PAYLOAD + sizeof(struct logger_entry)).
+ */
+#define DEFINE_LOGGER_DEVICE(VAR, NAME, SIZE) \
+static unsigned char _buf_ ## VAR[SIZE]; \
+static struct logger_log VAR = { \
+	.buffer = _buf_ ## VAR, \
+	.misc = { \
+		.minor = MISC_DYNAMIC_MINOR, \
+		.name = NAME, \
+		.fops = &logger_fops, \
+		.parent = NULL, \
+	}, \
+	.wq = __WAIT_QUEUE_HEAD_INITIALIZER(VAR .wq), \
+	.readers = LIST_HEAD_INIT(VAR .readers), \
+	.mutex = __MUTEX_INITIALIZER(VAR .mutex), \
+	.w_off = 0, \
+	.head = 0, \
+	.size = SIZE, \
+	.logs = LIST_HEAD_INIT(VAR .logs), \
+};
+
+#ifdef CONFIG_SEC_LOGGER_BUFFER_EXPANSION
+DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, CONFIG_LOGCAT_SIZE*1024*4)	// 1MB
+#else
+DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, CONFIG_LOGCAT_SIZE*1024*2)	// 512MB
+#endif
+DEFINE_LOGGER_DEVICE(log_events, LOGGER_LOG_EVENTS, CONFIG_LOGCAT_SIZE*1024)	// 256KB
+DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, CONFIG_LOGCAT_SIZE*1024*4)	// 1MB
+DEFINE_LOGGER_DEVICE(log_system, LOGGER_LOG_SYSTEM, CONFIG_LOGCAT_SIZE*1024)	// 256KB
+
+struct logger_log * log_buffers[]={
+	&log_main,
+	&log_events,
+	&log_radio,
+	&log_system,
+	NULL,
+};
+
+struct logger_log *sec_get_log_buffer(char *log_name, int size)
+{
+	struct logger_log **log_buf=&log_buffers[0];
+	
+	while (*log_buf) {
+		if (!strcmp(log_name,(*log_buf)->misc.name)) {
+			return *log_buf;
+		}
+
+		log_buf++;			
+	}
+	return NULL;
+}
+#endif
+
+
+/*
+ * Log size must must be a power of two, and greater than
+ * (LOGGER_ENTRY_MAX_PAYLOAD + sizeof(struct logger_entry)).
  */
 static int __init create_log(char *log_name, int size)
 {
