@@ -61,7 +61,6 @@ MODULE_DEVICE_TABLE(usb, id_table);
 static struct usb_driver csvt_driver = {
 	.name			= "qc_csvt",
 	.probe			= usb_serial_probe,
-	.disconnect		= usb_serial_disconnect,
 	.id_table		= id_table,
 	.suspend		= usb_serial_suspend,
 	.resume			= usb_serial_resume,
@@ -277,7 +276,7 @@ static void csvt_ctrl_set_termios(struct tty_struct *tty,
 	dev_dbg(&port->dev, "%s", __func__);
 
 	/* Doesn't support option setting */
-	tty_termios_copy_hw(tty->termios, old_termios);
+	tty_termios_copy_hw(&tty->termios, old_termios);
 
 	csvt_ctrl_write_cmd(dev, port);
 }
