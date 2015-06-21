@@ -71,7 +71,7 @@ struct exfat_sb_info {
 
 	struct exfat_mount_options options;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,00)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,00)
 	int s_dirt;
 	struct mutex s_lock;
 #endif
@@ -156,3 +156,4 @@ extern ssize_t exfat_listxattr(struct dentry *dentry, char *list, size_t size);
 extern int exfat_removexattr(struct dentry *dentry, const char *name);
 
 #endif
+

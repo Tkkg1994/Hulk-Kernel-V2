@@ -72,7 +72,7 @@ static UINT32 get_current_msec(void)
 
 static void __set_sb_dirty(struct super_block *sb)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,7,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)
 	sb->s_dirt = 1;
 #else
 	struct exfat_sb_info *sbi = EXFAT_SB(sb);
@@ -5044,3 +5044,4 @@ INT32 multi_sector_write(struct super_block *sb, UINT32 sec, struct buffer_head 
 
 	return ret;
 }
+

@@ -77,7 +77,7 @@
 #include <linux/exportfs.h>
 #include <linux/mount.h>
 #include <linux/vfs.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
 #include <linux/aio.h>
 #endif
 #include <linux/parser.h>
@@ -260,7 +260,7 @@ static void exfat_write_super(struct super_block *sb);
 
 static void __lock_super(struct super_block *sb)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,7,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)
 	lock_super(sb);
 #else
 	struct exfat_sb_info *sbi = EXFAT_SB(sb);
@@ -270,7 +270,7 @@ static void __lock_super(struct super_block *sb)
 
 static void __unlock_super(struct super_block *sb)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,7,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)
 	unlock_super(sb);
 #else
 	struct exfat_sb_info *sbi = EXFAT_SB(sb);
@@ -280,7 +280,7 @@ static void __unlock_super(struct super_block *sb)
 
 static int __is_sb_dirty(struct super_block *sb)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,7,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)
         return sb->s_dirt;
 #else
         struct exfat_sb_info *sbi = EXFAT_SB(sb);
@@ -290,7 +290,7 @@ static int __is_sb_dirty(struct super_block *sb)
 
 static void __set_sb_clean(struct super_block *sb)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,7,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)
 	sb->s_dirt = 0;
 #else
 	struct exfat_sb_info *sbi = EXFAT_SB(sb);
@@ -327,13 +327,13 @@ static int __exfat_revalidate(struct dentry *dentry)
 	return 0;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,00)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,00)
 static int exfat_revalidate(struct dentry *dentry, unsigned int flags)
 #else
 static int exfat_revalidate(struct dentry *dentry, struct nameidata *nd)
 #endif
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,00)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,00)
 	if (flags & LOOKUP_RCU)
 		return -ECHILD;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(3,0,00)
@@ -346,13 +346,13 @@ static int exfat_revalidate(struct dentry *dentry, struct nameidata *nd)
 	return __exfat_revalidate(dentry);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,00)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,00)
 static int exfat_revalidate_ci(struct dentry *dentry, unsigned int flags)
 #else
 static int exfat_revalidate_ci(struct dentry *dentry, struct nameidata *nd)
 #endif
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,00)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,00)
 	if (flags & LOOKUP_RCU)
 		return -ECHILD;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(3,0,00)
@@ -645,10 +645,10 @@ const struct file_operations exfat_dir_operations = {
 	.fsync      = exfat_file_fsync,
 };
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,00)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,00)
 static int exfat_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 						bool excl)
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,00)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3,0,00)
 static int exfat_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 						struct nameidata *nd)
 #else
@@ -729,7 +729,7 @@ static int exfat_d_anon_disconn(struct dentry *dentry)
 	return IS_ROOT(dentry) && (dentry->d_flags & DCACHE_DISCONNECTED);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,00)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,00)
 static struct dentry *exfat_lookup(struct inode *dir, struct dentry *dentry,
 						   unsigned int flags)
 #else
@@ -1620,7 +1620,7 @@ static struct inode *exfat_iget(struct super_block *sb, loff_t i_pos) {
 	struct exfat_inode_info *info;
 	struct hlist_head *head = sbi->inode_hashtable + exfat_hash(i_pos);
 	struct inode *inode = NULL;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,9,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)
 	struct hlist_node *node;
 
 	spin_lock(&sbi->inode_hash_lock);
@@ -1822,7 +1822,7 @@ static void exfat_evict_inode(struct inode *inode)
 	}
 
 	invalidate_inode_buffers(inode);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,7,00)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,4,00)
 	end_writeback(inode);
 #else
 	clear_inode(inode);
@@ -1985,7 +1985,7 @@ const struct super_operations exfat_sops = {
 	.evict_inode  = exfat_evict_inode,
 #endif
 	.put_super     = exfat_put_super,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,7,00)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,4,00)
 	.write_super   = exfat_write_super,
 #endif
 	.sync_fs       = exfat_sync_fs,
@@ -2228,7 +2228,7 @@ static int exfat_fill_super(struct super_block *sb, void *data, int silent)
 		exfat_mnt_msg(sb, 1, 0, "failed to mount! (ENOMEM)");
 		return -ENOMEM;
 	}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
 	mutex_init(&sbi->s_lock);
 #endif
 	sb->s_fs_info = sbi;
@@ -2414,3 +2414,4 @@ module_init(init_exfat_fs);
 module_exit(exit_exfat_fs);
 
 MODULE_LICENSE("GPL");
+

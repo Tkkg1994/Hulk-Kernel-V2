@@ -172,7 +172,7 @@ static void scfs_evict_inode(struct inode *inode)
 	struct scfs_inode_info *sii = SCFS_I(inode);
 
 	truncate_inode_pages(&inode->i_data, 0);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
 	clear_inode(inode);
 #else
 	end_writeback(inode);
@@ -389,7 +389,7 @@ static struct dentry *scfs_mount(struct file_system_type *fs_type, int flags,
 	if (!sbi->options.comp_type)
 		sbi->options.comp_type = SCFS_COMP_LZO;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
 	sb = sget(fs_type, NULL, set_anon_super, flags, NULL);
 #else
 	sb = sget(fs_type, NULL, set_anon_super, NULL);
@@ -566,7 +566,7 @@ static void scfs_kill_block_super(struct super_block *sb)
 	kmem_cache_free(scfs_sb_info_cache, sbi);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
 static int scfs_d_revalidate(struct dentry *dentry, unsigned int flags)
 {
 	struct dentry *lower_dentry;

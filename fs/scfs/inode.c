@@ -275,7 +275,7 @@ static struct inode * scfs_do_create(struct inode *parent_inode,
 		inode = ERR_CAST(lower_parent_dentry);
 		goto out;
 	}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
 	ret = vfs_create(lower_parent_dentry->d_inode, lower_file_dentry, mode, true);
 #else
 	ret = vfs_create(lower_parent_dentry->d_inode, lower_file_dentry, mode, NULL);
@@ -397,7 +397,7 @@ out:
  * create() for SCFS.
  */
 static int scfs_create(struct inode *parent_inode, struct dentry *scfs_dentry,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
 		umode_t mode, bool dummy)
 #else
 		umode_t mode, struct nameidata *nd)
@@ -567,7 +567,7 @@ static int scfs_lookup_interpose(struct dentry *dentry, struct dentry *lower_den
  *  
  */
 static struct dentry * scfs_lookup(struct inode *dir, struct dentry *dentry,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
 	unsigned int flags)
 #else
 	struct nameidata *nd)
@@ -674,13 +674,13 @@ int scfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat
 {
 	struct kstat lower_stat;
 	int ret;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
 	struct path path = {scfs_dentry_to_lower_mnt(dentry),
 		scfs_lower_dentry(dentry)};
 #endif
 
 	ret = vfs_getattr(
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
 			&path,
 #else
 			scfs_dentry_to_lower_mnt(dentry),

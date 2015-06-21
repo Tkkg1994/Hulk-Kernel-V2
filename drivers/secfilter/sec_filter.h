@@ -31,7 +31,7 @@
 #include    <linux/spinlock.h>
 #include    <net/netfilter/nf_queue.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0)  // from 3.8, nf_queue functions does not use protocol family
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)  // from 3.8, nf_queue functions does not use protocol family
 #define     _PF_DEFINED
 #endif
 

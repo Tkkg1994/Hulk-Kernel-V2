@@ -30,6 +30,8 @@
  *
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -90,7 +92,7 @@ static unsigned long lowmem_deathpending_timeout;
 #define lowmem_print(level, x...)			\
 	do {						\
 		if (lowmem_debug_level >= (level))	\
-			printk(x);			\
+			pr_info(x);			\
 	} while (0)
 
 #if defined(CONFIG_SEC_DEBUG_LMK_MEMINFO_VERBOSE) || defined(CONFIG_SEC_OOM_KILLER)
@@ -117,7 +119,7 @@ static void dump_tasks_info(void)
 			continue;
 		}
 
-		pr_info("[%5d] %5d %5d %8lu %8lu %3u	 %3d	     %5d %s\n",
+		pr_info("[%5d] %5d %5d %8lu %8lu %3u	 %5d %s\n",
 		task->pid, task_uid(task), task->tgid,
 		task->mm->total_vm, get_mm_rss(task->mm),
 		task_cpu(task),

@@ -7060,7 +7060,7 @@ wl_cfg80211_start_ap(
 	if (!check_dev_role_integrity(cfg, dev_role))
 		goto fail;
 
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0)) && !defined(WL_COMPAT_WIRELESS))
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0)) && !defined(WL_COMPAT_WIRELESS))
 	if ((err = wl_cfg80211_set_channel(wiphy, dev,
 		dev->ieee80211_ptr->preset_chandef.chan,
 		NL80211_CHAN_HT20) < 0)) {

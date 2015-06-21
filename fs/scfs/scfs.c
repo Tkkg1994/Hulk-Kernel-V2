@@ -347,7 +347,7 @@ int scfs_initialize_lower_file(struct dentry *dentry, struct file **lower_file, 
 	int ret = 0;
 	struct dentry *lower_dentry = scfs_lower_dentry(dentry);
 	struct vfsmount *lower_mnt = scfs_dentry_to_lower_mnt(dentry);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
 	const struct path path = {lower_mnt, lower_dentry};
 #else
 	/* dput and mntput is done in dentry_open if it returns an error */
@@ -361,7 +361,7 @@ int scfs_initialize_lower_file(struct dentry *dentry, struct file **lower_file, 
 	else
 		flags &= ~O_APPEND;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
 	(*lower_file) = dentry_open(&path, flags, cred);
 #else
 	(*lower_file) = dentry_open(lower_dentry, lower_mnt, flags, cred);
