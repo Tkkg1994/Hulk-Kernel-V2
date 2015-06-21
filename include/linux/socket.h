@@ -7,6 +7,7 @@
 #include <linux/types.h>		/* pid_t			*/
 #include <linux/compiler.h>		/* __user			*/
 #include <uapi/linux/socket.h>
+#include <uapi/asm-generic/socket.h>
 
 struct pid;
 struct cred;
