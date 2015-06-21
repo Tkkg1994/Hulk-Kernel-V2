@@ -148,9 +148,6 @@ static void		 ip_rt_update_pmtu(struct dst_entry *dst, struct sock *sk,
 static void		 ip_do_redirect(struct dst_entry *dst, struct sock *sk,
 					struct sk_buff *skb);
 
-static void __rt_garbage_collect(struct work_struct *w);
-static DECLARE_WORK(rt_gc_worker, __rt_garbage_collect);
-
 static void ipv4_dst_ifdown(struct dst_entry *dst, struct net_device *dev,
 			    int how)
 {
@@ -473,7 +470,6 @@ static void rt_cache_invalidate(struct net *net)
 void rt_cache_flush(struct net *net, int delay)
 {
 	rt_cache_invalidate(net);
-
 }
 
 static struct neighbour *ipv4_neigh_lookup(const struct dst_entry *dst,
@@ -497,6 +493,12 @@ static struct neighbour *ipv4_neigh_lookup(const struct dst_entry *dst,
 	return neigh_create(&arp_tbl, pkey, dev);
 }
 
+#define IP_IDENTS_SZ 2048u
+struct ip_ident_bucket {
+	atomic_t	id;
+	u32		stamp32;
+};
+
 static struct ip_ident_bucket *ip_idents __read_mostly;
 
 /* In order to protect privacy, we add a perturbation to identifiers
@@ -516,7 +518,6 @@ u32 ip_idents_reserve(u32 hash, int segs)
 		x *= (now - old);
 		delta = (u32)(x >> 32);
 	}
-
 	return atomic_add_return(segs + delta, &bucket->id) - segs;
 }
 EXPORT_SYMBOL(ip_idents_reserve);
@@ -541,7 +542,7 @@ void __ip_select_ident(struct iphdr *iph, int segs)
 }
 EXPORT_SYMBOL(__ip_select_ident);
 
-static void __build_flow_key(struct flowi4 *fl4, const struct sock *sk,
+static void __build_flow_key(struct flowi4 *fl4, struct sock *sk,
 			     const struct iphdr *iph,
 			     int oif, u8 tos,
 			     u8 prot, u32 mark, int flow_flags)
@@ -557,11 +558,12 @@ static void __build_flow_key(struct flowi4 *fl4, const struct sock *sk,
 	flowi4_init_output(fl4, oif, mark, tos,
 			   RT_SCOPE_UNIVERSE, prot,
 			   flow_flags,
-			   iph->daddr, iph->saddr, 0, 0);
+			   iph->daddr, iph->saddr, 0, 0,
+			   sk ? sock_i_uid(sk) : 0);
 }
 
 static void build_skb_flow_key(struct flowi4 *fl4, const struct sk_buff *skb,
-			       const struct sock *sk)
+			       struct sock *sk)
 {
 	const struct iphdr *iph = ip_hdr(skb);
 	int oif = skb->dev->ifindex;
@@ -586,7 +588,7 @@ static void build_sk_flow_key(struct flowi4 *fl4, const struct sock *sk)
 			   RT_CONN_FLAGS(sk), RT_SCOPE_UNIVERSE,
 			   inet->hdrincl ? IPPROTO_RAW : sk->sk_protocol,
 			   inet_sk_flowi_flags(sk),
-			   daddr, inet->inet_saddr, 0, 0);
+			   daddr, inet->inet_saddr, 0, 0, sock_i_uid(sk));
 	rcu_read_unlock();
 }
 
@@ -1844,7 +1846,7 @@ struct rtable *__ip_route_output_key(struct net *net, struct flowi4 *fl4)
 			 RT_SCOPE_LINK : RT_SCOPE_UNIVERSE);
 
 	rcu_read_lock();
-	if (fl4->saddr) {
+	if (!fl4->saddr) {
 		rth = ERR_PTR(-EINVAL);
 		if (ipv4_is_multicast(fl4->saddr) ||
 		    ipv4_is_lbcast(fl4->saddr) ||
@@ -1912,7 +1914,7 @@ struct rtable *__ip_route_output_key(struct net *net, struct flowi4 *fl4)
 							      RT_SCOPE_LINK);
 			goto make_route;
 		}
-		if (!fl4->saddr) {
+		if (fl4->saddr) {
 			if (ipv4_is_multicast(fl4->daddr))
 				fl4->saddr = inet_select_addr(dev_out, 0,
 							      fl4->flowi4_scope);
@@ -2160,9 +2162,6 @@ static int rt_fill_info(struct net *net,  __be32 dst, __be32 src,
 	if (fl4->flowi4_mark &&
 	    nla_put_be32(skb, RTA_MARK, fl4->flowi4_mark))
 		goto nla_put_failure;
-
-	if (rt->rt_uid != (uid_t) -1)
-		NLA_PUT_BE32(skb, RTA_UID, rt->rt_uid);
 
 	error = rt->dst.error;
 	expires = rt->dst.expires;
