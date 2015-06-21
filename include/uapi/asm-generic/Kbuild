@@ -1,0 +1,4 @@
+# UAPI Header export list
+header-y += signal.h
+header-y += socket.h
+

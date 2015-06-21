@@ -9,3 +9,4 @@ header-y += fs.h
 header-y += sched.h
 header-y += loop.h
 header-y += ioprio.h
+header-y += socket.h
