@@ -27,7 +27,6 @@
 #include <net/tcp_memcontrol.h>
 
 static int zero;
-static int two = 2;
 static int tcp_retr1_max = 255;
 static int ip_local_port_range_min[] = { 1, 1 };
 static int ip_local_port_range_max[] = { 65535, 65535 };
@@ -85,7 +84,7 @@ static int ipv4_local_port_range(ctl_table *table, int write,
 static void inet_get_ping_group_range_table(struct ctl_table *table, kgid_t *low, kgid_t *high)
 {
 	kgid_t *data = table->data;
-	unsigned int seq;
+	unsigned seq;
 	do {
 		seq = read_seqbegin(&sysctl_local_ports.lock);
 
@@ -336,13 +335,6 @@ static struct ctl_table ipv4_table[] = {
 		.proc_handler	= proc_dointvec
 	},
 	{
-		.procname	= "ip_early_demux",
-		.data		= &sysctl_ip_early_demux,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec
-	},
-	{
 		.procname	= "ip_dynaddr",
 		.data		= &sysctl_ip_dynaddr,
 		.maxlen		= sizeof(int),
@@ -401,13 +393,6 @@ static struct ctl_table ipv4_table[] = {
 		.proc_handler	= proc_dointvec
 	},
 #endif
-	{
-		.procname	= "tcp_fastopen",
-		.data		= &sysctl_tcp_fastopen,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-	},
 	{
 		.procname	= "tcp_tw_recycle",
 		.data		= &tcp_death_row.sysctl_tw_recycle,
@@ -641,13 +626,6 @@ static struct ctl_table ipv4_table[] = {
 		.proc_handler	= proc_dointvec
 	},
 	{
-		.procname	= "tcp_limit_output_bytes",
-		.data		= &sysctl_tcp_limit_output_bytes,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec
-	},
-	{
 		.procname	= "tcp_challenge_ack_limit",
 		.data		= &sysctl_tcp_challenge_ack_limit,
 		.maxlen		= sizeof(int),
@@ -748,15 +726,6 @@ static struct ctl_table ipv4_table[] = {
 		.proc_handler   = proc_tcp_default_init_rwnd
 	},
 	{
-		.procname	= "tcp_early_retrans",
-		.data		= &sysctl_tcp_early_retrans,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec_minmax,
-		.extra1		= &zero,
-		.extra2		= &two,
-	},
-	{
 		.procname	= "udp_mem",
 		.data		= &sysctl_udp_mem,
 		.maxlen		= sizeof(sysctl_udp_mem),
@@ -845,6 +814,13 @@ static struct ctl_table ipv4_net_table[] = {
 		.proc_handler	= proc_dointvec
 	},
 	{
+		.procname	= "rt_cache_rebuild_count",
+		.data		= &init_net.ipv4.sysctl_rt_cache_rebuild_count,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec
+	},
+	{
 		.procname	= "ping_group_range",
 		.data		= &init_net.ipv4.sysctl_ping_group_range,
 		.maxlen		= sizeof(gid_t)*2,
@@ -874,6 +850,13 @@ static struct ctl_table ipv4_net_table[] = {
 	{ }
 };
 
+struct ctl_path net_ipv4_ctl_path[] = {
+	{ .procname = "net", },
+	{ .procname = "ipv4", },
+	{ },
+};
+EXPORT_SYMBOL_GPL(net_ipv4_ctl_path);
+
 static __net_init int ipv4_sysctl_init_net(struct net *net)
 {
 	struct ctl_table *table;
@@ -897,6 +880,8 @@ static __net_init int ipv4_sysctl_init_net(struct net *net)
 		table[5].data =
 			&net->ipv4.sysctl_icmp_ratemask;
 		table[6].data =
+			&net->ipv4.sysctl_rt_cache_rebuild_count;
+		table[7].data =
 			&net->ipv4.sysctl_ping_group_range;
 
 	}
@@ -908,9 +893,12 @@ static __net_init int ipv4_sysctl_init_net(struct net *net)
 	net->ipv4.sysctl_ping_group_range[0] = make_kgid(&init_user_ns, 1);
 	net->ipv4.sysctl_ping_group_range[1] = make_kgid(&init_user_ns, 0);
 
+	net->ipv4.sysctl_rt_cache_rebuild_count = 4;
+
 	tcp_init_mem(net);
 
-	net->ipv4.ipv4_hdr = register_net_sysctl(net, "net/ipv4", table);
+	net->ipv4.ipv4_hdr = register_net_sysctl_table(net,
+			net_ipv4_ctl_path, table);
 	if (net->ipv4.ipv4_hdr == NULL)
 		goto err_reg;
 
@@ -951,12 +939,12 @@ static __init int sysctl_ipv4_init(void)
 	if (!i->procname)
 		return -EINVAL;
 
-	hdr = register_net_sysctl(&init_net, "net/ipv4", ipv4_table);
+	hdr = register_sysctl_paths(net_ipv4_ctl_path, ipv4_table);
 	if (hdr == NULL)
 		return -ENOMEM;
 
 	if (register_pernet_subsys(&ipv4_sysctl_ops)) {
-		unregister_net_sysctl_table(hdr);
+		unregister_sysctl_table(hdr);
 		return -ENOMEM;
 	}
 

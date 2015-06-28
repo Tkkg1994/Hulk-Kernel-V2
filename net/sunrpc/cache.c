@@ -1273,7 +1273,7 @@ static void *c_start(struct seq_file *m, loff_t *pos)
 	__acquires(cd->hash_lock)
 {
 	loff_t n = *pos;
-	unsigned int hash, entry;
+	unsigned hash, entry;
 	struct cache_head *ch;
 	struct cache_detail *cd = ((struct handle*)m->private)->cd;
 
@@ -1632,7 +1632,7 @@ static int create_cache_proc_entries(struct cache_detail *cd, struct net *net)
 
 void __init cache_initialize(void)
 {
-	INIT_DEFERRABLE_WORK(&cache_cleaner, do_cache_clean);
+	INIT_DELAYED_WORK_DEFERRABLE(&cache_cleaner, do_cache_clean);
 }
 
 int cache_register_net(struct cache_detail *cd, struct net *net)

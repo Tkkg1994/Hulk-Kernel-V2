@@ -60,17 +60,16 @@ EXPORT_SYMBOL_GPL(pingv6_ops);
 
 static u16 ping_port_rover;
 
-static inline int ping_hashfn(struct net *net, unsigned int num, unsigned int mask)
+static inline int ping_hashfn(struct net *net, unsigned num, unsigned mask)
 {
 	int res = (num + net_hash_mix(net)) & mask;
-
 	pr_debug("hash(%d) = %d\n", num, res);
 	return res;
 }
 EXPORT_SYMBOL_GPL(ping_hash);
 
 static inline struct hlist_nulls_head *ping_hashslot(struct ping_table *table,
-					     struct net *net, unsigned int num)
+					     struct net *net, unsigned num)
 {
 	return &table->hash[ping_hashfn(net, num, PING_HTABLE_MASK)];
 }
@@ -235,8 +234,7 @@ static void inet_get_ping_group_range_net(struct net *net, kgid_t *low,
 					  kgid_t *high)
 {
 	kgid_t *data = net->ipv4.sysctl_ping_group_range;
-	unsigned int seq;
-
+	unsigned seq;
 	do {
 		seq = read_seqbegin(&sysctl_local_ports.lock);
 
@@ -522,7 +520,6 @@ void ping_err(struct sk_buff *skb, int offset, u32 info)
 			break;
 		case ICMP_DEST_UNREACH:
 			if (code == ICMP_FRAG_NEEDED) { /* Path MTU discovery */
-				ipv4_sk_update_pmtu(skb, sk, info);
 				if (inet_sock->pmtudisc != IP_PMTUDISC_DONT) {
 					err = EMSGSIZE;
 					harderr = 1;
@@ -538,7 +535,6 @@ void ping_err(struct sk_buff *skb, int offset, u32 info)
 			break;
 		case ICMP_REDIRECT:
 			/* See ICMP_SOURCE_QUENCH */
-			ipv4_sk_redirect(skb, sk);
 			err = EREMOTEIO;
 			break;
 		}
@@ -1141,7 +1137,7 @@ static int ping_proc_register(struct net *net)
 	struct proc_dir_entry *p;
 	int rc = 0;
 
-	p = proc_create("icmp", S_IRUGO, net->proc_net, &ping_seq_fops);
+	p = proc_net_fops_create(net, "icmp", S_IRUGO, &ping_seq_fops);
 	if (!p)
 		rc = -ENOMEM;
 	return rc;
@@ -1149,7 +1145,7 @@ static int ping_proc_register(struct net *net)
 
 static void ping_proc_unregister(struct net *net)
 {
-	remove_proc_entry("icmp", net->proc_net);
+	proc_net_remove(net, "icmp");
 }
 
 

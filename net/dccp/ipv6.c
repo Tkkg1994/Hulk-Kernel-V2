@@ -130,13 +130,6 @@ static void dccp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 
 	np = inet6_sk(sk);
 
-	if (type == NDISC_REDIRECT) {
-		struct dst_entry *dst = __sk_dst_check(sk, np->dst_cookie);
-
-		if (dst)
-			dst->ops->redirect(dst, sk, skb);
-	}
-
 	if (type == ICMPV6_PKT_TOOBIG) {
 		struct dst_entry *dst = NULL;
 
@@ -145,12 +138,37 @@ static void dccp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 		if ((1 << sk->sk_state) & (DCCPF_LISTEN | DCCPF_CLOSED))
 			goto out;
 
-		dst = inet6_csk_update_pmtu(sk, ntohl(info));
-		if (!dst)
-			goto out;
+		/* icmp should have updated the destination cache entry */
+		dst = __sk_dst_check(sk, np->dst_cookie);
+		if (dst == NULL) {
+			struct inet_sock *inet = inet_sk(sk);
+			struct flowi6 fl6;
 
-		if (inet_csk(sk)->icsk_pmtu_cookie > dst_mtu(dst))
+			/* BUGGG_FUTURE: Again, it is not clear how
+			   to handle rthdr case. Ignore this complexity
+			   for now.
+			 */
+			memset(&fl6, 0, sizeof(fl6));
+			fl6.flowi6_proto = IPPROTO_DCCP;
+			fl6.daddr = np->daddr;
+			fl6.saddr = np->saddr;
+			fl6.flowi6_oif = sk->sk_bound_dev_if;
+			fl6.fl6_dport = inet->inet_dport;
+			fl6.fl6_sport = inet->inet_sport;
+			security_sk_classify_flow(sk, flowi6_to_flowi(&fl6));
+
+			dst = ip6_dst_lookup_flow(sk, &fl6, NULL, false);
+			if (IS_ERR(dst)) {
+				sk->sk_err_soft = -PTR_ERR(dst);
+				goto out;
+			}
+		} else
+			dst_hold(dst);
+
+		if (inet_csk(sk)->icsk_pmtu_cookie > dst_mtu(dst)) {
 			dccp_sync_mss(sk, dst_mtu(dst));
+		} /* else let the usual retransmit timer handle it */
+		dst_release(dst);
 		goto out;
 	}
 
@@ -325,7 +343,6 @@ static struct request_sock_ops dccp6_request_sock_ops = {
 	.send_ack	= dccp_reqsk_send_ack,
 	.destructor	= dccp_v6_reqsk_destructor,
 	.send_reset	= dccp_v6_ctl_send_reset,
-	.syn_ack_timeout = dccp_syn_ack_timeout,
 };
 
 static struct sock *dccp_v6_hnd_req(struct sock *sk,struct sk_buff *skb)

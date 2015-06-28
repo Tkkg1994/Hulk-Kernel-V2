@@ -73,13 +73,13 @@ static const struct file_operations xfrm_statistics_seq_fops = {
 
 int __net_init xfrm_proc_init(struct net *net)
 {
-	if (!proc_create("xfrm_stat", S_IRUGO, net->proc_net,
-			 &xfrm_statistics_seq_fops))
+	if (!proc_net_fops_create(net, "xfrm_stat", S_IRUGO,
+				  &xfrm_statistics_seq_fops))
 		return -ENOMEM;
 	return 0;
 }
 
 void xfrm_proc_fini(struct net *net)
 {
-	remove_proc_entry("xfrm_stat", net->proc_net);
+	proc_net_remove(net, "xfrm_stat");
 }

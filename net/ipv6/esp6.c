@@ -24,8 +24,6 @@
  * 	This file is derived from net/ipv4/esp.c
  */
 
-#define pr_fmt(fmt) "IPv6: " fmt
-
 #include <crypto/aead.h>
 #include <crypto/authenc.h>
 #include <linux/err.h>
@@ -39,7 +37,6 @@
 #include <linux/random.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
-#include <net/ip6_route.h>
 #include <net/icmp.h>
 #include <net/ipv6.h>
 #include <net/protocol.h>
@@ -434,19 +431,15 @@ static void esp6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	struct xfrm_state *x;
 
 	if (type != ICMPV6_DEST_UNREACH &&
-	    type != ICMPV6_PKT_TOOBIG &&
-	    type != NDISC_REDIRECT)
+	    type != ICMPV6_PKT_TOOBIG)
 		return;
 
 	x = xfrm_state_lookup(net, skb->mark, (const xfrm_address_t *)&iph->daddr,
 			      esph->spi, IPPROTO_ESP, AF_INET6);
 	if (!x)
 		return;
-
-	if (type == NDISC_REDIRECT)
-		ip6_redirect(skb, net, 0, 0);
-	else
-		ip6_update_pmtu(skb, net, info, 0, 0);
+	printk(KERN_DEBUG "pmtu discovery on SA ESP/%08x/%pI6\n",
+			ntohl(esph->spi), &iph->daddr);
 	xfrm_state_put(x);
 }
 
@@ -654,11 +647,11 @@ static const struct inet6_protocol esp6_protocol = {
 static int __init esp6_init(void)
 {
 	if (xfrm_register_type(&esp6_type, AF_INET6) < 0) {
-		pr_info("%s: can't add xfrm type\n", __func__);
+		printk(KERN_INFO "ipv6 esp init: can't add xfrm type\n");
 		return -EAGAIN;
 	}
 	if (inet6_add_protocol(&esp6_protocol, IPPROTO_ESP) < 0) {
-		pr_info("%s: can't add protocol\n", __func__);
+		printk(KERN_INFO "ipv6 esp init: can't add protocol\n");
 		xfrm_unregister_type(&esp6_type, AF_INET6);
 		return -EAGAIN;
 	}
@@ -669,9 +662,9 @@ static int __init esp6_init(void)
 static void __exit esp6_fini(void)
 {
 	if (inet6_del_protocol(&esp6_protocol, IPPROTO_ESP) < 0)
-		pr_info("%s: can't remove protocol\n", __func__);
+		printk(KERN_INFO "ipv6 esp close: can't remove protocol\n");
 	if (xfrm_unregister_type(&esp6_type, AF_INET6) < 0)
-		pr_info("%s: can't remove xfrm type\n", __func__);
+		printk(KERN_INFO "ipv6 esp close: can't remove xfrm type\n");
 }
 
 module_init(esp6_init);

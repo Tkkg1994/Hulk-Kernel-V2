@@ -107,8 +107,6 @@
 #include <net/checksum.h>
 #include <net/xfrm.h>
 #include <trace/events/udp.h>
-#include <linux/static_key.h>
-#include <trace/events/skb.h>
 #include "udp_impl.h"
 
 struct udp_table udp_table __read_mostly;
@@ -208,7 +206,7 @@ int udp_lib_get_port(struct sock *sk, unsigned short snum,
 
 	if (!snum) {
 		int low, high, remaining;
-		unsigned int rand;
+		unsigned rand;
 		unsigned short first, last;
 		DECLARE_BITMAP(bitmap, PORTS_PER_CHAIN);
 
@@ -616,7 +614,6 @@ void __udp4_lib_err(struct sk_buff *skb, u32 info, struct udp_table *udptable)
 		break;
 	case ICMP_DEST_UNREACH:
 		if (code == ICMP_FRAG_NEEDED) { /* Path MTU discovery */
-			ipv4_sk_update_pmtu(skb, sk, info);
 			if (inet->pmtudisc != IP_PMTUDISC_DONT) {
 				err = EMSGSIZE;
 				harderr = 1;
@@ -629,9 +626,6 @@ void __udp4_lib_err(struct sk_buff *skb, u32 info, struct udp_table *udptable)
 			harderr = icmp_err_convert[code].fatal;
 			err = icmp_err_convert[code].errno;
 		}
-		break;
-	case ICMP_REDIRECT:
-		ipv4_sk_redirect(skb, sk);
 		break;
 	}
 
@@ -853,7 +847,7 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	 *	Get and verify the address.
 	 */
 	if (msg->msg_name) {
-		struct sockaddr_in *usin = (struct sockaddr_in *)msg->msg_name;
+		struct sockaddr_in * usin = (struct sockaddr_in *)msg->msg_name;
 		if (msg->msg_namelen < sizeof(*usin))
 			return -EINVAL;
 		if (usin->sin_family != AF_INET) {
@@ -1223,10 +1217,8 @@ try_again:
 			goto csum_copy_err;
 	}
 
-	if (unlikely(err)) {
-		trace_kfree_skb(skb, udp_recvmsg);
+	if (err)
 		goto out_free;
-	}
 
 	if (!peeked)
 		UDP_INC_STATS_USER(sock_net(sk),
@@ -1387,14 +1379,6 @@ static int __udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 
 }
 
-static struct static_key udp_encap_needed __read_mostly;
-void udp_encap_enable(void)
-{
-	if (!static_key_enabled(&udp_encap_needed))
-		static_key_slow_inc(&udp_encap_needed);
-}
-EXPORT_SYMBOL(udp_encap_enable);
-
 /* returns:
  *  -1: error
  *   0: success
@@ -1416,7 +1400,7 @@ int udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		goto drop;
 	nf_reset(skb);
 
-	if (static_key_false(&udp_encap_needed) && up->encap_type) {
+	if (up->encap_type) {
 		int (*encap_rcv)(struct sock *sk, struct sk_buff *skb);
 
 		/*
@@ -1486,7 +1470,7 @@ int udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		goto drop;
 
 
-	if (sk_rcvqueues_full(sk, skb, sk->sk_rcvbuf))
+	if (sk_rcvqueues_full(sk, skb))
 		goto drop;
 
 	rc = 0;
@@ -1495,7 +1479,7 @@ int udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	bh_lock_sock(sk);
 	if (!sock_owned_by_user(sk))
 		rc = __udp_queue_rcv_skb(sk, skb);
-	else if (sk_add_backlog(sk, skb, sk->sk_rcvbuf)) {
+	else if (sk_add_backlog(sk, skb)) {
 		bh_unlock_sock(sk);
 		goto drop;
 	}
@@ -1776,7 +1760,6 @@ int udp_lib_setsockopt(struct sock *sk, int level, int optname,
 			/* FALLTHROUGH */
 		case UDP_ENCAP_L2TPINUDP:
 			up->encap_type = val;
-			udp_encap_enable();
 			break;
 		default:
 			err = -ENOPROTOOPT;
@@ -2091,7 +2074,7 @@ EXPORT_SYMBOL(udp_proc_register);
 
 void udp_proc_unregister(struct net *net, struct udp_seq_afinfo *afinfo)
 {
-	remove_proc_entry(afinfo->name, net->proc_net);
+	proc_net_remove(net, afinfo->name);
 }
 EXPORT_SYMBOL(udp_proc_unregister);
 
@@ -2181,15 +2164,9 @@ void udp4_proc_exit(void)
 static __initdata unsigned long uhash_entries;
 static int __init set_uhash_entries(char *str)
 {
-	ssize_t ret;
-
 	if (!str)
 		return 0;
-
-	ret = kstrtoul(str, 0, &uhash_entries);
-	if (ret)
-		return 0;
-
+	uhash_entries = simple_strtoul(str, &str, 0);
 	if (uhash_entries && uhash_entries < UDP_HTABLE_SIZE_MIN)
 		uhash_entries = UDP_HTABLE_SIZE_MIN;
 	return 1;

@@ -73,23 +73,23 @@ static ssize_t netdev_store(struct device *dev, struct device_attribute *attr,
 			    const char *buf, size_t len,
 			    int (*set)(struct net_device *, unsigned long))
 {
-	struct net_device *netdev = to_net_dev(dev);
-	struct net *net = dev_net(netdev);
+	struct net_device *net = to_net_dev(dev);
+	char *endp;
 	unsigned long new;
 	int ret = -EINVAL;
 
-	if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
+	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
-	ret = kstrtoul(buf, 0, &new);
-	if (ret)
+	new = simple_strtoul(buf, &endp, 0);
+	if (endp == buf)
 		goto err;
 
 	if (!rtnl_trylock())
 		return restart_syscall();
 
-	if (dev_isalive(netdev)) {
-		if ((ret = (*set)(netdev, new)) == 0)
+	if (dev_isalive(net)) {
+		if ((ret = (*set)(net, new)) == 0)
 			ret = len;
 	}
 	rtnl_unlock();
@@ -167,21 +167,9 @@ static ssize_t show_duplex(struct device *dev,
 
 	if (netif_running(netdev)) {
 		struct ethtool_cmd cmd;
-		if (!__ethtool_get_settings(netdev, &cmd)) {
-			const char *duplex;
-			switch (cmd.duplex) {
-			case DUPLEX_HALF:
-				duplex = "half";
-				break;
-			case DUPLEX_FULL:
-				duplex = "full";
-				break;
-			default:
-				duplex = "unknown";
-				break;
-			}
-			ret = sprintf(buf, "%s\n", duplex);
-		}
+		if (!__ethtool_get_settings(netdev, &cmd))
+			ret = sprintf(buf, "%s\n",
+				      cmd.duplex ? "full" : "half");
 	}
 	rtnl_unlock();
 	return ret;
@@ -244,7 +232,7 @@ NETDEVICE_SHOW(flags, fmt_hex);
 
 static int change_flags(struct net_device *net, unsigned long new_flags)
 {
-	return dev_change_flags(net, (unsigned int) new_flags);
+	return dev_change_flags(net, (unsigned) new_flags);
 }
 
 static ssize_t store_flags(struct device *dev, struct device_attribute *attr,
@@ -265,9 +253,6 @@ static ssize_t store_tx_queue_len(struct device *dev,
 				  struct device_attribute *attr,
 				  const char *buf, size_t len)
 {
-	if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
-
 	return netdev_store(dev, attr, buf, len, change_tx_queue_len);
 }
 
@@ -275,11 +260,10 @@ static ssize_t store_ifalias(struct device *dev, struct device_attribute *attr,
 			     const char *buf, size_t len)
 {
 	struct net_device *netdev = to_net_dev(dev);
-	struct net *net = dev_net(netdev);
 	size_t count = len;
 	ssize_t ret;
 
-	if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
+	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
 	/* ignore trailing newline */
@@ -434,6 +418,72 @@ static struct attribute_group netstat_group = {
 	.name  = "statistics",
 	.attrs  = netstat_attrs,
 };
+
+#ifdef CONFIG_WIRELESS_EXT_SYSFS
+/* helper function that does all the locking etc for wireless stats */
+static ssize_t wireless_show(struct device *d, char *buf,
+			     ssize_t (*format)(const struct iw_statistics *,
+					       char *))
+{
+	struct net_device *dev = to_net_dev(d);
+	const struct iw_statistics *iw;
+	ssize_t ret = -EINVAL;
+
+	if (!rtnl_trylock())
+		return restart_syscall();
+	if (dev_isalive(dev)) {
+		iw = get_wireless_stats(dev);
+		if (iw)
+			ret = (*format)(iw, buf);
+	}
+	rtnl_unlock();
+
+	return ret;
+}
+
+/* show function template for wireless fields */
+#define WIRELESS_SHOW(name, field, format_string)			\
+static ssize_t format_iw_##name(const struct iw_statistics *iw, char *buf) \
+{									\
+	return sprintf(buf, format_string, iw->field);			\
+}									\
+static ssize_t show_iw_##name(struct device *d,				\
+			      struct device_attribute *attr, char *buf)	\
+{									\
+	return wireless_show(d, buf, format_iw_##name);			\
+}									\
+static DEVICE_ATTR(name, S_IRUGO, show_iw_##name, NULL)
+
+WIRELESS_SHOW(status, status, fmt_hex);
+WIRELESS_SHOW(link, qual.qual, fmt_dec);
+WIRELESS_SHOW(level, qual.level, fmt_dec);
+WIRELESS_SHOW(noise, qual.noise, fmt_dec);
+WIRELESS_SHOW(nwid, discard.nwid, fmt_dec);
+WIRELESS_SHOW(crypt, discard.code, fmt_dec);
+WIRELESS_SHOW(fragment, discard.fragment, fmt_dec);
+WIRELESS_SHOW(misc, discard.misc, fmt_dec);
+WIRELESS_SHOW(retries, discard.retries, fmt_dec);
+WIRELESS_SHOW(beacon, miss.beacon, fmt_dec);
+
+static struct attribute *wireless_attrs[] = {
+	&dev_attr_status.attr,
+	&dev_attr_link.attr,
+	&dev_attr_level.attr,
+	&dev_attr_noise.attr,
+	&dev_attr_nwid.attr,
+	&dev_attr_crypt.attr,
+	&dev_attr_fragment.attr,
+	&dev_attr_retries.attr,
+	&dev_attr_misc.attr,
+	&dev_attr_beacon.attr,
+	NULL
+};
+
+static struct attribute_group wireless_group = {
+	.name = "wireless",
+	.attrs = wireless_attrs,
+};
+#endif
 #endif /* CONFIG_SYSFS */
 
 #ifdef CONFIG_RPS
@@ -532,7 +582,7 @@ static ssize_t store_rps_map(struct netdev_rx_queue *queue,
 		return err;
 	}
 
-	map = kzalloc(max_t(unsigned int,
+	map = kzalloc(max_t(unsigned,
 	    RPS_MAP_SIZE(cpumask_weight(mask)), L1_CACHE_BYTES),
 	    GFP_KERNEL);
 	if (!map) {
@@ -853,7 +903,7 @@ static ssize_t bql_set_hold_time(struct netdev_queue *queue,
 				 const char *buf, size_t len)
 {
 	struct dql *dql = &queue->dql;
-	unsigned int value;
+	unsigned value;
 	int err;
 
 	err = kstrtouint(buf, 10, &value);
@@ -1057,7 +1107,7 @@ static ssize_t store_xps_map(struct netdev_queue *queue,
 		return err;
 	}
 
-	new_dev_maps = kzalloc(max_t(unsigned int,
+	new_dev_maps = kzalloc(max_t(unsigned,
 	    XPS_DEV_MAPS_SIZE, L1_CACHE_BYTES), GFP_KERNEL);
 	if (!new_dev_maps) {
 		free_cpumask_var(mask);
@@ -1414,6 +1464,14 @@ int netdev_register_kobject(struct net_device *net)
 		groups++;
 
 	*groups++ = &netstat_group;
+#ifdef CONFIG_WIRELESS_EXT_SYSFS
+	if (net->ieee80211_ptr)
+		*groups++ = &wireless_group;
+#ifdef CONFIG_WIRELESS_EXT
+	else if (net->wireless_handlers)
+		*groups++ = &wireless_group;
+#endif
+#endif
 #endif /* CONFIG_SYSFS */
 
 	error = device_add(dev);

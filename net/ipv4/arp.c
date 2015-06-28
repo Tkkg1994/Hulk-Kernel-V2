@@ -73,8 +73,6 @@
  *		Jesper D. Brouer:       Proxy ARP PVLAN RFC 3069 support.
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/string.h>
@@ -91,6 +89,7 @@
 #include <linux/etherdevice.h>
 #include <linux/fddidevice.h>
 #include <linux/if_arp.h>
+#include <linux/trdevice.h>
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
@@ -193,6 +192,9 @@ int arp_mc_map(__be32 addr, u8 *haddr, struct net_device *dev, int dir)
 	case ARPHRD_FDDI:
 	case ARPHRD_IEEE802:
 		ip_eth_mc_map(addr, haddr);
+		return 0;
+	case ARPHRD_IEEE802_TR:
+		ip_tr_mc_map(addr, haddr);
 		return 0;
 	case ARPHRD_INFINIBAND:
 		ip_ib_mc_map(addr, dev->broadcast, haddr);
@@ -362,7 +364,8 @@ static void arp_solicit(struct neighbour *neigh, struct sk_buff *skb)
 	probes -= neigh->parms->ucast_probes;
 	if (probes < 0) {
 		if (!(neigh->nud_state & NUD_VALID))
-			pr_debug("trying to ucast probe in NUD_INVALID\n");
+			printk(KERN_DEBUG
+			       "trying to ucast probe in NUD_INVALID\n");
 		dst_ha = neigh->ha;
 		read_lock_bh(&neigh->lock);
 	} else {
@@ -449,7 +452,7 @@ static int arp_set_predefined(int addr_hint, unsigned char *haddr,
 {
 	switch (addr_hint) {
 	case RTN_LOCAL:
-		pr_debug("arp called for own IP address\n");
+		printk(KERN_DEBUG "ARP: arp called for own IP address\n");
 		memcpy(haddr, dev->dev_addr, dev->addr_len);
 		return 1;
 	case RTN_MULTICAST:
@@ -470,12 +473,13 @@ int arp_find(unsigned char *haddr, struct sk_buff *skb)
 	struct neighbour *n;
 
 	if (!skb_dst(skb)) {
-		pr_debug("arp_find is called with dst==NULL\n");
+		printk(KERN_DEBUG "arp_find is called with dst==NULL\n");
 		kfree_skb(skb);
 		return 1;
 	}
 
-	paddr = rt_nexthop(skb_rtable(skb), ip_hdr(skb)->daddr);
+	paddr = skb_rtable(skb)->rt_gateway;
+
 	if (arp_set_predefined(inet_addr_type(dev_net(dev), paddr), haddr,
 			       paddr, dev))
 		return 0;
@@ -644,6 +648,12 @@ struct sk_buff *arp_create(int type, int ptype, __be32 dest_ip,
 		arp->ar_pro = htons(ETH_P_IP);
 		break;
 #endif
+#if IS_ENABLED(CONFIG_TR)
+	case ARPHRD_IEEE802_TR:
+		arp->ar_hrd = htons(ARPHRD_IEEE802);
+		arp->ar_pro = htons(ETH_P_IP);
+		break;
+#endif
 	}
 
 	arp->ar_hln = dev->addr_len;
@@ -741,10 +751,11 @@ static int arp_process(struct sk_buff *skb)
 			goto out;
 		break;
 	case ARPHRD_ETHER:
+	case ARPHRD_IEEE802_TR:
 	case ARPHRD_FDDI:
 	case ARPHRD_IEEE802:
 		/*
-		 * ETHERNET, and Fibre Channel (which are IEEE 802
+		 * ETHERNET, Token Ring and Fibre Channel (which are IEEE 802
 		 * devices, according to RFC 2625) devices will accept ARP
 		 * hardware types of either 1 (Ethernet) or 6 (IEEE 802.2).
 		 * This is the case also of FDDI, where the RFC 1390 says that
@@ -789,8 +800,7 @@ static int arp_process(struct sk_buff *skb)
  *	Check for bad requests for 127.x.x.x and requests for multicast
  *	addresses.  If this is one such, delete it.
  */
-	if (ipv4_is_multicast(tip) ||
-	    (!IN_DEV_ROUTE_LOCALNET(in_dev) && ipv4_is_loopback(tip)))
+	if (ipv4_is_loopback(tip) || ipv4_is_multicast(tip))
 		goto out;
 
 /*
@@ -827,7 +837,7 @@ static int arp_process(struct sk_buff *skb)
 	}
 
 	if (arp->ar_op == htons(ARPOP_REQUEST) &&
-	    ip_route_input(skb, tip, sip, 0, dev) == 0) {
+	    ip_route_input_noref(skb, tip, sip, 0, dev) == 0) {
 
 		rt = skb_rtable(skb);
 		addr_type = rt->rt_type;
@@ -1049,7 +1059,7 @@ static int arp_req_set(struct net *net, struct arpreq *r,
 	neigh = __neigh_lookup_errno(&arp_tbl, &ip, dev);
 	err = PTR_ERR(neigh);
 	if (!IS_ERR(neigh)) {
-		unsigned int state = NUD_STALE;
+		unsigned state = NUD_STALE;
 		if (r->arp_flags & ATF_PERM)
 			state = NUD_PERMANENT;
 		err = neigh_update(neigh, (r->arp_flags & ATF_COM) ?
@@ -1061,7 +1071,7 @@ static int arp_req_set(struct net *net, struct arpreq *r,
 	return err;
 }
 
-static unsigned int arp_state_to_flags(struct neighbour *neigh)
+static unsigned arp_state_to_flags(struct neighbour *neigh)
 {
 	if (neigh->nud_state&NUD_PERMANENT)
 		return ATF_PERM | ATF_COM;
@@ -1406,14 +1416,14 @@ static const struct file_operations arp_seq_fops = {
 
 static int __net_init arp_net_init(struct net *net)
 {
-	if (!proc_create("arp", S_IRUGO, net->proc_net, &arp_seq_fops))
+	if (!proc_net_fops_create(net, "arp", S_IRUGO, &arp_seq_fops))
 		return -ENOMEM;
 	return 0;
 }
 
 static void __net_exit arp_net_exit(struct net *net)
 {
-	remove_proc_entry("arp", net->proc_net);
+	proc_net_remove(net, "arp");
 }
 
 static struct pernet_operations arp_net_ops = {

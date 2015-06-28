@@ -3,17 +3,12 @@
 #
 config XFRM
        bool
+       select CRYPTO
        depends on NET
-
-config XFRM_ALGO
-	tristate
-	select XFRM
-	select CRYPTO
 
 config XFRM_USER
 	tristate "Transformation user configuration interface"
-	depends on INET
-	select XFRM_ALGO
+	depends on INET && XFRM
 	---help---
 	  Support for Transformation(XFRM) user configuration interface
 	  like IPsec used by native Linux tools.
@@ -53,13 +48,13 @@ config XFRM_STATISTICS
 
 config XFRM_IPCOMP
 	tristate
-	select XFRM_ALGO
+	select XFRM
 	select CRYPTO
 	select CRYPTO_DEFLATE
 
 config NET_KEY
 	tristate "PF_KEY sockets"
-	select XFRM_ALGO
+	select XFRM
 	---help---
 	  PF_KEYv2 socket family, compatible to KAME ones.
 	  They are required if you are going to use IPsec tools ported

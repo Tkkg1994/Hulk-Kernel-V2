@@ -19,8 +19,6 @@
  * 		YOSHIFUJI Hideaki <yoshfuji@linux-ipv6.org>
  */
 
-#define pr_fmt(fmt) "IPv6: " fmt
-
 #include <linux/icmpv6.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -162,11 +160,11 @@ static const struct inet6_protocol tunnel46_protocol = {
 static int __init tunnel6_init(void)
 {
 	if (inet6_add_protocol(&tunnel6_protocol, IPPROTO_IPV6)) {
-		pr_err("%s: can't add protocol\n", __func__);
+		printk(KERN_ERR "tunnel6 init(): can't add protocol\n");
 		return -EAGAIN;
 	}
 	if (inet6_add_protocol(&tunnel46_protocol, IPPROTO_IPIP)) {
-		pr_err("%s: can't add protocol\n", __func__);
+		printk(KERN_ERR "tunnel6 init(): can't add protocol\n");
 		inet6_del_protocol(&tunnel6_protocol, IPPROTO_IPV6);
 		return -EAGAIN;
 	}
@@ -176,9 +174,9 @@ static int __init tunnel6_init(void)
 static void __exit tunnel6_fini(void)
 {
 	if (inet6_del_protocol(&tunnel46_protocol, IPPROTO_IPIP))
-		pr_err("%s: can't remove protocol\n", __func__);
+		printk(KERN_ERR "tunnel6 close: can't remove protocol\n");
 	if (inet6_del_protocol(&tunnel6_protocol, IPPROTO_IPV6))
-		pr_err("%s: can't remove protocol\n", __func__);
+		printk(KERN_ERR "tunnel6 close: can't remove protocol\n");
 }
 
 module_init(tunnel6_init);

@@ -221,8 +221,9 @@ static inline int arp_checkentry(const struct arpt_arp *arp)
 static unsigned int
 arpt_error(struct sk_buff *skb, const struct xt_action_param *par)
 {
-	net_err_ratelimited("arp_tables: error: '%s'\n",
-			    (const char *)par->targinfo);
+	if (net_ratelimit())
+		pr_err("arp_tables: error: '%s'\n",
+		       (const char *)par->targinfo);
 
 	return NF_DROP;
 }
@@ -308,7 +309,7 @@ unsigned int arpt_do_table(struct sk_buff *skb,
 			if (v < 0) {
 				/* Pop from stack? */
 				if (v != XT_RETURN) {
-					verdict = (unsigned int)(-v) - 1;
+					verdict = (unsigned)(-v) - 1;
 					break;
 				}
 				e = back;

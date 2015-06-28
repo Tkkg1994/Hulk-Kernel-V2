@@ -71,7 +71,6 @@ struct net {
 	struct hlist_head 	*dev_name_head;
 	struct hlist_head	*dev_index_head;
 	unsigned int		dev_base_seq;	/* protected by rtnl_mutex */
-	int			ifindex;
 
 	/* core fib_rules */
 	struct list_head	rules_ops;
@@ -107,7 +106,6 @@ struct net {
 	struct netns_xfrm	xfrm;
 #endif
 	struct netns_ipvs	*ipvs;
-	struct sock		*diag_nlsk;
 };
 
 
@@ -291,16 +289,14 @@ extern void unregister_pernet_subsys(struct pernet_operations *);
 extern int register_pernet_device(struct pernet_operations *);
 extern void unregister_pernet_device(struct pernet_operations *);
 
+struct ctl_path;
 struct ctl_table;
 struct ctl_table_header;
 
-#ifdef CONFIG_SYSCTL
-extern int net_sysctl_init(void);
-#else
-static inline int net_sysctl_init(void) { return 0; }
-#endif
-extern struct ctl_table_header *register_net_sysctl(struct net *net,
-	const char *path, struct ctl_table *table);
+extern struct ctl_table_header *register_net_sysctl_table(struct net *net,
+	const struct ctl_path *path, struct ctl_table *table);
+extern struct ctl_table_header *register_net_sysctl_rotable(
+	const struct ctl_path *path, struct ctl_table *table);
 extern void unregister_net_sysctl_table(struct ctl_table_header *header);
 
 #endif /* __NET_NET_NAMESPACE_H */

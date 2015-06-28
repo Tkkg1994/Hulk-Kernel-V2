@@ -890,15 +890,15 @@ __be16 xfrm_flowi_dport(const struct flowi *fl, const union flowi_uli *uli)
 	return port;
 }
 
-extern bool xfrm_selector_match(const struct xfrm_selector *sel,
-				const struct flowi *fl,
-				unsigned short family);
+extern int xfrm_selector_match(const struct xfrm_selector *sel,
+			       const struct flowi *fl,
+			       unsigned short family);
 
 #ifdef CONFIG_SECURITY_NETWORK_XFRM
 /*	If neither has a context --> match
  * 	Otherwise, both must have a context and the sids, doi, alg must match
  */
-static inline bool xfrm_sec_ctx_match(struct xfrm_sec_ctx *s1, struct xfrm_sec_ctx *s2)
+static inline int xfrm_sec_ctx_match(struct xfrm_sec_ctx *s1, struct xfrm_sec_ctx *s2)
 {
 	return ((!s1 && !s2) ||
 		(s1 && s2 &&
@@ -907,9 +907,9 @@ static inline bool xfrm_sec_ctx_match(struct xfrm_sec_ctx *s1, struct xfrm_sec_c
 		 (s1->ctx_alg == s2->ctx_alg)));
 }
 #else
-static inline bool xfrm_sec_ctx_match(struct xfrm_sec_ctx *s1, struct xfrm_sec_ctx *s2)
+static inline int xfrm_sec_ctx_match(struct xfrm_sec_ctx *s1, struct xfrm_sec_ctx *s2)
 {
-	return true;
+	return 1;
 }
 #endif
 
@@ -1479,8 +1479,6 @@ extern int xfrm4_output(struct sk_buff *skb);
 extern int xfrm4_output_finish(struct sk_buff *skb);
 extern int xfrm4_tunnel_register(struct xfrm_tunnel *handler, unsigned short family);
 extern int xfrm4_tunnel_deregister(struct xfrm_tunnel *handler, unsigned short family);
-extern int xfrm4_mode_tunnel_input_register(struct xfrm_tunnel *handler);
-extern int xfrm4_mode_tunnel_input_deregister(struct xfrm_tunnel *handler);
 extern int xfrm6_extract_header(struct sk_buff *skb);
 extern int xfrm6_extract_input(struct xfrm_state *x, struct sk_buff *skb);
 extern int xfrm6_rcv_spi(struct sk_buff *skb, int nexthdr, __be32 spi);
@@ -1688,11 +1686,12 @@ static inline int xfrm_mark_get(struct nlattr **attrs, struct xfrm_mark *m)
 
 static inline int xfrm_mark_put(struct sk_buff *skb, const struct xfrm_mark *m)
 {
-	int ret = 0;
-
 	if (m->m | m->v)
-		ret = nla_put(skb, XFRMA_MARK, sizeof(struct xfrm_mark), m);
-	return ret;
+		NLA_PUT(skb, XFRMA_MARK, sizeof(struct xfrm_mark), m);
+	return 0;
+
+nla_put_failure:
+	return -1;
 }
 
 #endif	/* _NET_XFRM_H */

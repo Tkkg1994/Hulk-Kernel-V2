@@ -404,7 +404,9 @@ static inline int __nf_ct_expect_check(struct nf_conntrack_expect *expect)
 	}
 
 	if (net->ct.expect_count >= nf_ct_expect_max) {
-		net_warn_ratelimited("nf_conntrack: expectation table full\n");
+		if (net_ratelimit())
+			printk(KERN_WARNING
+			       "nf_conntrack: expectation table full\n");
 		ret = -EMFILE;
 	}
 out:
@@ -568,8 +570,7 @@ static int exp_proc_init(struct net *net)
 #ifdef CONFIG_NF_CONNTRACK_PROCFS
 	struct proc_dir_entry *proc;
 
-	proc = proc_create("nf_conntrack_expect", 0440, net->proc_net,
-			   &exp_file_ops);
+	proc = proc_net_fops_create(net, "nf_conntrack_expect", 0440, &exp_file_ops);
 	if (!proc)
 		return -ENOMEM;
 #endif /* CONFIG_NF_CONNTRACK_PROCFS */
@@ -579,7 +580,7 @@ static int exp_proc_init(struct net *net)
 static void exp_proc_remove(struct net *net)
 {
 #ifdef CONFIG_NF_CONNTRACK_PROCFS
-	remove_proc_entry("nf_conntrack_expect", net->proc_net);
+	proc_net_remove(net, "nf_conntrack_expect");
 #endif /* CONFIG_NF_CONNTRACK_PROCFS */
 }
 

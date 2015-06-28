@@ -58,25 +58,16 @@ static inline unsigned int rt6_flags2srcprefs(int flags)
 	return (flags >> 3) & 7;
 }
 
-extern void rt6_bind_peer(struct rt6_info *rt, int create);
-
-static inline struct inet_peer *__rt6_get_peer(struct rt6_info *rt, int create)
-{
-	if (rt6_has_peer(rt))
-		return rt6_peer_ptr(rt);
-
-	rt6_bind_peer(rt, create);
-	return rt6_peer_ptr(rt);
-}
+extern void			rt6_bind_peer(struct rt6_info *rt,
+					      int create);
 
 static inline struct inet_peer *rt6_get_peer(struct rt6_info *rt)
 {
-	return __rt6_get_peer(rt, 0);
-}
+	if (rt->rt6i_peer)
+		return rt->rt6i_peer;
 
-static inline struct inet_peer *rt6_get_peer_create(struct rt6_info *rt)
-{
-	return __rt6_get_peer(rt, 1);
+	rt6_bind_peer(rt, 0);
+	return rt->rt6i_peer;
 }
 
 extern void			ip6_route_input(struct sk_buff *skb);
@@ -138,12 +129,17 @@ extern int			rt6_route_rcv(struct net_device *dev,
 					      u8 *opt, int len,
 					      const struct in6_addr *gwaddr);
 
-extern void ip6_update_pmtu(struct sk_buff *skb, struct net *net, __be32 mtu,
-			    int oif, u32 mark);
-extern void ip6_sk_update_pmtu(struct sk_buff *skb, struct sock *sk,
-			       __be32 mtu);
-extern void ip6_redirect(struct sk_buff *skb, struct net *net, int oif, u32 mark);
-extern void ip6_sk_redirect(struct sk_buff *skb, struct sock *sk);
+extern void			rt6_redirect(const struct in6_addr *dest,
+					     const struct in6_addr *src,
+					     const struct in6_addr *saddr,
+					     struct neighbour *neigh,
+					     u8 *lladdr,
+					     int on_link);
+
+extern void			rt6_pmtu_discovery(const struct in6_addr *daddr,
+						   const struct in6_addr *saddr,
+						   struct net_device *dev,
+						   u32 pmtu);
 
 struct netlink_callback;
 
@@ -155,7 +151,7 @@ struct rt6_rtnl_dump_arg {
 
 extern int rt6_dump_route(struct rt6_info *rt, void *p_arg);
 extern void rt6_ifdown(struct net *net, struct net_device *dev);
-extern void rt6_mtu_change(struct net_device *dev, unsigned int mtu);
+extern void rt6_mtu_change(struct net_device *dev, unsigned mtu);
 extern void rt6_remove_prefsrc(struct inet6_ifaddr *ifp);
 
 
@@ -184,7 +180,7 @@ static inline void ip6_dst_store(struct sock *sk, struct dst_entry *dst,
 	spin_unlock(&sk->sk_dst_lock);
 }
 
-static inline bool ipv6_unicast_destination(const struct sk_buff *skb)
+static inline int ipv6_unicast_destination(struct sk_buff *skb)
 {
 	struct rt6_info *rt = (struct rt6_info *) skb_dst(skb);
 

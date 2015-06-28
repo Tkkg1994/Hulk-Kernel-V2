@@ -1467,8 +1467,8 @@ static int pppol2tp_session_getsockopt(struct sock *sk,
  * handler, according to whether the PPPoX socket is a for a regular session
  * or the special tunnel type.
  */
-static int pppol2tp_getsockopt(struct socket *sock, int level, int optname,
-			       char __user *optval, int __user *optlen)
+static int pppol2tp_getsockopt(struct socket *sock, int level,
+			       int optname, char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	struct l2tp_session *session;
@@ -1480,7 +1480,7 @@ static int pppol2tp_getsockopt(struct socket *sock, int level, int optname,
 	if (level != SOL_PPPOL2TP)
 		return udp_prot.getsockopt(sk, level, optname, optval, optlen);
 
-	if (get_user(len, optlen))
+	if (get_user(len, (int __user *) optlen))
 		return -EFAULT;
 
 	len = min_t(unsigned int, len, sizeof(int));
@@ -1513,7 +1513,7 @@ static int pppol2tp_getsockopt(struct socket *sock, int level, int optname,
 		err = pppol2tp_session_getsockopt(sk, session, optname, &val);
 
 	err = -EFAULT;
-	if (put_user(len, optlen))
+	if (put_user(len, (int __user *) optlen))
 		goto end_put_sess;
 
 	if (copy_to_user((void __user *) optval, &val, len))
@@ -1734,8 +1734,7 @@ static __net_init int pppol2tp_init_net(struct net *net)
 	struct proc_dir_entry *pde;
 	int err = 0;
 
-	pde = proc_create("pppol2tp", S_IRUGO, net->proc_net,
-			  &pppol2tp_proc_fops);
+	pde = proc_net_fops_create(net, "pppol2tp", S_IRUGO, &pppol2tp_proc_fops);
 	if (!pde) {
 		err = -ENOMEM;
 		goto out;
@@ -1747,7 +1746,7 @@ out:
 
 static __net_exit void pppol2tp_exit_net(struct net *net)
 {
-	remove_proc_entry("pppol2tp", net->proc_net);
+	proc_net_remove(net, "pppol2tp");
 }
 
 static struct pernet_operations pppol2tp_net_ops = {

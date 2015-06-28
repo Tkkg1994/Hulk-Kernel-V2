@@ -46,8 +46,7 @@ struct prefix_info {
 #include <net/if_inet6.h>
 #include <net/ipv6.h>
 
-#define IN6_ADDR_HSIZE_SHIFT	4
-#define IN6_ADDR_HSIZE		(1 << IN6_ADDR_HSIZE_SHIFT)
+#define IN6_ADDR_HSIZE		16
 
 extern int			addrconf_init(void);
 extern void			addrconf_cleanup(void);
@@ -96,7 +95,7 @@ extern void			addrconf_leave_solict(struct inet6_dev *idev,
 					const struct in6_addr *addr);
 
 static inline unsigned long addrconf_timeout_fixup(u32 timeout,
-						   unsigned int unit)
+						    unsigned unit)
 {
 	if (timeout == 0xffffffff)
 		return ~0UL;
@@ -135,9 +134,9 @@ extern int ipv6_sock_mc_join(struct sock *sk, int ifindex,
 extern int ipv6_sock_mc_drop(struct sock *sk, int ifindex,
 			     const struct in6_addr *addr);
 extern void ipv6_sock_mc_close(struct sock *sk);
-extern bool inet6_mc_check(struct sock *sk,
-			   const struct in6_addr *mc_addr,
-			   const struct in6_addr *src_addr);
+extern int inet6_mc_check(struct sock *sk,
+			  const struct in6_addr *mc_addr,
+			  const struct in6_addr *src_addr);
 
 extern int ipv6_dev_mc_inc(struct net_device *dev, const struct in6_addr *addr);
 extern int __ipv6_dev_mc_dec(struct inet6_dev *idev, const struct in6_addr *addr);
@@ -150,10 +149,10 @@ extern void ipv6_mc_init_dev(struct inet6_dev *idev);
 extern void ipv6_mc_destroy_dev(struct inet6_dev *idev);
 extern void addrconf_dad_failure(struct inet6_ifaddr *ifp);
 
-extern bool ipv6_chk_mcast_addr(struct net_device *dev,
-				const struct in6_addr *group,
-				const struct in6_addr *src_addr);
-extern bool ipv6_is_mld(struct sk_buff *skb, int nexthdr);
+extern int ipv6_chk_mcast_addr(struct net_device *dev,
+			       const struct in6_addr *group,
+			       const struct in6_addr *src_addr);
+extern int ipv6_is_mld(struct sk_buff *skb, int nexthdr);
 
 extern void addrconf_prefix_rcv(struct net_device *dev,
 				u8 *opt, int len, bool sllao);
@@ -167,8 +166,8 @@ extern void ipv6_sock_ac_close(struct sock *sk);
 
 extern int ipv6_dev_ac_inc(struct net_device *dev, const struct in6_addr *addr);
 extern int __ipv6_dev_ac_dec(struct inet6_dev *idev, const struct in6_addr *addr);
-extern bool ipv6_chk_acast_addr(struct net *net, struct net_device *dev,
-				const struct in6_addr *addr);
+extern int ipv6_chk_acast_addr(struct net *net, struct net_device *dev,
+			       const struct in6_addr *addr);
 
 u32 addrconf_rt_table(const struct net_device *dev, u32 default_table);
 

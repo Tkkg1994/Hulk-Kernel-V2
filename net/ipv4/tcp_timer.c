@@ -32,6 +32,10 @@ int sysctl_tcp_retries2 __read_mostly = TCP_RETR2;
 int sysctl_tcp_orphan_retries __read_mostly;
 int sysctl_tcp_thin_linear_timeouts __read_mostly;
 
+static void tcp_write_timer(unsigned long);
+static void tcp_delack_timer(unsigned long);
+static void tcp_keepalive_timer (unsigned long data);
+
 /*Function to reset tcp_ack related sysctl on resetting master control */
 void set_tcp_default(void)
 {
@@ -61,6 +65,13 @@ int tcp_use_userconfig_sysctl_handler(ctl_table *table, int write,
 	}
 	return ret;
 }
+
+void tcp_init_xmit_timers(struct sock *sk)
+{
+	inet_csk_init_xmit_timers(sk, &tcp_write_timer, &tcp_delack_timer,
+				  &tcp_keepalive_timer);
+}
+EXPORT_SYMBOL(tcp_init_xmit_timers);
 
 static void tcp_write_err(struct sock *sk)
 {
@@ -224,10 +235,20 @@ static int tcp_write_timeout(struct sock *sk)
 	return 0;
 }
 
-void tcp_delack_timer_handler(struct sock *sk)
+static void tcp_delack_timer(unsigned long data)
 {
+	struct sock *sk = (struct sock *)data;
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
+
+	bh_lock_sock(sk);
+	if (sock_owned_by_user(sk)) {
+		/* Try again later. */
+		icsk->icsk_ack.blocked = 1;
+		NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_DELAYEDACKLOCKED);
+		sk_reset_timer(sk, &icsk->icsk_delack_timer, jiffies + TCP_DELACK_MIN);
+		goto out_unlock;
+	}
 
 	sk_mem_reclaim_partial(sk);
 
@@ -269,21 +290,7 @@ void tcp_delack_timer_handler(struct sock *sk)
 out:
 	if (sk_under_memory_pressure(sk))
 		sk_mem_reclaim(sk);
-}
-
-static void tcp_delack_timer(unsigned long data)
-{
-	struct sock *sk = (struct sock *)data;
-
-	bh_lock_sock(sk);
-	if (!sock_owned_by_user(sk)) {
-		tcp_delack_timer_handler(sk);
-	} else {
-		inet_csk(sk)->icsk_ack.blocked = 1;
-		NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_DELAYEDACKLOCKED);
-		/* deleguate our work to tcp_release_cb() */
-		set_bit(TCP_WRITE_TIMER_DEFERRED, &tcp_sk(sk)->tsq_flags);
-	}
+out_unlock:
 	bh_unlock_sock(sk);
 	sock_put(sk);
 }
@@ -341,11 +348,6 @@ void tcp_retransmit_timer(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
-
-	if (tp->early_retrans_delayed) {
-		tcp_resume_early_retransmit(sk);
-		return;
-	}
 
 	if (!tp->packets_out)
 		goto out;
@@ -473,10 +475,18 @@ out_reset_timer:
 out:;
 }
 
-void tcp_write_timer_handler(struct sock *sk)
+static void tcp_write_timer(unsigned long data)
 {
+	struct sock *sk = (struct sock *)data;
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	int event;
+
+	bh_lock_sock(sk);
+	if (sock_owned_by_user(sk)) {
+		/* Try again later */
+		sk_reset_timer(sk, &icsk->icsk_retransmit_timer, jiffies + (HZ / 20));
+		goto out_unlock;
+	}
 
 	if (sk->sk_state == TCP_CLOSE || !icsk->icsk_pending)
 		goto out;
@@ -500,19 +510,7 @@ void tcp_write_timer_handler(struct sock *sk)
 
 out:
 	sk_mem_reclaim(sk);
-}
-
-static void tcp_write_timer(unsigned long data)
-{
-	struct sock *sk = (struct sock *)data;
-
-	bh_lock_sock(sk);
-	if (!sock_owned_by_user(sk)) {
-		tcp_write_timer_handler(sk);
-	} else {
-		/* deleguate our work to tcp_release_cb() */
-		set_bit(TCP_WRITE_TIMER_DEFERRED, &tcp_sk(sk)->tsq_flags);
-	}
+out_unlock:
 	bh_unlock_sock(sk);
 	sock_put(sk);
 }
@@ -629,10 +627,3 @@ out:
 	bh_unlock_sock(sk);
 	sock_put(sk);
 }
-
-void tcp_init_xmit_timers(struct sock *sk)
-{
-	inet_csk_init_xmit_timers(sk, &tcp_write_timer, &tcp_delack_timer,
-				  &tcp_keepalive_timer);
-}
-EXPORT_SYMBOL(tcp_init_xmit_timers);

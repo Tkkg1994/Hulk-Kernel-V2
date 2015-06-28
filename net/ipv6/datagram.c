@@ -33,9 +33,9 @@
 #include <linux/errqueue.h>
 #include <asm/uaccess.h>
 
-static bool ipv6_mapped_addr_any(const struct in6_addr *a)
+static inline int ipv6_mapped_addr_any(const struct in6_addr *a)
 {
-	return ipv6_addr_v4mapped(a) && (a->s6_addr32[3] == 0);
+	return (ipv6_addr_v4mapped(a) && (a->s6_addr32[3] == 0));
 }
 
 int ip6_datagram_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
@@ -522,7 +522,7 @@ int ip6_datagram_recv_ctl(struct sock *sk, struct msghdr *msg, struct sk_buff *s
 		u8 nexthdr = ipv6_hdr(skb)->nexthdr;
 
 		while (off <= opt->lastopt) {
-			unsigned int len;
+			unsigned len;
 			u8 *ptr = nh + off;
 
 			switch(nexthdr) {

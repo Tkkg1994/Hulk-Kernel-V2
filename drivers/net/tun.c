@@ -69,7 +69,6 @@
 #include <net/netns/generic.h>
 #include <net/rtnetlink.h>
 #include <net/sock.h>
-#include <net/cls_cgroup.h>
 // ------------- START of KNOX_VPN ------------------//
 #include <linux/types.h>
 #include <linux/udp.h>
@@ -621,7 +620,7 @@ static struct sk_buff *tun_alloc_skb(struct tun_struct *tun,
 	struct sk_buff *skb;
 	int err;
 
-	sock_update_classid(sk, current);
+	sock_update_classid(sk);
 
 	/* Under a page?  Don't bother with paged skb. */
 	if (prepad + len < PAGE_SIZE || !linear)

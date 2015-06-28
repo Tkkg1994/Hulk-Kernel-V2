@@ -288,7 +288,7 @@ struct hh_cache {
 struct header_ops {
 	int	(*create) (struct sk_buff *skb, struct net_device *dev,
 			   unsigned short type, const void *daddr,
-			   const void *saddr, unsigned int len);
+			   const void *saddr, unsigned len);
 	int	(*parse)(const struct sk_buff *skb, unsigned char *haddr);
 	int	(*rebuild)(struct sk_buff *skb);
 	int	(*cache)(const struct neighbour *neigh, struct hh_cache *hh, __be16 type);
@@ -1377,9 +1377,6 @@ static inline void netdev_for_each_tx_queue(struct net_device *dev,
 		f(dev, &dev->_tx[i], arg);
 }
 
-extern struct netdev_queue *netdev_pick_tx(struct net_device *dev,
-					   struct sk_buff *skb);
-
 /*
  * Net namespace inlines
  */
@@ -1471,22 +1468,17 @@ struct napi_gro_cb {
 	/* This indicates where we are processing relative to skb->data. */
 	int data_offset;
 
+	/* This is non-zero if the packet may be of the same flow. */
+	int same_flow;
+
 	/* This is non-zero if the packet cannot be merged with the new skb. */
 	int flush;
 
 	/* Number of segments aggregated. */
-	u16	count;
-
-	/* This is non-zero if the packet may be of the same flow. */
-	u8	same_flow;
+	int count;
 
 	/* Free the skb? */
-	u8	free;
-#define NAPI_GRO_FREE		  1
-#define NAPI_GRO_FREE_STOLEN_HEAD 2
-
-	/* jiffies when first packet was created/queued */
-	unsigned long age;
+	int free;
 };
 
 #define NAPI_GRO_CB(skb) ((struct napi_gro_cb *)(skb)->cb)
@@ -1498,20 +1490,15 @@ struct packet_type {
 					 struct net_device *,
 					 struct packet_type *,
 					 struct net_device *);
-	bool			(*id_match)(struct packet_type *ptype,
-					    struct sock *sk);
-	void			*af_packet_priv;
-	struct list_head	list;
-};
-
-struct packet_offload {
-	__be16			type;	/* This is really htons(ether_type). */
 	struct sk_buff		*(*gso_segment)(struct sk_buff *skb,
 						netdev_features_t features);
 	int			(*gso_send_check)(struct sk_buff *skb);
 	struct sk_buff		**(*gro_receive)(struct sk_buff **head,
 					       struct sk_buff *skb);
 	int			(*gro_complete)(struct sk_buff *skb);
+	bool			(*id_match)(struct packet_type *ptype,
+					    struct sock *sk);
+	void			*af_packet_priv;
 	struct list_head	list;
 };
 
@@ -1540,7 +1527,7 @@ struct packet_offload {
 #define NETDEV_PRE_TYPE_CHANGE	0x000E
 #define NETDEV_POST_TYPE_CHANGE	0x000F
 #define NETDEV_POST_INIT	0x0010
-#define NETDEV_UNREGISTER_FINAL 0x0011
+#define NETDEV_UNREGISTER_BATCH 0x0011
 #define NETDEV_RELEASE		0x0012
 #define NETDEV_NOTIFY_PEERS	0x0013
 #define NETDEV_JOIN		0x0014
@@ -1551,8 +1538,6 @@ extern int call_netdevice_notifiers(unsigned long val, struct net_device *dev);
 
 
 extern rwlock_t				dev_base_lock;		/* Device list lock */
-
-extern seqcount_t	devnet_rename_seq;	/* Device rename seq */
 
 
 #define for_each_netdev(net, d)		\
@@ -1611,9 +1596,6 @@ extern struct net_device *__dev_getfirstbyhwtype(struct net *net, unsigned short
 extern void		dev_add_pack(struct packet_type *pt);
 extern void		dev_remove_pack(struct packet_type *pt);
 extern void		__dev_remove_pack(struct packet_type *pt);
-extern void		dev_add_offload(struct packet_offload *po);
-extern void		dev_remove_offload(struct packet_offload *po);
-extern void		__dev_remove_offload(struct packet_offload *po);
 
 extern struct net_device	*dev_get_by_flags_rcu(struct net *net, unsigned short flags,
 						      unsigned short mask);
@@ -1624,7 +1606,6 @@ extern int		dev_alloc_name(struct net_device *dev, const char *name);
 extern int		dev_open(struct net_device *dev);
 extern int		dev_close(struct net_device *dev);
 extern void		dev_disable_lro(struct net_device *dev);
-extern int		dev_loopback_xmit(struct sk_buff *newskb);
 extern int		dev_queue_xmit(struct sk_buff *skb);
 extern int		register_netdevice(struct net_device *dev);
 extern void		unregister_netdevice_queue(struct net_device *dev,
@@ -1650,6 +1631,7 @@ extern int		netpoll_trap(void);
 #endif
 extern int	       skb_gro_receive(struct sk_buff **head,
 				       struct sk_buff *skb);
+extern void	       skb_gro_reset_offset(struct sk_buff *skb);
 
 static inline unsigned int skb_gro_offset(const struct sk_buff *skb)
 {
@@ -1702,7 +1684,7 @@ static inline void *skb_gro_network_header(struct sk_buff *skb)
 static inline int dev_hard_header(struct sk_buff *skb, struct net_device *dev,
 				  unsigned short type,
 				  const void *daddr, const void *saddr,
-				  unsigned int len)
+				  unsigned len)
 {
 	if (!dev->header_ops || !dev->header_ops->create)
 		return 0;
@@ -1762,7 +1744,7 @@ struct softnet_data {
 	unsigned int		input_queue_head;
 	unsigned int		input_queue_tail;
 #endif
-	unsigned int		dropped;
+	unsigned		dropped;
 	struct sk_buff_head	input_pkt_queue;
 	struct napi_struct	backlog;
 };
@@ -1947,7 +1929,7 @@ static inline void netdev_sent_queue(struct net_device *dev, unsigned int bytes)
 }
 
 static inline void netdev_tx_completed_queue(struct netdev_queue *dev_queue,
-					     unsigned int pkts, unsigned int bytes)
+					     unsigned pkts, unsigned bytes)
 {
 #ifdef CONFIG_BQL
 	if (unlikely(!bytes))
@@ -1971,7 +1953,7 @@ static inline void netdev_tx_completed_queue(struct netdev_queue *dev_queue,
 }
 
 static inline void netdev_completed_queue(struct net_device *dev,
-					  unsigned int pkts, unsigned int bytes)
+					  unsigned pkts, unsigned bytes)
 {
 	netdev_tx_completed_queue(netdev_get_tx_queue(dev, 0), pkts, bytes);
 }
@@ -2124,9 +2106,6 @@ static inline int netif_copy_real_num_queues(struct net_device *to_dev,
 #endif
 }
 
-#define DEFAULT_MAX_NUM_RSS_QUEUES	(8)
-extern int netif_get_num_default_rss_queues(void);
-
 /* Use this variant when it is known for sure that it
  * is executing from hardware interrupt context or with hardware interrupts
  * disabled.
@@ -2147,7 +2126,7 @@ extern gro_result_t	dev_gro_receive(struct napi_struct *napi,
 extern gro_result_t	napi_skb_finish(gro_result_t ret, struct sk_buff *skb);
 extern gro_result_t	napi_gro_receive(struct napi_struct *napi,
 					 struct sk_buff *skb);
-extern void		napi_gro_flush(struct napi_struct *napi, bool flush_old);
+extern void		napi_gro_flush(struct napi_struct *napi);
 extern struct sk_buff *	napi_get_frags(struct napi_struct *napi);
 extern gro_result_t	napi_frags_finish(struct napi_struct *napi,
 					  struct sk_buff *skb,
@@ -2169,9 +2148,9 @@ extern void netdev_rx_handler_unregister(struct net_device *dev);
 extern bool		dev_valid_name(const char *name);
 extern int		dev_ioctl(struct net *net, unsigned int cmd, void __user *);
 extern int		dev_ethtool(struct net *net, struct ifreq *);
-extern unsigned int	dev_get_flags(const struct net_device *);
+extern unsigned		dev_get_flags(const struct net_device *);
 extern int		__dev_change_flags(struct net_device *, unsigned int flags);
-extern int		dev_change_flags(struct net_device *, unsigned int);
+extern int		dev_change_flags(struct net_device *, unsigned);
 extern void		__dev_notify_flags(struct net_device *, unsigned int old_flags);
 extern int		dev_change_name(struct net_device *, const char *);
 extern int		dev_set_alias(struct net_device *, const char *, size_t);
@@ -2223,7 +2202,6 @@ static inline void dev_hold(struct net_device *dev)
  * kind of lower layer not just hardware media.
  */
 
-extern void linkwatch_init_dev(struct net_device *dev);
 extern void linkwatch_fire_event(struct net_device *dev);
 extern void linkwatch_forget_dev(struct net_device *dev);
 
@@ -2245,6 +2223,8 @@ extern void __netdev_watchdog_up(struct net_device *dev);
 extern void netif_carrier_on(struct net_device *dev);
 
 extern void netif_carrier_off(struct net_device *dev);
+
+extern void netif_notify_peers(struct net_device *dev);
 
 /**
  *	netif_dormant_on - mark device as dormant.
@@ -2592,7 +2572,8 @@ extern void		__dev_set_rx_mode(struct net_device *dev);
 extern int		dev_set_promiscuity(struct net_device *dev, int inc);
 extern int		dev_set_allmulti(struct net_device *dev, int inc);
 extern void		netdev_state_change(struct net_device *dev);
-extern void		netdev_notify_peers(struct net_device *dev);
+extern int		netdev_bonding_change(struct net_device *dev,
+					      unsigned long event);
 extern void		netdev_features_change(struct net_device *dev);
 /* Load a device via the kmod */
 extern void		dev_load(struct net *net, const char *name);

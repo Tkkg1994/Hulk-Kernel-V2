@@ -432,32 +432,32 @@ static int mem_check(struct sock *sk)
 	return 0;
 }
 
-static bool ipv6_hdr_cmp(struct ipv6_opt_hdr *h1, struct ipv6_opt_hdr *h2)
+static int ipv6_hdr_cmp(struct ipv6_opt_hdr *h1, struct ipv6_opt_hdr *h2)
 {
 	if (h1 == h2)
-		return false;
+		return 0;
 	if (h1 == NULL || h2 == NULL)
-		return true;
+		return 1;
 	if (h1->hdrlen != h2->hdrlen)
-		return true;
+		return 1;
 	return memcmp(h1+1, h2+1, ((h1->hdrlen+1)<<3) - sizeof(*h1));
 }
 
-static bool ipv6_opt_cmp(struct ipv6_txoptions *o1, struct ipv6_txoptions *o2)
+static int ipv6_opt_cmp(struct ipv6_txoptions *o1, struct ipv6_txoptions *o2)
 {
 	if (o1 == o2)
-		return false;
+		return 0;
 	if (o1 == NULL || o2 == NULL)
-		return true;
+		return 1;
 	if (o1->opt_nflen != o2->opt_nflen)
-		return true;
+		return 1;
 	if (ipv6_hdr_cmp(o1->hopopt, o2->hopopt))
-		return true;
+		return 1;
 	if (ipv6_hdr_cmp(o1->dst0opt, o2->dst0opt))
-		return true;
+		return 1;
 	if (ipv6_hdr_cmp((struct ipv6_opt_hdr *)o1->srcrt, (struct ipv6_opt_hdr *)o2->srcrt))
-		return true;
-	return false;
+		return 1;
+	return 0;
 }
 
 static inline void fl_link(struct ipv6_pinfo *np, struct ipv6_fl_socklist *sfl,
@@ -705,9 +705,9 @@ static int ip6fl_seq_show(struct seq_file *seq, void *v)
 		struct ip6_flowlabel *fl = v;
 		seq_printf(seq,
 			   "%05X %-1d %-6d %-6d %-6ld %-8ld %pi6 %-4d\n",
-			   (unsigned int)ntohl(fl->label),
+			   (unsigned)ntohl(fl->label),
 			   fl->share,
-			   (int)fl->owner,
+			   (unsigned)fl->owner,
 			   atomic_read(&fl->users),
 			   fl->linger/HZ,
 			   (long)(fl->expires - jiffies)/HZ,
@@ -740,15 +740,15 @@ static const struct file_operations ip6fl_seq_fops = {
 
 static int __net_init ip6_flowlabel_proc_init(struct net *net)
 {
-	if (!proc_create("ip6_flowlabel", S_IRUGO, net->proc_net,
-			 &ip6fl_seq_fops))
+	if (!proc_net_fops_create(net, "ip6_flowlabel",
+				  S_IRUGO, &ip6fl_seq_fops))
 		return -ENOMEM;
 	return 0;
 }
 
 static void __net_exit ip6_flowlabel_proc_fini(struct net *net)
 {
-	remove_proc_entry("ip6_flowlabel", net->proc_net);
+	proc_net_remove(net, "ip6_flowlabel");
 }
 #else
 static inline int ip6_flowlabel_proc_init(struct net *net)

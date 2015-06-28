@@ -554,7 +554,7 @@ static inline int __sock_sendmsg_nosec(struct kiocb *iocb, struct socket *sock,
 {
 	struct sock_iocb *si = kiocb_to_siocb(iocb);
 
-	sock_update_classid(sock->sk, current);
+	sock_update_classid(sock->sk);
 
 	si->sock = sock;
 	si->scm = NULL;
@@ -718,7 +718,7 @@ static inline int __sock_recvmsg_nosec(struct kiocb *iocb, struct socket *sock,
 {
 	struct sock_iocb *si = kiocb_to_siocb(iocb);
 
-	sock_update_classid(sock->sk, current);
+	sock_update_classid(sock->sk);
 
 	si->sock = sock;
 	si->scm = NULL;
@@ -830,7 +830,7 @@ static ssize_t sock_splice_read(struct file *file, loff_t *ppos,
 	if (unlikely(!sock->ops->splice_read))
 		return -EINVAL;
 
-	sock_update_classid(sock->sk, current);
+	sock_update_classid(sock->sk);
 
 	return sock->ops->splice_read(sock, ppos, pipe, len, flags);
 }
@@ -1237,7 +1237,8 @@ int __sock_create(struct net *net, int family, int type, int protocol,
 	 */
 	sock = sock_alloc();
 	if (!sock) {
-		net_warn_ratelimited("socket: no more sockets\n");
+		if (net_ratelimit())
+			printk(KERN_WARNING "socket: no more sockets\n");
 		return -ENFILE;	/* Not exactly a match, but its the
 				   closest posix thing */
 	}
@@ -1481,7 +1482,7 @@ SYSCALL_DEFINE2(listen, int, fd, int, backlog)
 	sock = sockfd_lookup_light(fd, &err, &fput_needed);
 	if (sock) {
 		somaxconn = sock_net(sock->sk)->core.sysctl_somaxconn;
-		if ((unsigned int)backlog > somaxconn)
+		if ((unsigned)backlog > somaxconn)
 			backlog = somaxconn;
 
 		err = security_socket_listen(sock, backlog);
@@ -1693,7 +1694,7 @@ SYSCALL_DEFINE3(getpeername, int, fd, struct sockaddr __user *, usockaddr,
  */
 
 SYSCALL_DEFINE6(sendto, int, fd, void __user *, buff, size_t, len,
-		unsigned int, flags, struct sockaddr __user *, addr,
+		unsigned, flags, struct sockaddr __user *, addr,
 		int, addr_len)
 {
 	struct socket *sock;
@@ -1740,7 +1741,7 @@ out:
  */
 
 SYSCALL_DEFINE4(send, int, fd, void __user *, buff, size_t, len,
-		unsigned int, flags)
+		unsigned, flags)
 {
 	return sys_sendto(fd, buff, len, flags, NULL, 0);
 }
@@ -1752,7 +1753,7 @@ SYSCALL_DEFINE4(send, int, fd, void __user *, buff, size_t, len,
  */
 
 SYSCALL_DEFINE6(recvfrom, int, fd, void __user *, ubuf, size_t, size,
-		unsigned int, flags, struct sockaddr __user *, addr,
+		unsigned, flags, struct sockaddr __user *, addr,
 		int __user *, addr_len)
 {
 	struct socket *sock;
@@ -1799,7 +1800,7 @@ out:
  */
 
 asmlinkage long sys_recv(int fd, void __user *ubuf, size_t size,
-			 unsigned int flags)
+			 unsigned flags)
 {
 	return sys_recvfrom(fd, ubuf, size, flags, NULL, NULL);
 }
@@ -1918,7 +1919,7 @@ static int copy_msghdr_from_user(struct msghdr *kmsg,
 }
 
 static int ___sys_sendmsg(struct socket *sock, struct msghdr __user *msg,
-			  struct msghdr *msg_sys, unsigned int flags,
+			  struct msghdr *msg_sys, unsigned flags,
 			  struct used_address *used_address)
 {
 	struct compat_msghdr __user *msg_compat =
@@ -2038,7 +2039,7 @@ out:
  *	BSD sendmsg interface
  */
 
-long __sys_sendmsg(int fd, struct msghdr __user *msg, unsigned int flags)
+long __sys_sendmsg(int fd, struct msghdr __user *msg, unsigned flags)
 {
 	int fput_needed, err;
 	struct msghdr msg_sys;
@@ -2131,7 +2132,7 @@ SYSCALL_DEFINE4(sendmmsg, int, fd, struct mmsghdr __user *, mmsg,
 }
 
 static int ___sys_recvmsg(struct socket *sock, struct msghdr __user *msg,
-			  struct msghdr *msg_sys, unsigned int flags, int nosec)
+			  struct msghdr *msg_sys, unsigned flags, int nosec)
 {
 	struct compat_msghdr __user *msg_compat =
 	    (struct compat_msghdr __user *)msg;
@@ -2575,12 +2576,12 @@ EXPORT_SYMBOL(sock_unregister);
 static int __init sock_init(void)
 {
 	int err;
+
 	/*
-	 *      Initialize the network sysctl infrastructure.
+	 *      Initialize sock SLAB cache.
 	 */
-	err = net_sysctl_init();
-	if (err)
-		goto out;
+
+	sk_init();
 
 	/*
 	 *      Initialize skbuff SLAB cache
@@ -3275,7 +3276,7 @@ static int compat_sock_ioctl_trans(struct file *file, struct socket *sock,
 	return -ENOIOCTLCMD;
 }
 
-static long compat_sock_ioctl(struct file *file, unsigned int cmd,
+static long compat_sock_ioctl(struct file *file, unsigned cmd,
 			      unsigned long arg)
 {
 	struct socket *sock = file->private_data;
@@ -3403,7 +3404,7 @@ EXPORT_SYMBOL(kernel_setsockopt);
 int kernel_sendpage(struct socket *sock, struct page *page, int offset,
 		    size_t size, int flags)
 {
-	sock_update_classid(sock->sk, current);
+	sock_update_classid(sock->sk);
 
 	if (sock->ops->sendpage)
 		return sock->ops->sendpage(sock, page, offset, size, flags);

@@ -129,7 +129,7 @@ static void ip6addrlbl_free_rcu(struct rcu_head *h)
 	ip6addrlbl_free(container_of(h, struct ip6addrlbl_entry, rcu));
 }
 
-static bool ip6addrlbl_hold(struct ip6addrlbl_entry *p)
+static inline int ip6addrlbl_hold(struct ip6addrlbl_entry *p)
 {
 	return atomic_inc_not_zero(&p->refcnt);
 }
@@ -141,20 +141,20 @@ static inline void ip6addrlbl_put(struct ip6addrlbl_entry *p)
 }
 
 /* Find label */
-static bool __ip6addrlbl_match(struct net *net,
-			       const struct ip6addrlbl_entry *p,
-			       const struct in6_addr *addr,
-			       int addrtype, int ifindex)
+static int __ip6addrlbl_match(struct net *net,
+			      struct ip6addrlbl_entry *p,
+			      const struct in6_addr *addr,
+			      int addrtype, int ifindex)
 {
 	if (!net_eq(ip6addrlbl_net(p), net))
-		return false;
+		return 0;
 	if (p->ifindex && p->ifindex != ifindex)
-		return false;
+		return 0;
 	if (p->addrtype && p->addrtype != addrtype)
-		return false;
+		return 0;
 	if (!ipv6_prefix_equal(addr, &p->prefix, p->prefixlen))
-		return false;
-	return true;
+		return 0;
+	return 1;
 }
 
 static struct ip6addrlbl_entry *__ipv6_addr_label(struct net *net,
@@ -349,7 +349,7 @@ static int __net_init ip6addrlbl_net_init(struct net *net)
 	int err = 0;
 	int i;
 
-	ADDRLABEL(KERN_DEBUG "%s\n", __func__);
+	ADDRLABEL(KERN_DEBUG "%s()\n", __func__);
 
 	for (i = 0; i < ARRAY_SIZE(ip6addrlbl_init_table); i++) {
 		int ret = ip6addrlbl_add(net,
@@ -455,8 +455,8 @@ static int ip6addrlbl_newdel(struct sk_buff *skb, struct nlmsghdr *nlh,
 	return err;
 }
 
-static void ip6addrlbl_putmsg(struct nlmsghdr *nlh,
-			      int prefixlen, int ifindex, u32 lseq)
+static inline void ip6addrlbl_putmsg(struct nlmsghdr *nlh,
+				     int prefixlen, int ifindex, u32 lseq)
 {
 	struct ifaddrlblmsg *ifal = nlmsg_data(nlh);
 	ifal->ifal_family = AF_INET6;

@@ -1147,7 +1147,7 @@ int sctp_outq_sack(struct sctp_outq *q, struct sctp_sackhdr *sack)
 	__u32 sack_ctsn, ctsn, tsn;
 	__u32 highest_tsn, highest_new_tsn;
 	__u32 sack_a_rwnd;
-	unsigned int outstanding;
+	unsigned outstanding;
 	struct sctp_transport *primary = asoc->peer.primary_path;
 	int count_of_newacks = 0;
 	int gap_ack_blocks;
@@ -1681,8 +1681,10 @@ static void sctp_check_transmitted(struct sctp_outq *q,
 		 * address.
 		 */
 		if (!transport->flight_size) {
-			if (del_timer(&transport->T3_rtx_timer))
+			if (timer_pending(&transport->T3_rtx_timer) &&
+			    del_timer(&transport->T3_rtx_timer)) {
 				sctp_transport_put(transport);
+			}
 		} else if (restart_timer) {
 			if (!mod_timer(&transport->T3_rtx_timer,
 				       jiffies + transport->rto))

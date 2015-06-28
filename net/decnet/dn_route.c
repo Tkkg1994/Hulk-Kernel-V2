@@ -116,18 +116,13 @@ static unsigned int dn_dst_mtu(const struct dst_entry *dst);
 static void dn_dst_destroy(struct dst_entry *);
 static struct dst_entry *dn_dst_negative_advice(struct dst_entry *);
 static void dn_dst_link_failure(struct sk_buff *);
-static void dn_dst_update_pmtu(struct dst_entry *dst, struct sock *sk,
-			       struct sk_buff *skb , u32 mtu);
-static void dn_dst_redirect(struct dst_entry *dst, struct sock *sk,
-			    struct sk_buff *skb);
-static struct neighbour *dn_dst_neigh_lookup(const struct dst_entry *dst,
-					     struct sk_buff *skb,
-					     const void *daddr);
+static void dn_dst_update_pmtu(struct dst_entry *dst, u32 mtu);
+static struct neighbour *dn_dst_neigh_lookup(const struct dst_entry *dst, const void *daddr);
 static int dn_route_input(struct sk_buff *);
 static void dn_run_flush(unsigned long dummy);
 
 static struct dn_rt_hash_bucket *dn_rt_hash_table;
-static unsigned int dn_rt_hash_mask;
+static unsigned dn_rt_hash_mask;
 
 static struct timer_list dn_route_timer;
 static DEFINE_TIMER(dn_rt_flush_timer, dn_run_flush, 0, 0);
@@ -146,7 +141,6 @@ static struct dst_ops dn_dst_ops = {
 	.negative_advice =	dn_dst_negative_advice,
 	.link_failure =		dn_dst_link_failure,
 	.update_pmtu =		dn_dst_update_pmtu,
-	.redirect =		dn_dst_redirect,
 	.neigh_lookup =		dn_dst_neigh_lookup,
 };
 
@@ -155,13 +149,13 @@ static void dn_dst_destroy(struct dst_entry *dst)
 	dst_destroy_metrics_generic(dst);
 }
 
-static __inline__ unsigned int dn_hash(__le16 src, __le16 dst)
+static __inline__ unsigned dn_hash(__le16 src, __le16 dst)
 {
 	__u16 tmp = (__u16 __force)(src ^ dst);
 	tmp ^= (tmp >> 3);
 	tmp ^= (tmp >> 5);
 	tmp ^= (tmp >> 10);
-	return dn_rt_hash_mask & (unsigned int)tmp;
+	return dn_rt_hash_mask & (unsigned)tmp;
 }
 
 static inline void dnrt_free(struct dn_route *rt)
@@ -248,8 +242,7 @@ static int dn_dst_gc(struct dst_ops *ops)
  * We update both the mtu and the advertised mss (i.e. the segment size we
  * advertise to the other end).
  */
-static void dn_dst_update_pmtu(struct dst_entry *dst, struct sock *sk,
-			       struct sk_buff *skb, u32 mtu)
+static void dn_dst_update_pmtu(struct dst_entry *dst, u32 mtu)
 {
 	struct neighbour *n = dst_get_neighbour_noref(dst);
 	u32 min_mtu = 230;
@@ -274,11 +267,6 @@ static void dn_dst_update_pmtu(struct dst_entry *dst, struct sock *sk,
 				dst_metric_set(dst, RTAX_ADVMSS, mss);
 		}
 	}
-}
-
-static void dn_dst_redirect(struct dst_entry *dst, struct sock *sk,
-			    struct sk_buff *skb)
-{
 }
 
 /*
@@ -309,7 +297,7 @@ static inline int compare_keys(struct flowidn *fl1, struct flowidn *fl2)
 		(fl1->flowidn_iif ^ fl2->flowidn_iif)) == 0;
 }
 
-static int dn_insert_route(struct dn_route *rt, unsigned int hash, struct dn_route **rp)
+static int dn_insert_route(struct dn_route *rt, unsigned hash, struct dn_route **rp)
 {
 	struct dn_route *rth;
 	struct dn_route __rcu **rthp;
@@ -760,7 +748,8 @@ static int dn_output(struct sk_buff *skb)
 		       dn_to_neigh_output);
 
 error:
-	net_dbg_ratelimited("dn_output: This should not happen\n");
+	if (net_ratelimit())
+		printk(KERN_DEBUG "dn_output: This should not happen\n");
 
 	kfree_skb(skb);
 
@@ -818,10 +807,12 @@ drop:
  */
 static int dn_rt_bug(struct sk_buff *skb)
 {
-	struct dn_skb_cb *cb = DN_SKB_CB(skb);
+	if (net_ratelimit()) {
+		struct dn_skb_cb *cb = DN_SKB_CB(skb);
 
-	net_dbg_ratelimited("dn_rt_bug: skb from:%04x to:%04x\n",
-			    le16_to_cpu(cb->src), le16_to_cpu(cb->dst));
+		printk(KERN_DEBUG "dn_rt_bug: skb from:%04x to:%04x\n",
+				le16_to_cpu(cb->src), le16_to_cpu(cb->dst));
+	}
 
 	kfree_skb(skb);
 
@@ -840,9 +831,7 @@ static unsigned int dn_dst_mtu(const struct dst_entry *dst)
 	return mtu ? : dst->dev->mtu;
 }
 
-static struct neighbour *dn_dst_neigh_lookup(const struct dst_entry *dst,
-					     struct sk_buff *skb,
-					     const void *daddr)
+static struct neighbour *dn_dst_neigh_lookup(const struct dst_entry *dst, const void *daddr)
 {
 	return __neigh_lookup_errno(&dn_neigh_table, daddr, dst->dev);
 }
@@ -945,8 +934,8 @@ static int dn_route_output_slow(struct dst_entry **pprt, const struct flowidn *o
 	struct dn_route *rt = NULL;
 	struct net_device *dev_out = NULL, *dev;
 	struct neighbour *neigh = NULL;
-	unsigned int hash;
-	unsigned int flags = 0;
+	unsigned hash;
+	unsigned flags = 0;
 	struct dn_fib_res res = { .fi = NULL, .type = RTN_UNICAST };
 	int err;
 	int free_res = 0;
@@ -1154,7 +1143,7 @@ make_route:
 	if (dev_out->flags & IFF_LOOPBACK)
 		flags |= RTCF_LOCAL;
 
-	rt = dst_alloc(&dn_dst_ops, dev_out, 1, DST_OBSOLETE_NONE, DST_HOST);
+	rt = dst_alloc(&dn_dst_ops, dev_out, 1, 0, DST_HOST);
 	if (rt == NULL)
 		goto e_nobufs;
 
@@ -1220,7 +1209,7 @@ e_neighbour:
  */
 static int __dn_route_output_key(struct dst_entry **pprt, const struct flowidn *flp, int flags)
 {
-	unsigned int hash = dn_hash(flp->saddr, flp->daddr);
+	unsigned hash = dn_hash(flp->saddr, flp->daddr);
 	struct dn_route *rt = NULL;
 
 	if (!(flags & MSG_TRYHARD)) {
@@ -1286,7 +1275,7 @@ static int dn_route_input_slow(struct sk_buff *skb)
 	struct net_device *out_dev = NULL;
 	struct dn_dev *dn_db;
 	struct neighbour *neigh = NULL;
-	unsigned int hash;
+	unsigned hash;
 	int flags = 0;
 	__le16 gateway = 0;
 	__le16 local_src = 0;
@@ -1338,7 +1327,9 @@ static int dn_route_input_slow(struct sk_buff *skb)
 
 		out_dev = DN_FIB_RES_DEV(res);
 		if (out_dev == NULL) {
-			net_crit_ratelimited("Bug in dn_route_input_slow() No output device\n");
+			if (net_ratelimit())
+				printk(KERN_CRIT "Bug in dn_route_input_slow() "
+						 "No output device\n");
 			goto e_inval;
 		}
 		dev_hold(out_dev);
@@ -1422,7 +1413,7 @@ static int dn_route_input_slow(struct sk_buff *skb)
 	}
 
 make_route:
-	rt = dst_alloc(&dn_dst_ops, out_dev, 0, DST_OBSOLETE_NONE, DST_HOST);
+	rt = dst_alloc(&dn_dst_ops, out_dev, 0, 0, DST_HOST);
 	if (rt == NULL)
 		goto e_nobufs;
 
@@ -1499,7 +1490,7 @@ static int dn_route_input(struct sk_buff *skb)
 {
 	struct dn_route *rt;
 	struct dn_skb_cb *cb = DN_SKB_CB(skb);
-	unsigned int hash = dn_hash(cb->src, cb->dst);
+	unsigned hash = dn_hash(cb->src, cb->dst);
 
 	if (skb_dst(skb))
 		return 0;
@@ -1564,7 +1555,7 @@ static int dn_rt_fill_info(struct sk_buff *skb, u32 portid, u32 seq,
 	if (rtnetlink_put_metrics(skb, dst_metrics_ptr(&rt->dst)) < 0)
 		goto rtattr_failure;
 	expires = rt->dst.expires ? rt->dst.expires - jiffies : 0;
-	if (rtnl_put_cacheinfo(skb, &rt->dst, 0, expires,
+	if (rtnl_put_cacheinfo(skb, &rt->dst, 0, 0, 0, expires,
 			       rt->dst.error) < 0)
 		goto rtattr_failure;
 	if (dn_is_input_route(rt))
@@ -1783,11 +1774,12 @@ static int dn_rt_cache_seq_show(struct seq_file *seq, void *v)
 	char buf1[DN_ASCBUF_LEN], buf2[DN_ASCBUF_LEN];
 
 	seq_printf(seq, "%-8s %-7s %-7s %04d %04d %04d\n",
-		   rt->dst.dev ? rt->dst.dev->name : "*",
-		   dn_addr2asc(le16_to_cpu(rt->rt_daddr), buf1),
-		   dn_addr2asc(le16_to_cpu(rt->rt_saddr), buf2),
-		   atomic_read(&rt->dst.__refcnt),
-		   rt->dst.__use, 0);
+			rt->dst.dev ? rt->dst.dev->name : "*",
+			dn_addr2asc(le16_to_cpu(rt->rt_daddr), buf1),
+			dn_addr2asc(le16_to_cpu(rt->rt_saddr), buf2),
+			atomic_read(&rt->dst.__refcnt),
+			rt->dst.__use,
+			(int) dst_metric(&rt->dst, RTAX_RTT));
 	return 0;
 }
 
@@ -1864,8 +1856,7 @@ void __init dn_route_init(void)
 
 	dn_dst_ops.gc_thresh = (dn_rt_hash_mask + 1);
 
-	proc_create("decnet_cache", S_IRUGO, init_net.proc_net,
-		    &dn_rt_cache_seq_fops);
+	proc_net_fops_create(&init_net, "decnet_cache", S_IRUGO, &dn_rt_cache_seq_fops);
 
 #ifdef CONFIG_DECNET_ROUTER
 	rtnl_register(PF_DECnet, RTM_GETROUTE, dn_cache_getroute,
@@ -1881,7 +1872,7 @@ void __exit dn_route_cleanup(void)
 	del_timer(&dn_route_timer);
 	dn_run_flush(0);
 
-	remove_proc_entry("decnet_cache", init_net.proc_net);
+	proc_net_remove(&init_net, "decnet_cache");
 	dst_entries_destroy(&dn_dst_ops);
 }
 

@@ -600,7 +600,7 @@ static void init_prb_bdqc(struct packet_sock *po,
 	p1->knxt_seq_num = 1;
 	p1->pkbdq = pg_vec;
 	pbd = (struct tpacket_block_desc *)pg_vec[0].buffer;
-	p1->pkblk_start	= pg_vec[0].buffer;
+	p1->pkblk_start	= (char *)pg_vec[0].buffer;
 	p1->kblk_size = req_u->req3.tp_block_size;
 	p1->knum_blocks	= req_u->req3.tp_block_nr;
 	p1->hdrlen = po->tp_hdrlen;
@@ -830,7 +830,8 @@ static void prb_open_block(struct tpacket_kbdq_core *pkc1,
 	h1->ts_first_pkt.ts_sec = ts.tv_sec;
 	h1->ts_first_pkt.ts_nsec = ts.tv_nsec;
 	pkc1->pkblk_start = (char *)pbd1;
-	pkc1->nxt_offset = pkc1->pkblk_start + BLK_PLUS_PRIV(pkc1->blk_sizeof_priv);
+	pkc1->nxt_offset = (char *)(pkc1->pkblk_start +
+				    BLK_PLUS_PRIV(pkc1->blk_sizeof_priv));
 	BLOCK_O2FP(pbd1) = (__u32)BLK_PLUS_PRIV(pkc1->blk_sizeof_priv);
 	BLOCK_O2PRIV(pbd1) = BLK_HDR_LEN;
 	pbd1->version = pkc1->version;
@@ -1011,7 +1012,7 @@ static void *__packet_lookup_frame_in_block(struct packet_sock *po,
 	struct tpacket_block_desc *pbd;
 	char *curr, *end;
 
-	pkc = GET_PBDQC_FROM_RB(&po->rx_ring);
+	pkc = GET_PBDQC_FROM_RB(((struct packet_ring_buffer *)&po->rx_ring));
 	pbd = GET_CURR_PBLOCK_DESC_FROM_CORE(pkc);
 
 	/* Queue is frozen when user space is lagging behind */
@@ -1037,7 +1038,7 @@ static void *__packet_lookup_frame_in_block(struct packet_sock *po,
 	smp_mb();
 	curr = pkc->nxt_offset;
 	pkc->skb = skb;
-	end = (char *)pbd + pkc->kblk_size;
+	end = (char *) ((char *)pbd + pkc->kblk_size);
 
 	/* first try the current block */
 	if (curr+TOTAL_PKT_LEN_INCL_ALIGN(len) < end) {
@@ -1766,7 +1767,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 		macoff = netoff = TPACKET_ALIGN(po->tp_hdrlen) + 16 +
 				  po->tp_reserve;
 	} else {
-		unsigned int maclen = skb_network_offset(skb);
+		unsigned maclen = skb_network_offset(skb);
 		netoff = TPACKET_ALIGN(po->tp_hdrlen +
 				       (maclen < 16 ? 16 : maclen)) +
 			po->tp_reserve;
@@ -3923,7 +3924,7 @@ static int __net_init packet_net_init(struct net *net)
 	spin_lock_init(&net->packet.sklist_lock);
 	INIT_HLIST_HEAD(&net->packet.sklist);
 
-	if (!proc_create("packet", 0, net->proc_net, &packet_seq_fops))
+	if (!proc_net_fops_create(net, "packet", 0, &packet_seq_fops))
 		return -ENOMEM;
 
 	return 0;
@@ -3931,7 +3932,7 @@ static int __net_init packet_net_init(struct net *net)
 
 static void __net_exit packet_net_exit(struct net *net)
 {
-	remove_proc_entry("packet", net->proc_net);
+	proc_net_remove(net, "packet");
 }
 
 static struct pernet_operations packet_net_ops = {

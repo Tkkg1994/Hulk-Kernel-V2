@@ -1714,7 +1714,7 @@ static int key_notify_sa_flush(const struct km_event *c)
 static int pfkey_flush(struct sock *sk, struct sk_buff *skb, const struct sadb_msg *hdr, void * const *ext_hdrs)
 {
 	struct net *net = sock_net(sk);
-	unsigned int proto;
+	unsigned proto;
 	struct km_event c;
 	struct xfrm_audit audit_info;
 	int err, err2;
@@ -3553,7 +3553,7 @@ static int pfkey_sendmsg(struct kiocb *kiocb,
 		goto out;
 
 	err = -EMSGSIZE;
-	if ((unsigned int)len > sk->sk_sndbuf - 32)
+	if ((unsigned)len > sk->sk_sndbuf - 32)
 		goto out;
 
 	err = -ENOBUFS;
@@ -3720,7 +3720,7 @@ static int __net_init pfkey_init_proc(struct net *net)
 {
 	struct proc_dir_entry *e;
 
-	e = proc_create("pfkey", 0, net->proc_net, &pfkey_proc_ops);
+	e = proc_net_fops_create(net, "pfkey", 0, &pfkey_proc_ops);
 	if (e == NULL)
 		return -ENOMEM;
 
@@ -3729,7 +3729,7 @@ static int __net_init pfkey_init_proc(struct net *net)
 
 static void __net_exit pfkey_exit_proc(struct net *net)
 {
-	remove_proc_entry("pfkey", net->proc_net);
+	proc_net_remove(net, "pfkey");
 }
 #else
 static inline int pfkey_init_proc(struct net *net)

@@ -146,11 +146,13 @@ void sctp_transport_free(struct sctp_transport *transport)
 	 * structure hang around in memory since we know
 	 * the tranport is going away.
 	 */
-	if (del_timer(&transport->T3_rtx_timer))
+	if (timer_pending(&transport->T3_rtx_timer) &&
+	    del_timer(&transport->T3_rtx_timer))
 		sctp_transport_put(transport);
 
 	/* Delete the ICMP proto unreachable timer if it's active. */
-	if (del_timer(&transport->proto_unreach_timer))
+	if (timer_pending(&transport->proto_unreach_timer) &&
+	    del_timer(&transport->proto_unreach_timer))
 		sctp_association_put(transport->asoc);
 
 	sctp_transport_put(transport);
@@ -212,7 +214,7 @@ void sctp_transport_set_owner(struct sctp_transport *transport,
 void sctp_transport_pmtu(struct sctp_transport *transport, struct sock *sk)
 {
 	/* If we don't have a fresh route, look one up */
-	if (!transport->dst || transport->dst->obsolete) {
+	if (!transport->dst || transport->dst->obsolete > 1) {
 		dst_release(transport->dst);
 		transport->af_specific->get_dst(transport, &transport->saddr,
 						&transport->fl, sk);
@@ -242,7 +244,7 @@ void sctp_transport_update_pmtu(struct sctp_transport *t, u32 pmtu)
 
 	dst = sctp_transport_dst_check(t);
 	if (dst)
-		dst->ops->update_pmtu(dst, sk, NULL, pmtu);
+		dst->ops->update_pmtu(dst, pmtu);
 }
 
 /* Caches the dst entry and source address for a transport's destination
@@ -627,9 +629,10 @@ void sctp_transport_reset(struct sctp_transport *t)
 void sctp_transport_immediate_rtx(struct sctp_transport *t)
 {
 	/* Stop pending T3_rtx_timer */
-	if (del_timer(&t->T3_rtx_timer))
+	if (timer_pending(&t->T3_rtx_timer)) {
+		(void)del_timer(&t->T3_rtx_timer);
 		sctp_transport_put(t);
-
+	}
 	sctp_retransmit(&t->asoc->outqueue, t, SCTP_RTXR_T3_RTX);
 	if (!timer_pending(&t->T3_rtx_timer)) {
 		if (!mod_timer(&t->T3_rtx_timer, jiffies + t->rto))

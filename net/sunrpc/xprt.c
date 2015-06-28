@@ -535,7 +535,7 @@ void xprt_set_retrans_timeout_def(struct rpc_task *task)
 }
 EXPORT_SYMBOL_GPL(xprt_set_retrans_timeout_def);
 
-/**
+/*
  * xprt_set_retrans_timeout_rtt - set a request's retransmit timeout
  * @task: task whose timeout is to be set
  *
@@ -787,7 +787,7 @@ static void xprt_update_rtt(struct rpc_task *task)
 {
 	struct rpc_rqst *req = task->tk_rqstp;
 	struct rpc_rtt *rtt = task->tk_client->cl_rtt;
-	unsigned int timer = task->tk_msg.rpc_proc->p_timer;
+	unsigned timer = task->tk_msg.rpc_proc->p_timer;
 	long m = usecs_to_jiffies(ktime_to_us(req->rq_rtt));
 
 	if (timer) {

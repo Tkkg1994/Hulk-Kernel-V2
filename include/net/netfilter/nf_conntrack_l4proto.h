@@ -12,7 +12,6 @@
 #include <linux/netlink.h>
 #include <net/netlink.h>
 #include <net/netfilter/nf_conntrack.h>
-#include <net/netns/generic.h>
 
 struct seq_file;
 
@@ -87,21 +86,23 @@ struct nf_conntrack_l4proto {
 #if IS_ENABLED(CONFIG_NF_CT_NETLINK_TIMEOUT)
 	struct {
 		size_t obj_size;
-		int (*nlattr_to_obj)(struct nlattr *tb[],
-				     struct net *net, void *data);
+		int (*nlattr_to_obj)(struct nlattr *tb[], void *data);
 		int (*obj_to_nlattr)(struct sk_buff *skb, const void *data);
 
 		unsigned int nlattr_max;
 		const struct nla_policy *nla_policy;
 	} ctnl_timeout;
 #endif
-	int	*net_id;
-	/* Init l4proto pernet data */
-	int (*init_net)(struct net *net, u_int16_t proto);
 
-	/* Return the per-net protocol part. */
-	struct nf_proto_net *(*get_net_proto)(struct net *net);
-
+#ifdef CONFIG_SYSCTL
+	struct ctl_table_header	**ctl_table_header;
+	struct ctl_table	*ctl_table;
+	unsigned int		*ctl_table_users;
+#ifdef CONFIG_NF_CONNTRACK_PROC_COMPAT
+	struct ctl_table_header	*ctl_compat_table_header;
+	struct ctl_table	*ctl_compat_table;
+#endif
+#endif
 	/* Protocol name */
 	const char *name;
 
@@ -122,18 +123,8 @@ nf_ct_l4proto_find_get(u_int16_t l3proto, u_int8_t l4proto);
 extern void nf_ct_l4proto_put(struct nf_conntrack_l4proto *p);
 
 /* Protocol registration. */
-extern int nf_conntrack_l4proto_register(struct net *net,
-					 struct nf_conntrack_l4proto *proto);
-extern void nf_conntrack_l4proto_unregister(struct net *net,
-					    struct nf_conntrack_l4proto *proto);
-
-static inline void nf_ct_kfree_compat_sysctl_table(struct nf_proto_net *pn)
-{
-#if defined(CONFIG_SYSCTL) && defined(CONFIG_NF_CONNTRACK_PROC_COMPAT)
-	kfree(pn->ctl_compat_table);
-	pn->ctl_compat_table = NULL;
-#endif
-}
+extern int nf_conntrack_l4proto_register(struct nf_conntrack_l4proto *proto);
+extern void nf_conntrack_l4proto_unregister(struct nf_conntrack_l4proto *proto);
 
 /* Generic netlink helpers */
 extern int nf_ct_port_tuple_to_nlattr(struct sk_buff *skb,

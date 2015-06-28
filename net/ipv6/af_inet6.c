@@ -18,7 +18,6 @@
  *      2 of the License, or (at your option) any later version.
  */
 
-#define pr_fmt(fmt) "IPv6: " fmt
 
 #include <linux/module.h>
 #include <linux/capability.h>
@@ -651,11 +650,13 @@ out:
 	return ret;
 
 out_permanent:
-	pr_err("Attempt to override permanent protocol %d\n", protocol);
+	printk(KERN_ERR "Attempt to override permanent protocol %d.\n",
+	       protocol);
 	goto out;
 
 out_illegal:
-	pr_err("Ignoring attempt to register invalid socket type %d\n",
+	printk(KERN_ERR
+	       "Ignoring attempt to register invalid socket type %d.\n",
 	       p->type);
 	goto out;
 }
@@ -666,7 +667,8 @@ void
 inet6_unregister_protosw(struct inet_protosw *p)
 {
 	if (INET_PROTOSW_PERMANENT & p->flags) {
-		pr_err("Attempt to unregister permanent protocol %d\n",
+		printk(KERN_ERR
+		       "Attempt to unregister permanent protocol %d.\n",
 		       p->protocol);
 	} else {
 		spin_lock_bh(&inetsw6_lock);
@@ -720,10 +722,10 @@ int inet6_sk_rebuild_header(struct sock *sk)
 
 EXPORT_SYMBOL_GPL(inet6_sk_rebuild_header);
 
-bool ipv6_opt_accepted(const struct sock *sk, const struct sk_buff *skb)
+int ipv6_opt_accepted(struct sock *sk, struct sk_buff *skb)
 {
-	const struct ipv6_pinfo *np = inet6_sk(sk);
-	const struct inet6_skb_parm *opt = IP6CB(skb);
+	struct ipv6_pinfo *np = inet6_sk(sk);
+	struct inet6_skb_parm *opt = IP6CB(skb);
 
 	if (np->rxopt.all) {
 		if ((opt->hop && (np->rxopt.bits.hopopts ||
@@ -735,9 +737,9 @@ bool ipv6_opt_accepted(const struct sock *sk, const struct sk_buff *skb)
 		     np->rxopt.bits.osrcrt)) ||
 		    ((opt->dst1 || opt->dst0) &&
 		     (np->rxopt.bits.dstopts || np->rxopt.bits.odstopts)))
-			return true;
+			return 1;
 	}
-	return false;
+	return 0;
 }
 
 EXPORT_SYMBOL_GPL(ipv6_opt_accepted);
@@ -985,10 +987,6 @@ out_unlock:
 static struct packet_type ipv6_packet_type __read_mostly = {
 	.type = cpu_to_be16(ETH_P_IPV6),
 	.func = ipv6_rcv,
-};
-
-static struct packet_offload ipv6_packet_offload __read_mostly = {
-	.type = cpu_to_be16(ETH_P_IPV6),
 	.gso_send_check = ipv6_gso_send_check,
 	.gso_segment = ipv6_gso_segment,
 	.gro_receive = ipv6_gro_receive,
@@ -997,7 +995,6 @@ static struct packet_offload ipv6_packet_offload __read_mostly = {
 
 static int __init ipv6_packet_init(void)
 {
-	dev_add_offload(&ipv6_packet_offload);
 	dev_add_pack(&ipv6_packet_type);
 	return 0;
 }
@@ -1005,7 +1002,6 @@ static int __init ipv6_packet_init(void)
 static void ipv6_packet_cleanup(void)
 {
 	dev_remove_pack(&ipv6_packet_type);
-	dev_remove_offload(&ipv6_packet_offload);
 }
 
 static int __net_init ipv6_init_mibs(struct net *net)
@@ -1114,7 +1110,9 @@ static int __init inet6_init(void)
 		INIT_LIST_HEAD(r);
 
 	if (disable_ipv6_mod) {
-		pr_info("Loaded, but administratively disabled, reboot required to enable\n");
+		printk(KERN_INFO
+		       "IPv6: Loaded, but administratively disabled, "
+		       "reboot required to enable\n");
 		goto out;
 	}
 
@@ -1152,6 +1150,11 @@ static int __init inet6_init(void)
 	if (err)
 		goto out_sock_register_fail;
 
+#ifdef CONFIG_SYSCTL
+	err = ipv6_static_sysctl_register();
+	if (err)
+		goto static_sysctl_fail;
+#endif
 	tcpv6_prot.sysctl_mem = init_net.ipv4.sysctl_tcp_mem;
 
 	/*
@@ -1284,6 +1287,10 @@ ipmr_fail:
 icmp_fail:
 	unregister_pernet_subsys(&inet6_net_ops);
 register_pernet_fail:
+#ifdef CONFIG_SYSCTL
+	ipv6_static_sysctl_unregister();
+static_sysctl_fail:
+#endif
 	sock_unregister(PF_INET6);
 	rtnl_unregister_all(PF_INET6);
 out_sock_register_fail:
@@ -1312,6 +1319,9 @@ static void __exit inet6_exit(void)
 	/* Disallow any further netlink messages */
 	rtnl_unregister_all(PF_INET6);
 
+#ifdef CONFIG_SYSCTL
+	ipv6_sysctl_unregister();
+#endif
 	udpv6_exit();
 	udplitev6_exit();
 	tcpv6_exit();
@@ -1339,6 +1349,9 @@ static void __exit inet6_exit(void)
 	rawv6_exit();
 
 	unregister_pernet_subsys(&inet6_net_ops);
+#ifdef CONFIG_SYSCTL
+	ipv6_static_sysctl_unregister();
+#endif
 	proto_unregister(&rawv6_prot);
 	proto_unregister(&udplitev6_prot);
 	proto_unregister(&udpv6_prot);

@@ -54,7 +54,7 @@ struct tipc_sock {
 };
 
 #define tipc_sk(sk) ((struct tipc_sock *)(sk))
-#define tipc_sk_port(sk) (tipc_sk(sk)->p)
+#define tipc_sk_port(sk) ((struct tipc_port *)(tipc_sk(sk)->p))
 
 #define tipc_rx_ready(sock) (!skb_queue_empty(&sock->sk->sk_receive_queue) || \
 			(sock->state == SS_DISCONNECTING))
@@ -535,7 +535,7 @@ static int send_msg(struct kiocb *iocb, struct socket *sock,
 		     (dest->family != AF_TIPC)))
 		return -EINVAL;
 	if ((total_len > TIPC_MAX_USER_MSG_SIZE) ||
-	    (m->msg_iovlen > (unsigned int)INT_MAX))
+	    (m->msg_iovlen > (unsigned)INT_MAX))
 		return -EMSGSIZE;
 
 	if (iocb)
@@ -647,7 +647,7 @@ static int send_packet(struct kiocb *iocb, struct socket *sock,
 		return send_msg(iocb, sock, m, total_len);
 
 	if ((total_len > TIPC_MAX_USER_MSG_SIZE) ||
-	    (m->msg_iovlen > (unsigned int)INT_MAX))
+	    (m->msg_iovlen > (unsigned)INT_MAX))
 		return -EMSGSIZE;
 
 	if (iocb)
@@ -734,8 +734,8 @@ static int send_stream(struct kiocb *iocb, struct socket *sock,
 		goto exit;
 	}
 
-	if ((total_len > (unsigned int)INT_MAX) ||
-	    (m->msg_iovlen > (unsigned int)INT_MAX)) {
+	if ((total_len > (unsigned)INT_MAX) ||
+	    (m->msg_iovlen > (unsigned)INT_MAX)) {
 		res = -EMSGSIZE;
 		goto exit;
 	}
@@ -1330,7 +1330,7 @@ static u32 dispatch(struct tipc_port *tport, struct sk_buff *buf)
 	if (!sock_owned_by_user(sk)) {
 		res = filter_rcv(sk, buf);
 	} else {
-		if (sk_add_backlog(sk, buf, sk->sk_rcvbuf))
+		if (sk_add_backlog(sk, buf))
 			res = TIPC_ERR_OVERLOAD;
 		else
 			res = TIPC_OK;
@@ -1778,7 +1778,9 @@ static int getsockopt(struct socket *sock,
 	return put_user(sizeof(value), ol);
 }
 
-/* Protocol switches for the various types of TIPC sockets */
+/**
+ * Protocol switches for the various types of TIPC sockets
+ */
 
 static const struct proto_ops msg_ops = {
 	.owner		= THIS_MODULE,

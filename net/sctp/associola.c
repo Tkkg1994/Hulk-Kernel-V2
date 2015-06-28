@@ -427,7 +427,8 @@ void sctp_association_free(struct sctp_association *asoc)
 	 * on our state.
 	 */
 	for (i = SCTP_EVENT_TIMEOUT_NONE; i < SCTP_NUM_TIMEOUT_TYPES; ++i) {
-		if (del_timer(&asoc->timers[i]))
+		if (timer_pending(&asoc->timers[i]) &&
+		    del_timer(&asoc->timers[i]))
 			sctp_association_put(asoc);
 	}
 
@@ -1407,7 +1408,7 @@ static inline int sctp_peer_needs_update(struct sctp_association *asoc)
 }
 
 /* Increase asoc's rwnd by len and send any window update SACK if needed. */
-void sctp_assoc_rwnd_increase(struct sctp_association *asoc, unsigned int len)
+void sctp_assoc_rwnd_increase(struct sctp_association *asoc, unsigned len)
 {
 	struct sctp_chunk *sack;
 	struct timer_list *timer;
@@ -1458,13 +1459,13 @@ void sctp_assoc_rwnd_increase(struct sctp_association *asoc, unsigned int len)
 
 		/* Stop the SACK timer.  */
 		timer = &asoc->timers[SCTP_EVENT_TIMEOUT_SACK];
-		if (del_timer(timer))
+		if (timer_pending(timer) && del_timer(timer))
 			sctp_association_put(asoc);
 	}
 }
 
 /* Decrease asoc's rwnd by len. */
-void sctp_assoc_rwnd_decrease(struct sctp_association *asoc, unsigned int len)
+void sctp_assoc_rwnd_decrease(struct sctp_association *asoc, unsigned len)
 {
 	int rx_count;
 	int over = 0;

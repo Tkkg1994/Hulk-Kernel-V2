@@ -153,7 +153,8 @@ ip_checkentry(const struct ipt_ip *ip)
 static unsigned int
 ipt_error(struct sk_buff *skb, const struct xt_action_param *par)
 {
-	net_info_ratelimited("error: `%s'\n", (const char *)par->targinfo);
+	if (net_ratelimit())
+		pr_info("error: `%s'\n", (const char *)par->targinfo);
 
 	return NF_DROP;
 }
@@ -382,7 +383,7 @@ ipt_do_table(struct sk_buff *skb,
 			if (v < 0) {
 				/* Pop from stack? */
 				if (v != XT_RETURN) {
-					verdict = (unsigned int)(-v) - 1;
+					verdict = (unsigned)(-v) - 1;
 					break;
 				}
 				if (*stackptr <= origptr) {

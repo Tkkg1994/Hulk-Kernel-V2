@@ -88,8 +88,10 @@ static void ulog_send(unsigned int nlgroupnum)
 {
 	ulog_buff_t *ub = &ulog_buffers[nlgroupnum];
 
-	pr_debug("ulog_send: timer is deleting\n");
-	del_timer(&ub->timer);
+	if (timer_pending(&ub->timer)) {
+		pr_debug("ulog_send: timer was pending, deleting\n");
+		del_timer(&ub->timer);
+	}
 
 	if (!ub->skb) {
 		pr_debug("ulog_send: nothing to send\n");
@@ -194,15 +196,12 @@ static void ipt_ulog_packet(unsigned int hooknum,
 
 	pr_debug("qlen %d, qthreshold %Zu\n", ub->qlen, loginfo->qthreshold);
 
-	nlh = nlmsg_put(ub->skb, 0, ub->qlen, ULOG_NL_EVENT,
-			sizeof(*pm)+copy_len, 0);
-	if (!nlh) {
-		pr_debug("error during nlmsg_put\n");
-		goto out_unlock;
-	}
+	/* NLMSG_PUT contains a hidden goto nlmsg_failure !!! */
+	nlh = NLMSG_PUT(ub->skb, 0, ub->qlen, ULOG_NL_EVENT,
+			sizeof(*pm)+copy_len);
 	ub->qlen++;
 
-	pm = nlmsg_data(nlh);
+	pm = NLMSG_DATA(nlh);
 
 	/* We might not have a timestamp, get one */
 	if (skb->tstamp.tv64 == 0)
@@ -262,11 +261,13 @@ static void ipt_ulog_packet(unsigned int hooknum,
 			nlh->nlmsg_type = NLMSG_DONE;
 		ulog_send(groupnum);
 	}
-out_unlock:
+
 	spin_unlock_bh(&ulog_lock);
 
 	return;
 
+nlmsg_failure:
+	pr_debug("error during NLMSG_PUT\n");
 alloc_failure:
 	pr_debug("Error building netlink message\n");
 	spin_unlock_bh(&ulog_lock);
@@ -424,8 +425,10 @@ static void __exit ulog_tg_exit(void)
 	/* remove pending timers and free allocated skb's */
 	for (i = 0; i < ULOG_MAXNLGROUPS; i++) {
 		ub = &ulog_buffers[i];
-		pr_debug("timer is deleting\n");
-		del_timer(&ub->timer);
+		if (timer_pending(&ub->timer)) {
+			pr_debug("timer was pending, deleting\n");
+			del_timer(&ub->timer);
+		}
 
 		if (ub->skb) {
 			kfree_skb(ub->skb);

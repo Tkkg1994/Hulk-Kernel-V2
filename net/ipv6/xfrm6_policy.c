@@ -101,11 +101,12 @@ static int xfrm6_fill_dst(struct xfrm_dst *xdst, struct net_device *dev,
 		return -ENODEV;
 	}
 
-	rt6_transfer_peer(&xdst->u.rt6, rt);
+	xdst->u.rt6.rt6i_peer = rt->rt6i_peer;
+	if (rt->rt6i_peer)
+		atomic_inc(&rt->rt6i_peer->refcnt);
 
 	/* Sheit... I remember I did this right. Apparently,
 	 * it was magically lost, so this code needs audit */
-	xdst->u.rt6.n = neigh_clone(rt->n);
 	xdst->u.rt6.rt6i_flags = rt->rt6i_flags & (RTF_ANYCAST |
 						   RTF_LOCAL);
 	xdst->u.rt6.rt6i_metric = rt->rt6i_metric;
@@ -212,22 +213,12 @@ static inline int xfrm6_garbage_collect(struct dst_ops *ops)
 	return dst_entries_get_fast(ops) > ops->gc_thresh * 2;
 }
 
-static void xfrm6_update_pmtu(struct dst_entry *dst, struct sock *sk,
-			      struct sk_buff *skb, u32 mtu)
+static void xfrm6_update_pmtu(struct dst_entry *dst, u32 mtu)
 {
 	struct xfrm_dst *xdst = (struct xfrm_dst *)dst;
 	struct dst_entry *path = xdst->route;
 
-	path->ops->update_pmtu(path, sk, skb, mtu);
-}
-
-static void xfrm6_redirect(struct dst_entry *dst, struct sock *sk,
-			   struct sk_buff *skb)
-{
-	struct xfrm_dst *xdst = (struct xfrm_dst *)dst;
-	struct dst_entry *path = xdst->route;
-
-	path->ops->redirect(path, sk, skb);
+	path->ops->update_pmtu(path, mtu);
 }
 
 static void xfrm6_dst_destroy(struct dst_entry *dst)
@@ -237,10 +228,8 @@ static void xfrm6_dst_destroy(struct dst_entry *dst)
 	if (likely(xdst->u.rt6.rt6i_idev))
 		in6_dev_put(xdst->u.rt6.rt6i_idev);
 	dst_destroy_metrics_generic(dst);
-	if (rt6_has_peer(&xdst->u.rt6)) {
-		struct inet_peer *peer = rt6_peer_ptr(&xdst->u.rt6);
-		inet_putpeer(peer);
-	}
+	if (likely(xdst->u.rt6.rt6i_peer))
+		inet_putpeer(xdst->u.rt6.rt6i_peer);
 	xfrm_dst_destroy(xdst);
 }
 
@@ -276,7 +265,6 @@ static struct dst_ops xfrm6_dst_ops = {
 	.protocol =		cpu_to_be16(ETH_P_IPV6),
 	.gc =			xfrm6_garbage_collect,
 	.update_pmtu =		xfrm6_update_pmtu,
-	.redirect =		xfrm6_redirect,
 	.cow_metrics =		dst_cow_metrics_generic,
 	.destroy =		xfrm6_dst_destroy,
 	.ifdown =		xfrm6_dst_ifdown,
@@ -351,8 +339,8 @@ int __init xfrm6_init(void)
 		goto out_policy;
 
 #ifdef CONFIG_SYSCTL
-	sysctl_hdr = register_net_sysctl(&init_net, "net/ipv6",
-					 xfrm6_policy_table);
+	sysctl_hdr = register_net_sysctl_table(&init_net, net_ipv6_ctl_path,
+						xfrm6_policy_table);
 #endif
 out:
 	return ret;

@@ -460,7 +460,7 @@ static void atm_proc_dirs_remove(void)
 		if (e->dirent)
 			remove_proc_entry(e->name, atm_proc_root);
 	}
-	remove_proc_entry("atm", init_net.proc_net);
+	proc_net_remove(&init_net, "atm");
 }
 
 int __init atm_proc_init(void)

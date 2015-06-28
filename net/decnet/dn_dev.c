@@ -209,7 +209,15 @@ static void dn_dev_sysctl_register(struct net_device *dev, struct dn_dev_parms *
 	struct dn_dev_sysctl_table *t;
 	int i;
 
-	char path[sizeof("net/decnet/conf/") + IFNAMSIZ];
+#define DN_CTL_PATH_DEV	3
+
+	struct ctl_path dn_ctl_path[] = {
+		{ .procname = "net",  },
+		{ .procname = "decnet",  },
+		{ .procname = "conf",  },
+		{ /* to be set */ },
+		{ },
+	};
 
 	t = kmemdup(&dn_dev_sysctl, sizeof(*t), GFP_KERNEL);
 	if (t == NULL)
@@ -220,12 +228,15 @@ static void dn_dev_sysctl_register(struct net_device *dev, struct dn_dev_parms *
 		t->dn_dev_vars[i].data = ((char *)parms) + offset;
 	}
 
-	snprintf(path, sizeof(path), "net/decnet/conf/%s",
-		dev? dev->name : parms->name);
+	if (dev) {
+		dn_ctl_path[DN_CTL_PATH_DEV].procname = dev->name;
+	} else {
+		dn_ctl_path[DN_CTL_PATH_DEV].procname = parms->name;
+	}
 
 	t->dn_dev_vars[0].extra1 = (void *)dev;
 
-	t->sysctl_header = register_net_sysctl(&init_net, path, t->dn_dev_vars);
+	t->sysctl_header = register_sysctl_paths(dn_ctl_path, t->dn_dev_vars);
 	if (t->sysctl_header == NULL)
 		kfree(t);
 	else
@@ -237,7 +248,7 @@ static void dn_dev_sysctl_unregister(struct dn_dev_parms *parms)
 	if (parms->sysctl) {
 		struct dn_dev_sysctl_table *t = parms->sysctl;
 		parms->sysctl = NULL;
-		unregister_net_sysctl_table(t->sysctl_header);
+		unregister_sysctl_table(t->sysctl_header);
 		kfree(t);
 	}
 }
@@ -1406,7 +1417,7 @@ void __init dn_dev_init(void)
 	rtnl_register(PF_DECnet, RTM_DELADDR, dn_nl_deladdr, NULL, NULL);
 	rtnl_register(PF_DECnet, RTM_GETADDR, NULL, dn_nl_dump_ifaddr, NULL);
 
-	proc_create("decnet_dev", S_IRUGO, init_net.proc_net, &dn_dev_seq_fops);
+	proc_net_fops_create(&init_net, "decnet_dev", S_IRUGO, &dn_dev_seq_fops);
 
 #ifdef CONFIG_SYSCTL
 	{
@@ -1427,7 +1438,7 @@ void __exit dn_dev_cleanup(void)
 	}
 #endif /* CONFIG_SYSCTL */
 
-	remove_proc_entry("decnet_dev", init_net.proc_net);
+	proc_net_remove(&init_net, "decnet_dev");
 
 	dn_dev_devices_off();
 }

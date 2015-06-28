@@ -86,8 +86,9 @@ static inline int handle_dev_cpu_collision(struct sk_buff *skb,
 		 * deadloop is detected. Return OK to try the next skb.
 		 */
 		kfree_skb(skb);
-		net_warn_ratelimited("Dead loop on netdevice %s, fix it urgently!\n",
-				     dev_queue->dev->name);
+		if (net_ratelimit())
+			pr_warning("Dead loop on netdevice %s, fix it urgently!\n",
+				   dev_queue->dev->name);
 		ret = qdisc_qlen(q);
 	} else {
 		/*
@@ -135,9 +136,9 @@ int sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 		ret = handle_dev_cpu_collision(skb, txq, q);
 	} else {
 		/* Driver returned NETDEV_TX_BUSY - requeue skb */
-		if (unlikely(ret != NETDEV_TX_BUSY))
-			net_warn_ratelimited("BUG %s code %d qlen %d\n",
-					     dev->name, ret, q->q.qlen);
+		if (unlikely (ret != NETDEV_TX_BUSY && net_ratelimit()))
+			pr_warning("BUG %s code %d qlen %d\n",
+				   dev->name, ret, q->q.qlen);
 
 		ret = dev_requeue_skb(skb, q);
 	}
@@ -323,6 +324,24 @@ void netif_carrier_off(struct net_device *dev)
 	}
 }
 EXPORT_SYMBOL(netif_carrier_off);
+
+/**
+ * 	netif_notify_peers - notify network peers about existence of @dev
+ * 	@dev: network device
+ *
+ * Generate traffic such that interested network peers are aware of
+ * @dev, such as by generating a gratuitous ARP. This may be used when
+ * a device wants to inform the rest of the network about some sort of
+ * reconfiguration such as a failover event or virtual machine
+ * migration.
+ */
+void netif_notify_peers(struct net_device *dev)
+{
+	rtnl_lock();
+	call_netdevice_notifiers(NETDEV_NOTIFY_PEERS, dev);
+	rtnl_unlock();
+}
+EXPORT_SYMBOL(netif_notify_peers);
 
 /* "NOOP" scheduler: the best scheduler, recommended for all interfaces
    under all circumstances. It is difficult to invent anything faster or

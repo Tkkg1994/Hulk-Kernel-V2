@@ -104,7 +104,9 @@ static int __net_init iptable_mangle_net_init(struct net *net)
 	net->ipv4.iptable_mangle =
 		ipt_register_table(net, &packet_mangler, repl);
 	kfree(repl);
-	return PTR_RET(net->ipv4.iptable_mangle);
+	if (IS_ERR(net->ipv4.iptable_mangle))
+		return PTR_ERR(net->ipv4.iptable_mangle);
+	return 0;
 }
 
 static void __net_exit iptable_mangle_net_exit(struct net *net)
@@ -129,9 +131,13 @@ static int __init iptable_mangle_init(void)
 	mangle_ops = xt_hook_link(&packet_mangler, iptable_mangle_hook);
 	if (IS_ERR(mangle_ops)) {
 		ret = PTR_ERR(mangle_ops);
-		unregister_pernet_subsys(&iptable_mangle_net_ops);
+		goto cleanup_table;
 	}
 
+	return ret;
+
+ cleanup_table:
+	unregister_pernet_subsys(&iptable_mangle_net_ops);
 	return ret;
 }
 

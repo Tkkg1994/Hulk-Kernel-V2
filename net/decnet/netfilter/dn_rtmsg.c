@@ -57,7 +57,8 @@ nlmsg_failure:
 	if (skb)
 		kfree_skb(skb);
 	*errp = -ENOMEM;
-	net_err_ratelimited("dn_rtmsg: error creating netlink message\n");
+	if (net_ratelimit())
+		printk(KERN_ERR "dn_rtmsg: error creating netlink message\n");
 	return NULL;
 }
 

@@ -177,7 +177,7 @@ static int ip_vs_ftp_out(struct ip_vs_app *app, struct ip_vs_conn *cp,
 	__be16 port;
 	struct ip_vs_conn *n_cp;
 	char buf[24];		/* xxx.xxx.xxx.xxx,ppp,ppp\000 */
-	unsigned int buf_len;
+	unsigned buf_len;
 	int ret = 0;
 	enum ip_conntrack_info ctinfo;
 	struct nf_conn *ct;

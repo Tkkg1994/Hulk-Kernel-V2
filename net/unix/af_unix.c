@@ -157,10 +157,9 @@ static inline void unix_set_secdata(struct scm_cookie *scm, struct sk_buff *skb)
  *    each socket state is protected by separate spin lock.
  */
 
-static inline unsigned int unix_hash_fold(__wsum n)
+static inline unsigned unix_hash_fold(__wsum n)
 {
-	unsigned int hash = (__force unsigned int)n;
-
+	unsigned hash = (__force unsigned)n;
 	hash ^= hash>>16;
 	hash ^= hash>>8;
 	return hash&(UNIX_HASH_SIZE-1);
@@ -209,7 +208,7 @@ static inline void unix_release_addr(struct unix_address *addr)
  *		- if started by zero, it is abstract name.
  */
 
-static int unix_mkname(struct sockaddr_un *sunaddr, int len, unsigned int *hashp)
+static int unix_mkname(struct sockaddr_un *sunaddr, int len, unsigned *hashp)
 {
 	if (len <= sizeof(short) || len > sizeof(*sunaddr))
 		return -EINVAL;
@@ -259,7 +258,7 @@ static inline void unix_insert_socket(struct hlist_head *list, struct sock *sk)
 
 static struct sock *__unix_find_socket_byname(struct net *net,
 					      struct sockaddr_un *sunname,
-					      int len, int type, unsigned int hash)
+					      int len, int type, unsigned hash)
 {
 	struct sock *s;
 
@@ -281,7 +280,7 @@ found:
 static inline struct sock *unix_find_socket_byname(struct net *net,
 						   struct sockaddr_un *sunname,
 						   int len, int type,
-						   unsigned int hash)
+						   unsigned hash)
 {
 	struct sock *s;
 
@@ -772,7 +771,7 @@ out:	mutex_unlock(&u->readlock);
 
 static struct sock *unix_find_other(struct net *net,
 				    struct sockaddr_un *sunname, int len,
-				    int type, unsigned int hash, int *error)
+				    int type, unsigned hash, int *error)
 {
 	struct sock *u;
 	struct path path;
@@ -836,7 +835,7 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	struct dentry *dentry = NULL;
 	struct path path;
 	int err;
-	unsigned int hash;
+	unsigned hash;
 	struct unix_address *addr;
 	struct hlist_head *list;
 
@@ -973,7 +972,7 @@ static int unix_dgram_connect(struct socket *sock, struct sockaddr *addr,
 	struct net *net = sock_net(sk);
 	struct sockaddr_un *sunaddr = (struct sockaddr_un *)addr;
 	struct sock *other;
-	unsigned int hash;
+	unsigned hash;
 	int err;
 
 	if (addr->sa_family != AF_UNSPEC) {
@@ -1071,7 +1070,7 @@ static int unix_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	struct sock *newsk = NULL;
 	struct sock *other = NULL;
 	struct sk_buff *skb = NULL;
-	unsigned int hash;
+	unsigned hash;
 	int st;
 	int err;
 	long timeo;
@@ -1456,7 +1455,7 @@ static int unix_dgram_sendmsg(struct kiocb *kiocb, struct socket *sock,
 	struct sock *other = NULL;
 	int namelen = 0; /* fake GCC */
 	int err;
-	unsigned int hash;
+	unsigned hash;
 	struct sk_buff *skb;
 	long timeo;
 	struct scm_cookie tmp_scm;
@@ -2414,7 +2413,7 @@ static int __net_init unix_net_init(struct net *net)
 		goto out;
 
 #ifdef CONFIG_PROC_FS
-	if (!proc_create("unix", 0, net->proc_net, &unix_seq_fops)) {
+	if (!proc_net_fops_create(net, "unix", 0, &unix_seq_fops)) {
 		unix_sysctl_unregister(net);
 		goto out;
 	}
@@ -2427,7 +2426,7 @@ out:
 static void __net_exit unix_net_exit(struct net *net)
 {
 	unix_sysctl_unregister(net);
-	remove_proc_entry("unix", net->proc_net);
+	proc_net_remove(net, "unix");
 }
 
 static struct pernet_operations unix_net_ops = {

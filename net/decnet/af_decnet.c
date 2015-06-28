@@ -249,7 +249,7 @@ static void dn_unhash_sock_bh(struct sock *sk)
 static struct hlist_head *listen_hash(struct sockaddr_dn *addr)
 {
 	int i;
-	unsigned int hash = addr->sdn_objnum;
+	unsigned hash = addr->sdn_objnum;
 
 	if (hash == 0) {
 		hash = addr->sdn_objnamel;
@@ -1841,9 +1841,9 @@ static inline int dn_queue_too_long(struct dn_scp *scp, struct sk_buff_head *que
  * inclusion (or not) of the two 16 bit acknowledgement fields so it doesn't
  * make much practical difference.
  */
-unsigned int dn_mss_from_pmtu(struct net_device *dev, int mtu)
+unsigned dn_mss_from_pmtu(struct net_device *dev, int mtu)
 {
-	unsigned int mss = 230 - DN_MAX_NSP_DATA_HEADER;
+	unsigned mss = 230 - DN_MAX_NSP_DATA_HEADER;
 	if (dev) {
 		struct dn_dev *dn_db = rcu_dereference_raw(dev->dn_ptr);
 		mtu -= LL_RESERVED_SPACE(dev);
@@ -2379,7 +2379,7 @@ static int __init decnet_init(void)
 	dev_add_pack(&dn_dix_packet_type);
 	register_netdevice_notifier(&dn_dev_notifier);
 
-	proc_create("decnet", S_IRUGO, init_net.proc_net, &dn_socket_seq_fops);
+	proc_net_fops_create(&init_net, "decnet", S_IRUGO, &dn_socket_seq_fops);
 	dn_register_sysctl();
 out:
 	return rc;
@@ -2408,7 +2408,7 @@ static void __exit decnet_exit(void)
 	dn_neigh_cleanup();
 	dn_fib_cleanup();
 
-	remove_proc_entry("decnet", init_net.proc_net);
+	proc_net_remove(&init_net, "decnet");
 
 	proto_unregister(&dn_proto);
 

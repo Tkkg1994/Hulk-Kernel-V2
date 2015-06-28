@@ -524,7 +524,7 @@ static void sctp_do_8_2_transport_strike(struct sctp_association *asoc,
 /* Worker routine to handle INIT command failure.  */
 static void sctp_cmd_init_failed(sctp_cmd_seq_t *commands,
 				 struct sctp_association *asoc,
-				 unsigned int error)
+				 unsigned error)
 {
 	struct sctp_ulpevent *event;
 
@@ -550,7 +550,7 @@ static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
 				  sctp_event_t event_type,
 				  sctp_subtype_t subtype,
 				  struct sctp_chunk *chunk,
-				  unsigned int error)
+				  unsigned error)
 {
 	struct sctp_ulpevent *event;
 
@@ -642,8 +642,10 @@ static void sctp_cmd_t3_rtx_timers_stop(sctp_cmd_seq_t *cmds,
 
 	list_for_each_entry(t, &asoc->peer.transport_addr_list,
 			transports) {
-		if (del_timer(&t->T3_rtx_timer))
+		if (timer_pending(&t->T3_rtx_timer) &&
+		    del_timer(&t->T3_rtx_timer)) {
 			sctp_transport_put(t);
+		}
 	}
 }
 
@@ -1159,8 +1161,9 @@ static int sctp_side_effects(sctp_event_t event_type, sctp_subtype_t subtype,
 		break;
 
 	case SCTP_DISPOSITION_VIOLATION:
-		net_err_ratelimited("protocol violation state %d chunkid %d\n",
-				    state, subtype.chunk);
+		if (net_ratelimit())
+			pr_err("protocol violation state %d chunkid %d\n",
+			       state, subtype.chunk);
 		break;
 
 	case SCTP_DISPOSITION_NOT_IMPL:
@@ -1475,7 +1478,7 @@ static int sctp_cmd_interpreter(sctp_event_t event_type,
 
 		case SCTP_CMD_TIMER_STOP:
 			timer = &asoc->timers[cmd->obj.to];
-			if (del_timer(timer))
+			if (timer_pending(timer) && del_timer(timer))
 				sctp_association_put(asoc);
 			break;
 

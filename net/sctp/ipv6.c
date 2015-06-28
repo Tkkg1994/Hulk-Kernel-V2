@@ -185,9 +185,6 @@ SCTP_STATIC void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 			goto out_unlock;
 		}
 		break;
-	case NDISC_REDIRECT:
-		sctp_icmp_redirect(sk, transport, skb);
-		break;
 	default:
 		break;
 	}

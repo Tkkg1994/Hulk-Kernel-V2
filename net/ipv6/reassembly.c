@@ -137,16 +137,15 @@ static unsigned int ip6_hashfn(struct inet_frag_queue *q)
 	return inet6_hash_frag(fq->id, &fq->saddr, &fq->daddr, ip6_frags.rnd);
 }
 
-bool ip6_frag_match(struct inet_frag_queue *q, void *a)
+int ip6_frag_match(struct inet_frag_queue *q, void *a)
 {
 	struct frag_queue *fq;
 	struct ip6_create_arg *arg = a;
 
 	fq = container_of(q, struct frag_queue, q);
-	return	fq->id == arg->id &&
-		fq->user == arg->user &&
-		ipv6_addr_equal(&fq->saddr, arg->src) &&
-		ipv6_addr_equal(&fq->daddr, arg->dst);
+	return (fq->id == arg->id && fq->user == arg->user &&
+			ipv6_addr_equal(&fq->saddr, arg->src) &&
+			ipv6_addr_equal(&fq->daddr, arg->dst));
 }
 EXPORT_SYMBOL(ip6_frag_match);
 
@@ -533,10 +532,12 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff *prev,
 	return 1;
 
 out_oversize:
-	net_dbg_ratelimited("ip6_frag_reasm: payload len = %d\n", payload_len);
+	if (net_ratelimit())
+		printk(KERN_DEBUG "ip6_frag_reasm: payload len = %d\n", payload_len);
 	goto out_fail;
 out_oom:
-	net_dbg_ratelimited("ip6_frag_reasm: no memory for reassembly\n");
+	if (net_ratelimit())
+		printk(KERN_DEBUG "ip6_frag_reasm: no memory for reassembly\n");
 out_fail:
 	rcu_read_lock();
 	IP6_INC_STATS_BH(net, __in6_dev_get(dev), IPSTATS_MIB_REASMFAILS);
@@ -663,7 +664,7 @@ static int __net_init ip6_frags_ns_sysctl_register(struct net *net)
 		table[2].data = &net->ipv6.frags.timeout;
 	}
 
-	hdr = register_net_sysctl(net, "net/ipv6", table);
+	hdr = register_net_sysctl_table(net, net_ipv6_ctl_path, table);
 	if (hdr == NULL)
 		goto err_reg;
 
@@ -691,7 +692,7 @@ static struct ctl_table_header *ip6_ctl_header;
 
 static int ip6_frags_sysctl_register(void)
 {
-	ip6_ctl_header = register_net_sysctl(&init_net, "net/ipv6",
+	ip6_ctl_header = register_net_sysctl_rotable(net_ipv6_ctl_path,
 			ip6_frags_ctl_table);
 	return ip6_ctl_header == NULL ? -ENOMEM : 0;
 }

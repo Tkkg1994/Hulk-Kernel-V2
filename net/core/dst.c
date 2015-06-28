@@ -94,7 +94,7 @@ loop:
 			 * But we do not have state "obsoleted, but
 			 * referenced by parent", so it is right.
 			 */
-			if (dst->obsolete > 0)
+			if (dst->obsolete > 1)
 				continue;
 
 			___dst_free(dst);
@@ -152,7 +152,7 @@ EXPORT_SYMBOL(dst_discard);
 const u32 dst_default_metrics[RTAX_MAX];
 
 void *dst_alloc(struct dst_ops *ops, struct net_device *dev,
-		int initial_ref, int initial_obsolete, unsigned short flags)
+		int initial_ref, int initial_obsolete, int flags)
 {
 	struct dst_entry *dst;
 
@@ -188,7 +188,6 @@ void *dst_alloc(struct dst_ops *ops, struct net_device *dev,
 	dst->__use = 0;
 	dst->lastuse = jiffies;
 	dst->flags = flags;
-	dst->pending_confirm = 0;
 	dst->next = NULL;
 	if (!(flags & DST_NOCOUNT))
 		dst_entries_add(ops, 1);
@@ -203,7 +202,7 @@ static void ___dst_free(struct dst_entry *dst)
 	 */
 	if (dst->dev == NULL || !(dst->dev->flags&IFF_UP))
 		dst->input = dst->output = dst_discard;
-	dst->obsolete = DST_OBSOLETE_DEAD;
+	dst->obsolete = 2;
 }
 
 void __dst_free(struct dst_entry *dst)
@@ -384,7 +383,7 @@ static int dst_dev_event(struct notifier_block *this, unsigned long event,
 	struct dst_entry *dst, *last = NULL;
 
 	switch (event) {
-	case NETDEV_UNREGISTER_FINAL:
+	case NETDEV_UNREGISTER:
 	case NETDEV_DOWN:
 		mutex_lock(&dst_gc_mutex);
 		for (dst = dst_busy_list; dst; dst = dst->next) {

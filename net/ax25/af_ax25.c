@@ -1988,10 +1988,9 @@ static int __init ax25_init(void)
 	register_netdevice_notifier(&ax25_dev_notifier);
 	ax25_register_sysctl();
 
-	proc_create("ax25_route", S_IRUGO, init_net.proc_net,
-		    &ax25_route_fops);
-	proc_create("ax25", S_IRUGO, init_net.proc_net, &ax25_info_fops);
-	proc_create("ax25_calls", S_IRUGO, init_net.proc_net, &ax25_uid_fops);
+	proc_net_fops_create(&init_net, "ax25_route", S_IRUGO, &ax25_route_fops);
+	proc_net_fops_create(&init_net, "ax25", S_IRUGO, &ax25_info_fops);
+	proc_net_fops_create(&init_net, "ax25_calls", S_IRUGO, &ax25_uid_fops);
 out:
 	return rc;
 }
@@ -2005,9 +2004,9 @@ MODULE_ALIAS_NETPROTO(PF_AX25);
 
 static void __exit ax25_exit(void)
 {
-	remove_proc_entry("ax25_route", init_net.proc_net);
-	remove_proc_entry("ax25", init_net.proc_net);
-	remove_proc_entry("ax25_calls", init_net.proc_net);
+	proc_net_remove(&init_net, "ax25_route");
+	proc_net_remove(&init_net, "ax25");
+	proc_net_remove(&init_net, "ax25_calls");
 
 	unregister_netdevice_notifier(&ax25_dev_notifier);
 	ax25_unregister_sysctl();

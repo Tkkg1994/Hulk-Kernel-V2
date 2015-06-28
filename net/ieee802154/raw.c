@@ -106,7 +106,7 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		       size_t size)
 {
 	struct net_device *dev;
-	unsigned int mtu;
+	unsigned mtu;
 	struct sk_buff *skb;
 	int hlen, tlen;
 	int err;

@@ -117,6 +117,7 @@ struct frag_hdr {
 
 /* sysctls */
 extern int sysctl_mld_max_msf;
+extern struct ctl_path net_ipv6_ctl_path[];
 
 #define _DEVINC(net, statname, modifier, idev, field)			\
 ({									\
@@ -275,7 +276,7 @@ extern struct ipv6_txoptions *	ipv6_renew_options(struct sock *sk, struct ipv6_t
 struct ipv6_txoptions *ipv6_fixup_options(struct ipv6_txoptions *opt_space,
 					  struct ipv6_txoptions *opt);
 
-extern bool ipv6_opt_accepted(const struct sock *sk, const struct sk_buff *skb);
+extern int ipv6_opt_accepted(struct sock *sk, struct sk_buff *skb);
 
 int ip6_frag_nqueues(struct net *net);
 int ip6_frag_mem(struct net *net);
@@ -322,23 +323,14 @@ static inline int ipv6_addr_cmp(const struct in6_addr *a1, const struct in6_addr
 	return memcmp(a1, a2, sizeof(struct in6_addr));
 }
 
-static inline bool
+static inline int
 ipv6_masked_addr_cmp(const struct in6_addr *a1, const struct in6_addr *m,
 		     const struct in6_addr *a2)
 {
-#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS) && BITS_PER_LONG == 64
-	const unsigned long *ul1 = (const unsigned long *)a1;
-	const unsigned long *ulm = (const unsigned long *)m;
-	const unsigned long *ul2 = (const unsigned long *)a2;
-
-	return !!(((ul1[0] ^ ul2[0]) & ulm[0]) |
-		  ((ul1[1] ^ ul2[1]) & ulm[1]));
-#else
 	return !!(((a1->s6_addr32[0] ^ a2->s6_addr32[0]) & m->s6_addr32[0]) |
 		  ((a1->s6_addr32[1] ^ a2->s6_addr32[1]) & m->s6_addr32[1]) |
 		  ((a1->s6_addr32[2] ^ a2->s6_addr32[2]) & m->s6_addr32[2]) |
 		  ((a1->s6_addr32[3] ^ a2->s6_addr32[3]) & m->s6_addr32[3]));
-#endif
 }
 
 static inline void ipv6_addr_prefix(struct in6_addr *pfx, 
@@ -365,43 +357,36 @@ static inline void ipv6_addr_set(struct in6_addr *addr,
 	addr->s6_addr32[3] = w4;
 }
 
-static inline bool ipv6_addr_equal(const struct in6_addr *a1,
-				   const struct in6_addr *a2)
+static inline int ipv6_addr_equal(const struct in6_addr *a1,
+				  const struct in6_addr *a2)
 {
-#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS) && BITS_PER_LONG == 64
-	const unsigned long *ul1 = (const unsigned long *)a1;
-	const unsigned long *ul2 = (const unsigned long *)a2;
-
-	return ((ul1[0] ^ ul2[0]) | (ul1[1] ^ ul2[1])) == 0UL;
-#else
 	return ((a1->s6_addr32[0] ^ a2->s6_addr32[0]) |
 		(a1->s6_addr32[1] ^ a2->s6_addr32[1]) |
 		(a1->s6_addr32[2] ^ a2->s6_addr32[2]) |
 		(a1->s6_addr32[3] ^ a2->s6_addr32[3])) == 0;
-#endif
 }
 
-static inline bool __ipv6_prefix_equal(const __be32 *a1, const __be32 *a2,
-				       unsigned int prefixlen)
+static inline int __ipv6_prefix_equal(const __be32 *a1, const __be32 *a2,
+				      unsigned int prefixlen)
 {
-	unsigned int pdw, pbi;
+	unsigned pdw, pbi;
 
 	/* check complete u32 in prefix */
 	pdw = prefixlen >> 5;
 	if (pdw && memcmp(a1, a2, pdw << 2))
-		return false;
+		return 0;
 
 	/* check incomplete u32 in prefix */
 	pbi = prefixlen & 0x1f;
 	if (pbi && ((a1[pdw] ^ a2[pdw]) & htonl((0xffffffff) << (32 - pbi))))
-		return false;
+		return 0;
 
-	return true;
+	return 1;
 }
 
-static inline bool ipv6_prefix_equal(const struct in6_addr *a1,
-				     const struct in6_addr *a2,
-				     unsigned int prefixlen)
+static inline int ipv6_prefix_equal(const struct in6_addr *a1,
+				    const struct in6_addr *a2,
+				    unsigned int prefixlen)
 {
 	return __ipv6_prefix_equal(a1->s6_addr32, a2->s6_addr32,
 				   prefixlen);
@@ -427,7 +412,7 @@ struct ip6_create_arg {
 };
 
 void ip6_frag_init(struct inet_frag_queue *q, void *a);
-bool ip6_frag_match(struct inet_frag_queue *q, void *a);
+int ip6_frag_match(struct inet_frag_queue *q, void *a);
 
 /* more secured version of ipv6_addr_hash() */
 static inline u32 __ipv6_addr_jhash(const struct in6_addr *a, const u32 initval)
@@ -445,38 +430,19 @@ static inline u32 ipv6_addr_jhash(const struct in6_addr *a)
 	return __ipv6_addr_jhash(a, ipv6_hash_secret);
 }
 
-static inline bool ipv6_addr_any(const struct in6_addr *a)
+static inline int ipv6_addr_any(const struct in6_addr *a)
 {
-#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS) && BITS_PER_LONG == 64
-	const unsigned long *ul = (const unsigned long *)a;
-
-	return (ul[0] | ul[1]) == 0UL;
-#else
 	return (a->s6_addr32[0] | a->s6_addr32[1] |
 		a->s6_addr32[2] | a->s6_addr32[3]) == 0;
-#endif
 }
 
-static inline u32 ipv6_addr_hash(const struct in6_addr *a)
-{
-#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS) && BITS_PER_LONG == 64
-	const unsigned long *ul = (const unsigned long *)a;
-	unsigned long x = ul[0] ^ ul[1];
-
-	return (u32)(x ^ (x >> 32));
-#else
-	return (__force u32)(a->s6_addr32[0] ^ a->s6_addr32[1] ^
-			     a->s6_addr32[2] ^ a->s6_addr32[3]);
-#endif
-}
-
-static inline bool ipv6_addr_loopback(const struct in6_addr *a)
+static inline int ipv6_addr_loopback(const struct in6_addr *a)
 {
 	return (a->s6_addr32[0] | a->s6_addr32[1] |
 		a->s6_addr32[2] | (a->s6_addr32[3] ^ htonl(1))) == 0;
 }
 
-static inline bool ipv6_addr_v4mapped(const struct in6_addr *a)
+static inline int ipv6_addr_v4mapped(const struct in6_addr *a)
 {
 	return (a->s6_addr32[0] | a->s6_addr32[1] |
 		 (a->s6_addr32[2] ^ htonl(0x0000ffff))) == 0;
@@ -486,7 +452,7 @@ static inline bool ipv6_addr_v4mapped(const struct in6_addr *a)
  * Check for a RFC 4843 ORCHID address
  * (Overlay Routable Cryptographic Hash Identifiers)
  */
-static inline bool ipv6_addr_orchid(const struct in6_addr *a)
+static inline int ipv6_addr_orchid(const struct in6_addr *a)
 {
 	return (a->s6_addr32[0] & htonl(0xfffffff0)) == htonl(0x20010010);
 }
@@ -640,7 +606,7 @@ extern void			ipv6_push_frag_opts(struct sk_buff *skb,
 extern int			ipv6_skip_exthdr(const struct sk_buff *, int start,
 					         u8 *nexthdrp, __be16 *frag_offp);
 
-extern bool			ipv6_ext_hdr(u8 nexthdr);
+extern int 			ipv6_ext_hdr(u8 nexthdr);
 
 extern int ipv6_find_tlv(struct sk_buff *skb, int offset, int type);
 
@@ -743,6 +709,8 @@ extern struct ctl_table *ipv6_icmp_sysctl_init(struct net *net);
 extern struct ctl_table *ipv6_route_sysctl_init(struct net *net);
 extern int ipv6_sysctl_register(void);
 extern void ipv6_sysctl_unregister(void);
+extern int ipv6_static_sysctl_register(void);
+extern void ipv6_static_sysctl_unregister(void);
 #endif
 
 #endif /* _NET_IPV6_H */

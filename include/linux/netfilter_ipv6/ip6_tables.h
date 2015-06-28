@@ -298,14 +298,9 @@ ip6t_ext_hdr(u8 nexthdr)
 	       (nexthdr == IPPROTO_DSTOPTS);
 }
 
-enum {
-	IP6T_FH_F_FRAG	= (1 << 0),
-	IP6T_FH_F_AUTH	= (1 << 1),
-};
-
 /* find specified header and get offset to it */
 extern int ipv6_find_hdr(const struct sk_buff *skb, unsigned int *offset,
-			 int target, unsigned short *fragoff, int *fragflg);
+			 int target, unsigned short *fragoff);
 
 #ifdef CONFIG_COMPAT
 #include <net/compat.h>

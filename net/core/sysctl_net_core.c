@@ -14,7 +14,6 @@
 #include <linux/vmalloc.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/kmemleak.h>
 
 #include <net/ip.h>
 #include <net/sock.h>
@@ -208,6 +207,12 @@ static struct ctl_table netns_core_table[] = {
 	{ }
 };
 
+__net_initdata struct ctl_path net_core_path[] = {
+	{ .procname = "net", },
+	{ .procname = "core", },
+	{ },
+};
+
 static __net_init int sysctl_core_net_init(struct net *net)
 {
 	struct ctl_table *tbl;
@@ -223,7 +228,8 @@ static __net_init int sysctl_core_net_init(struct net *net)
 		tbl[0].data = &net->core.sysctl_somaxconn;
 	}
 
-	net->core.sysctl_hdr = register_net_sysctl(net, "net/core", tbl);
+	net->core.sysctl_hdr = register_net_sysctl_table(net,
+			net_core_path, tbl);
 	if (net->core.sysctl_hdr == NULL)
 		goto err_reg;
 
@@ -253,7 +259,10 @@ static __net_initdata struct pernet_operations sysctl_core_ops = {
 
 static __init int sysctl_core_init(void)
 {
-	register_net_sysctl(&init_net, "net/core", net_core_table);
+	static struct ctl_table empty[1];
+
+	register_sysctl_paths(net_core_path, empty);
+	register_net_sysctl_rotable(net_core_path, net_core_table);
 	return register_pernet_subsys(&sysctl_core_ops);
 }
 

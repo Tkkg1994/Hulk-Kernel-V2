@@ -1744,7 +1744,7 @@ static void netback_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateConnected:
-		netdev_notify_peers(netdev);
+		netif_notify_peers(netdev);
 		break;
 
 	case XenbusStateClosing:

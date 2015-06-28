@@ -17,8 +17,6 @@
  * Fred Templin <fred.l.templin@boeing.com>:	isatap support
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
 #include <linux/module.h>
 #include <linux/capability.h>
 #include <linux/errno.h>
@@ -89,47 +87,31 @@ struct sit_net {
 
 /* often modified stats are per cpu, other are shared (netdev->stats) */
 struct pcpu_tstats {
-	u64	rx_packets;
-	u64	rx_bytes;
-	u64	tx_packets;
-	u64	tx_bytes;
-	struct u64_stats_sync	syncp;
-};
+	unsigned long	rx_packets;
+	unsigned long	rx_bytes;
+	unsigned long	tx_packets;
+	unsigned long	tx_bytes;
+} __attribute__((aligned(4*sizeof(unsigned long))));
 
-static struct rtnl_link_stats64 *ipip6_get_stats64(struct net_device *dev,
-						   struct rtnl_link_stats64 *tot)
+static struct net_device_stats *ipip6_get_stats(struct net_device *dev)
 {
+	struct pcpu_tstats sum = { 0 };
 	int i;
 
 	for_each_possible_cpu(i) {
 		const struct pcpu_tstats *tstats = per_cpu_ptr(dev->tstats, i);
-		u64 rx_packets, rx_bytes, tx_packets, tx_bytes;
-		unsigned int start;
 
-		do {
-			start = u64_stats_fetch_begin_bh(&tstats->syncp);
-			rx_packets = tstats->rx_packets;
-			tx_packets = tstats->tx_packets;
-			rx_bytes = tstats->rx_bytes;
-			tx_bytes = tstats->tx_bytes;
-		} while (u64_stats_fetch_retry_bh(&tstats->syncp, start));
-
-		tot->rx_packets += rx_packets;
-		tot->tx_packets += tx_packets;
-		tot->rx_bytes   += rx_bytes;
-		tot->tx_bytes   += tx_bytes;
+		sum.rx_packets += tstats->rx_packets;
+		sum.rx_bytes   += tstats->rx_bytes;
+		sum.tx_packets += tstats->tx_packets;
+		sum.tx_bytes   += tstats->tx_bytes;
 	}
-
-	tot->rx_errors = dev->stats.rx_errors;
-	tot->tx_fifo_errors = dev->stats.tx_fifo_errors;
-	tot->tx_carrier_errors = dev->stats.tx_carrier_errors;
-	tot->tx_dropped = dev->stats.tx_dropped;
-	tot->tx_aborted_errors = dev->stats.tx_aborted_errors;
-	tot->tx_errors = dev->stats.tx_errors;
-
-	return tot;
+	dev->stats.rx_packets = sum.rx_packets;
+	dev->stats.rx_bytes   = sum.rx_bytes;
+	dev->stats.tx_packets = sum.tx_packets;
+	dev->stats.tx_bytes   = sum.tx_bytes;
+	return &dev->stats;
 }
-
 /*
  * Must be invoked with rcu_read_lock
  */
@@ -527,6 +509,9 @@ static int ipip6_err(struct sk_buff *skb, u32 info)
 		case ICMP_PORT_UNREACH:
 			/* Impossible event. */
 			return 0;
+		case ICMP_FRAG_NEEDED:
+			/* Soft state for pmtu is maintained by IP core. */
+			return 0;
 		default:
 			/* All others are translated to HOST_UNREACH.
 			   rfc2003 contains "deep thoughts" about NET_UNREACH,
@@ -539,8 +524,6 @@ static int ipip6_err(struct sk_buff *skb, u32 info)
 		if (code != ICMP_EXC_TTL)
 			return 0;
 		break;
-	case ICMP_REDIRECT:
-		break;
 	}
 
 	err = -ENOENT;
@@ -550,23 +533,7 @@ static int ipip6_err(struct sk_buff *skb, u32 info)
 				skb->dev,
 				iph->daddr,
 				iph->saddr);
-	if (t == NULL)
-		goto out;
-
-	if (type == ICMP_DEST_UNREACH && code == ICMP_FRAG_NEEDED) {
-		ipv4_update_pmtu(skb, dev_net(skb->dev), info,
-				 t->dev->ifindex, 0, IPPROTO_IPV6, 0);
-		err = 0;
-		goto out;
-	}
-	if (type == ICMP_REDIRECT) {
-		ipv4_redirect(skb, dev_net(skb->dev), t->dev->ifindex, 0,
-			      IPPROTO_IPV6, 0);
-		err = 0;
-		goto out;
-	}
-
-	if (t->parms.iph.daddr == 0)
+	if (t == NULL || t->parms.iph.daddr == 0)
 		goto out;
 
 	err = 0;
@@ -719,7 +686,8 @@ static netdev_tx_t ipip6_tunnel_xmit(struct sk_buff *skb,
 			neigh = dst_neigh_lookup(skb_dst(skb), &iph6->daddr);
 
 		if (neigh == NULL) {
-			net_dbg_ratelimited("sit: nexthop == NULL\n");
+			if (net_ratelimit())
+				printk(KERN_DEBUG "sit: nexthop == NULL\n");
 			goto tx_error;
 		}
 
@@ -748,7 +716,8 @@ static netdev_tx_t ipip6_tunnel_xmit(struct sk_buff *skb,
 			neigh = dst_neigh_lookup(skb_dst(skb), &iph6->daddr);
 
 		if (neigh == NULL) {
-			net_dbg_ratelimited("sit: nexthop == NULL\n");
+			if (net_ratelimit())
+				printk(KERN_DEBUG "sit: nexthop == NULL\n");
 			goto tx_error;
 		}
 
@@ -807,7 +776,7 @@ static netdev_tx_t ipip6_tunnel_xmit(struct sk_buff *skb,
 		}
 
 		if (tunnel->parms.iph.daddr && skb_dst(skb))
-			skb_dst(skb)->ops->update_pmtu(skb_dst(skb), NULL, skb, mtu);
+			skb_dst(skb)->ops->update_pmtu(skb_dst(skb), mtu);
 
 		if (skb->len > mtu) {
 			icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu);
@@ -1157,7 +1126,7 @@ static const struct net_device_ops ipip6_netdev_ops = {
 	.ndo_start_xmit	= ipip6_tunnel_xmit,
 	.ndo_do_ioctl	= ipip6_tunnel_ioctl,
 	.ndo_change_mtu	= ipip6_tunnel_change_mtu,
-	.ndo_get_stats64= ipip6_get_stats64,
+	.ndo_get_stats	= ipip6_get_stats,
 };
 
 static void ipip6_dev_free(struct net_device *dev)
@@ -1318,7 +1287,7 @@ static int __init sit_init(void)
 {
 	int err;
 
-	pr_info("IPv6 over IPv4 tunneling driver\n");
+	printk(KERN_INFO "IPv6 over IPv4 tunneling driver\n");
 
 	err = register_pernet_device(&sit_net_ops);
 	if (err < 0)
@@ -1326,7 +1295,7 @@ static int __init sit_init(void)
 	err = xfrm4_tunnel_register(&sit_handler, AF_INET6);
 	if (err < 0) {
 		unregister_pernet_device(&sit_net_ops);
-		pr_info("%s: can't add protocol\n", __func__);
+		printk(KERN_INFO "sit init: Can't add protocol\n");
 	}
 	return err;
 }

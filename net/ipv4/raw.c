@@ -216,11 +216,6 @@ static void raw_err(struct sock *sk, struct sk_buff *skb, u32 info)
 	int err = 0;
 	int harderr = 0;
 
-	if (type == ICMP_DEST_UNREACH && code == ICMP_FRAG_NEEDED)
-		ipv4_sk_update_pmtu(skb, sk, info);
-	else if (type == ICMP_REDIRECT)
-		ipv4_sk_redirect(skb, sk);
-
 	/* Report error on raw socket, if:
 	   1. User requested ip_recverr.
 	   2. Socket is connected (otherwise the error indication
@@ -293,7 +288,7 @@ void raw_icmp_error(struct sk_buff *skb, int protocol, u32 info)
 	read_unlock(&raw_v4_hashinfo.lock);
 }
 
-static int raw_rcv_skb(struct sock *sk, struct sk_buff *skb)
+static int raw_rcv_skb(struct sock * sk, struct sk_buff * skb)
 {
 	/* Charge it to the socket. */
 
@@ -1044,7 +1039,7 @@ static const struct file_operations raw_seq_fops = {
 
 static __net_init int raw_init_net(struct net *net)
 {
-	if (!proc_create("raw", S_IRUGO, net->proc_net, &raw_seq_fops))
+	if (!proc_net_fops_create(net, "raw", S_IRUGO, &raw_seq_fops))
 		return -ENOMEM;
 
 	return 0;
@@ -1052,7 +1047,7 @@ static __net_init int raw_init_net(struct net *net)
 
 static __net_exit void raw_exit_net(struct net *net)
 {
-	remove_proc_entry("raw", net->proc_net);
+	proc_net_remove(net, "raw");
 }
 
 static __net_initdata struct pernet_operations raw_net_ops = {

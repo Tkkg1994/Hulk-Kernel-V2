@@ -1717,10 +1717,12 @@ reclassify:
 		tp = otp;
 
 		if (verd++ >= MAX_REC_LOOP) {
-			net_notice_ratelimited("%s: packet reclassify loop rule prio %u protocol %02x\n",
-					       tp->q->ops->id,
-					       tp->prio & 0xffff,
-					       ntohs(tp->protocol));
+			if (net_ratelimit())
+				pr_notice("%s: packet reclassify loop"
+					  " rule prio %u protocol %02x\n",
+					  tp->q->ops->id,
+					  tp->prio & 0xffff,
+					  ntohs(tp->protocol));
 			return TC_ACT_SHOT;
 		}
 		skb->tc_verd = SET_TC_VERD(skb->tc_verd, verd);
@@ -1780,7 +1782,7 @@ static int __net_init psched_net_init(struct net *net)
 {
 	struct proc_dir_entry *e;
 
-	e = proc_create("psched", 0, net->proc_net, &psched_fops);
+	e = proc_net_fops_create(net, "psched", 0, &psched_fops);
 	if (e == NULL)
 		return -ENOMEM;
 
@@ -1789,7 +1791,7 @@ static int __net_init psched_net_init(struct net *net)
 
 static void __net_exit psched_net_exit(struct net *net)
 {
-	remove_proc_entry("psched", net->proc_net);
+	proc_net_remove(net, "psched");
 }
 #else
 static int __net_init psched_net_init(struct net *net)

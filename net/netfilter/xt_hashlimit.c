@@ -156,22 +156,11 @@ dsthash_find(const struct xt_hashlimit_htable *ht,
 /* allocate dsthash_ent, initialize dst, put in htable and lock it */
 static struct dsthash_ent *
 dsthash_alloc_init(struct xt_hashlimit_htable *ht,
-		   const struct dsthash_dst *dst, bool *race)
+		   const struct dsthash_dst *dst)
 {
 	struct dsthash_ent *ent;
 
 	spin_lock(&ht->lock);
-
-	/* Two or more packets may race to create the same entry in the
-	 * hashtable, double check if this packet lost race.
-	 */
-	ent = dsthash_find(ht, dst);
-	if (ent != NULL) {
-		spin_unlock(&ht->lock);
-		*race = true;
-		return ent;
-	}
-
 	/* initialize hash with random val at the time we allocate
 	 * the first hashtable entry */
 	if (unlikely(!ht->rnd_initialized)) {
@@ -181,7 +170,8 @@ dsthash_alloc_init(struct xt_hashlimit_htable *ht,
 
 	if (ht->cfg.max && ht->count >= ht->cfg.max) {
 		/* FIXME: do something. question is what.. */
-		net_err_ratelimited("max count of %u reached\n", ht->cfg.max);
+		if (net_ratelimit())
+			pr_err("max count of %u reached\n", ht->cfg.max);
 		ent = NULL;
 	} else
 		ent = kmem_cache_alloc(hashlimit_cachep, GFP_ATOMIC);
@@ -328,10 +318,7 @@ static void htable_destroy(struct xt_hashlimit_htable *hinfo)
 		parent = hashlimit_net->ipt_hashlimit;
 	else
 		parent = hashlimit_net->ip6t_hashlimit;
-
-	if(parent != NULL)
-		remove_proc_entry(hinfo->pde->name, parent);
-
+	remove_proc_entry(hinfo->pde->name, parent);
 	htable_selective_cleanup(hinfo, select_all);
 	vfree(hinfo);
 }
@@ -399,18 +386,6 @@ static void htable_put(struct xt_hashlimit_htable *hinfo)
 
 #define CREDITS_PER_JIFFY POW2_BELOW32(MAX_CPJ)
 
-/* in byte mode, the lowest possible rate is one packet/second.
- * credit_cap is used as a counter that tells us how many times we can
- * refill the "credits available" counter when it becomes empty.
- */
-#define MAX_CPJ_BYTES (0xFFFFFFFF / HZ)
-#define CREDITS_PER_JIFFY_BYTES POW2_BELOW32(MAX_CPJ_BYTES)
-
-static u32 xt_hashlimit_len_to_chunks(u32 len)
-{
-	return (len >> XT_HASHLIMIT_BYTE_SHIFT) + 1;
-}
-
 /* Precision saver. */
 static u32 user2credits(u32 user)
 {
@@ -422,53 +397,12 @@ static u32 user2credits(u32 user)
 	return (user * HZ * CREDITS_PER_JIFFY) / XT_HASHLIMIT_SCALE;
 }
 
-static u32 user2credits_byte(u32 user)
+static void rateinfo_recalc(struct dsthash_ent *dh, unsigned long now)
 {
-	u64 us = user;
-	us *= HZ * CREDITS_PER_JIFFY_BYTES;
-	return (u32) (us >> 32);
-}
-
-static void rateinfo_recalc(struct dsthash_ent *dh, unsigned long now, u32 mode)
-{
-	unsigned long delta = now - dh->rateinfo.prev;
-	u32 cap;
-
-	if (delta == 0)
-		return;
-
+	dh->rateinfo.credit += (now - dh->rateinfo.prev) * CREDITS_PER_JIFFY;
+	if (dh->rateinfo.credit > dh->rateinfo.credit_cap)
+		dh->rateinfo.credit = dh->rateinfo.credit_cap;
 	dh->rateinfo.prev = now;
-
-	if (mode & XT_HASHLIMIT_BYTES) {
-		u32 tmp = dh->rateinfo.credit;
-		dh->rateinfo.credit += CREDITS_PER_JIFFY_BYTES * delta;
-		cap = CREDITS_PER_JIFFY_BYTES * HZ;
-		if (tmp >= dh->rateinfo.credit) {/* overflow */
-			dh->rateinfo.credit = cap;
-			return;
-		}
-	} else {
-		dh->rateinfo.credit += delta * CREDITS_PER_JIFFY;
-		cap = dh->rateinfo.credit_cap;
-	}
-	if (dh->rateinfo.credit > cap)
-		dh->rateinfo.credit = cap;
-}
-
-static void rateinfo_init(struct dsthash_ent *dh,
-			  struct xt_hashlimit_htable *hinfo)
-{
-	dh->rateinfo.prev = jiffies;
-	if (hinfo->cfg.mode & XT_HASHLIMIT_BYTES) {
-		dh->rateinfo.credit = CREDITS_PER_JIFFY_BYTES * HZ;
-		dh->rateinfo.cost = user2credits_byte(hinfo->cfg.avg);
-		dh->rateinfo.credit_cap = hinfo->cfg.burst;
-	} else {
-		dh->rateinfo.credit = user2credits(hinfo->cfg.avg *
-						   hinfo->cfg.burst);
-		dh->rateinfo.cost = user2credits(hinfo->cfg.avg);
-		dh->rateinfo.credit_cap = dh->rateinfo.credit;
-	}
 }
 
 static inline __be32 maskl(__be32 a, unsigned int l)
@@ -574,21 +508,6 @@ hashlimit_init_dst(const struct xt_hashlimit_htable *hinfo,
 	return 0;
 }
 
-static u32 hashlimit_byte_cost(unsigned int len, struct dsthash_ent *dh)
-{
-	u64 tmp = xt_hashlimit_len_to_chunks(len);
-	tmp = tmp * dh->rateinfo.cost;
-
-	if (unlikely(tmp > CREDITS_PER_JIFFY_BYTES * HZ))
-		tmp = CREDITS_PER_JIFFY_BYTES * HZ;
-
-	if (dh->rateinfo.credit < tmp && dh->rateinfo.credit_cap) {
-		dh->rateinfo.credit_cap--;
-		dh->rateinfo.credit = CREDITS_PER_JIFFY_BYTES * HZ;
-	}
-	return (u32) tmp;
-}
-
 static bool
 hashlimit_mt(const struct sk_buff *skb, struct xt_action_param *par)
 {
@@ -597,8 +516,6 @@ hashlimit_mt(const struct sk_buff *skb, struct xt_action_param *par)
 	unsigned long now = jiffies;
 	struct dsthash_ent *dh;
 	struct dsthash_dst dst;
-	bool race = false;
-	u32 cost;
 
 	if (hashlimit_init_dst(hinfo, &dst, skb, par->thoff) < 0)
 		goto hotdrop;
@@ -606,32 +523,26 @@ hashlimit_mt(const struct sk_buff *skb, struct xt_action_param *par)
 	rcu_read_lock_bh();
 	dh = dsthash_find(hinfo, &dst);
 	if (dh == NULL) {
-		dh = dsthash_alloc_init(hinfo, &dst, &race);
+		dh = dsthash_alloc_init(hinfo, &dst);
 		if (dh == NULL) {
 			rcu_read_unlock_bh();
 			goto hotdrop;
-		} else if (race) {
-			/* Already got an entry, update expiration timeout */
-			dh->expires = now + msecs_to_jiffies(hinfo->cfg.expire);
-			rateinfo_recalc(dh, now, hinfo->cfg.mode);
-		} else {
-			dh->expires = jiffies + msecs_to_jiffies(hinfo->cfg.expire);
-			rateinfo_init(dh, hinfo);
 		}
+		dh->expires = jiffies + msecs_to_jiffies(hinfo->cfg.expire);
+		dh->rateinfo.prev = jiffies;
+		dh->rateinfo.credit = user2credits(hinfo->cfg.avg *
+		                      hinfo->cfg.burst);
+		dh->rateinfo.credit_cap = dh->rateinfo.credit;
+		dh->rateinfo.cost = user2credits(hinfo->cfg.avg);
 	} else {
 		/* update expiration timeout */
 		dh->expires = now + msecs_to_jiffies(hinfo->cfg.expire);
-		rateinfo_recalc(dh, now, hinfo->cfg.mode);
+		rateinfo_recalc(dh, now);
 	}
 
-	if (info->cfg.mode & XT_HASHLIMIT_BYTES)
-		cost = hashlimit_byte_cost(skb->len, dh);
-	else
-		cost = dh->rateinfo.cost;
-
-	if (dh->rateinfo.credit >= cost) {
+	if (dh->rateinfo.credit >= dh->rateinfo.cost) {
 		/* below the limit */
-		dh->rateinfo.credit -= cost;
+		dh->rateinfo.credit -= dh->rateinfo.cost;
 		spin_unlock(&dh->lock);
 		rcu_read_unlock_bh();
 		return !(info->cfg.mode & XT_HASHLIMIT_INVERT);
@@ -653,6 +564,14 @@ static int hashlimit_mt_check(const struct xt_mtchk_param *par)
 	struct xt_hashlimit_mtinfo1 *info = par->matchinfo;
 	int ret;
 
+	/* Check for overflow. */
+	if (info->cfg.burst == 0 ||
+	    user2credits(info->cfg.avg * info->cfg.burst) <
+	    user2credits(info->cfg.avg)) {
+		pr_info("overflow, try lower: %u/%u\n",
+			info->cfg.avg, info->cfg.burst);
+		return -ERANGE;
+	}
 	if (info->cfg.gc_interval == 0 || info->cfg.expire == 0)
 		return -EINVAL;
 	if (info->name[sizeof(info->name)-1] != '\0')
@@ -663,26 +582,6 @@ static int hashlimit_mt_check(const struct xt_mtchk_param *par)
 	} else {
 		if (info->cfg.srcmask > 128 || info->cfg.dstmask > 128)
 			return -EINVAL;
-	}
-
-	if (info->cfg.mode & ~XT_HASHLIMIT_ALL) {
-		pr_info("Unknown mode mask %X, kernel too old?\n",
-						info->cfg.mode);
-		return -EINVAL;
-	}
-
-	/* Check for overflow. */
-	if (info->cfg.mode & XT_HASHLIMIT_BYTES) {
-		if (user2credits_byte(info->cfg.avg) == 0) {
-			pr_info("overflow, rate too high: %u\n", info->cfg.avg);
-			return -EINVAL;
-		}
-	} else if (info->cfg.burst == 0 ||
-		    user2credits(info->cfg.avg * info->cfg.burst) <
-		    user2credits(info->cfg.avg)) {
-			pr_info("overflow, try lower: %u/%u\n",
-				info->cfg.avg, info->cfg.burst);
-			return -ERANGE;
 	}
 
 	mutex_lock(&hashlimit_mutex);
@@ -777,11 +676,10 @@ static int dl_seq_real_show(struct dsthash_ent *ent, u_int8_t family,
 				   struct seq_file *s)
 {
 	int res;
-	const struct xt_hashlimit_htable *ht = s->private;
 
 	spin_lock(&ent->lock);
 	/* recalculate to show accurate numbers */
-	rateinfo_recalc(ent, jiffies, ht->cfg.mode);
+	rateinfo_recalc(ent, jiffies);
 
 	switch (family) {
 	case NFPROTO_IPV4:
@@ -864,7 +762,7 @@ static int __net_init hashlimit_proc_net_init(struct net *net)
 #if IS_ENABLED(CONFIG_IP6_NF_IPTABLES)
 	hashlimit_net->ip6t_hashlimit = proc_mkdir("ip6t_hashlimit", net->proc_net);
 	if (!hashlimit_net->ip6t_hashlimit) {
-		remove_proc_entry("ipt_hashlimit", net->proc_net);
+		proc_net_remove(net, "ipt_hashlimit");
 		return -ENOMEM;
 	}
 #endif
@@ -873,30 +771,9 @@ static int __net_init hashlimit_proc_net_init(struct net *net)
 
 static void __net_exit hashlimit_proc_net_exit(struct net *net)
 {
-	struct xt_hashlimit_htable *hinfo;
-	struct hlist_node *pos;
-	struct proc_dir_entry *pde;
-	struct hashlimit_net *hashlimit_net = hashlimit_pernet(net);
-
-	/* recent_net_exit() is called before recent_mt_destroy(). Make sure
-	 * that the parent xt_recent proc entry is is empty before trying to
-	 * remove it.
-	 */
-	mutex_lock(&hashlimit_mutex);
-	pde = hashlimit_net->ipt_hashlimit;
-	if (pde == NULL)
-		pde = hashlimit_net->ip6t_hashlimit;
-
-	hlist_for_each_entry(hinfo, pos, &hashlimit_net->htables, node)
-		remove_proc_entry(hinfo->pde->name, pde);
-
-	hashlimit_net->ipt_hashlimit = NULL;
-	hashlimit_net->ip6t_hashlimit = NULL;
-	mutex_unlock(&hashlimit_mutex);
-
-	remove_proc_entry("ipt_hashlimit", net->proc_net);
+	proc_net_remove(net, "ipt_hashlimit");
 #if IS_ENABLED(CONFIG_IP6_NF_IPTABLES)
-	remove_proc_entry("ip6t_hashlimit", net->proc_net);
+	proc_net_remove(net, "ip6t_hashlimit");
 #endif
 }
 
@@ -910,6 +787,9 @@ static int __net_init hashlimit_net_init(struct net *net)
 
 static void __net_exit hashlimit_net_exit(struct net *net)
 {
+	struct hashlimit_net *hashlimit_net = hashlimit_pernet(net);
+
+	BUG_ON(!hlist_empty(&hashlimit_net->htables));
 	hashlimit_proc_net_exit(net);
 }
 

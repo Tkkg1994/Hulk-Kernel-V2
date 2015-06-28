@@ -246,7 +246,8 @@ clusterip_hashfn(const struct sk_buff *skb,
 			dport = ports[1];
 		}
 	} else {
-		net_info_ratelimited("unknown protocol %u\n", iph->protocol);
+		if (net_ratelimit())
+			pr_info("unknown protocol %u\n", iph->protocol);
 	}
 
 	switch (config->hash_mode) {

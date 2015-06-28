@@ -405,7 +405,7 @@ static unsigned char asn1_octets_decode(struct asn1_ctx *ctx,
 
 	ptr = *octets;
 	while (ctx->pointer < eoc) {
-		if (!asn1_octet_decode(ctx, ptr++)) {
+		if (!asn1_octet_decode(ctx, (unsigned char *)ptr++)) {
 			kfree(*octets);
 			*octets = NULL;
 			return 0;
@@ -759,7 +759,7 @@ static unsigned char snmp_object_decode(struct asn1_ctx *ctx,
 		}
 		break;
 	case SNMP_OBJECTID:
-		if (!asn1_oid_decode(ctx, end, &lp, &len)) {
+		if (!asn1_oid_decode(ctx, end, (unsigned long **)&lp, &len)) {
 			kfree(id);
 			return 0;
 		}
@@ -1206,7 +1206,8 @@ static int snmp_translate(struct nf_conn *ct,
 
 	if (!snmp_parse_mangle((unsigned char *)udph + sizeof(struct udphdr),
 			       paylen, &map, &udph->check)) {
-		net_warn_ratelimited("bsalg: parser failed\n");
+		if (net_ratelimit())
+			printk(KERN_WARNING "bsalg: parser failed\n");
 		return NF_DROP;
 	}
 	return NF_ACCEPT;
@@ -1240,8 +1241,9 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 	 * can mess around with the payload.
 	 */
 	if (ntohs(udph->len) != skb->len - (iph->ihl << 2)) {
-		net_warn_ratelimited("SNMP: dropping malformed packet src=%pI4 dst=%pI4\n",
-				     &iph->saddr, &iph->daddr);
+		 if (net_ratelimit())
+			 printk(KERN_WARNING "SNMP: dropping malformed packet src=%pI4 dst=%pI4\n",
+				&iph->saddr, &iph->daddr);
 		 return NF_DROP;
 	}
 

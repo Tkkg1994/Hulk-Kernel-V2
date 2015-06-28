@@ -1008,7 +1008,7 @@ e100_send_mdio_bit(unsigned char bit)
 }
 
 static unsigned char
-e100_receive_mdio_bit(void)
+e100_receive_mdio_bit()
 {
 	unsigned char bit;
 	*R_NETWORK_MGM_CTRL = 0;
