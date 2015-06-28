@@ -56,7 +56,7 @@ struct nfulnl_instance {
 	struct sk_buff *skb;		/* pre-allocatd skb */
 	struct timer_list timer;
 	struct user_namespace *peer_user_ns;	/* User namespace of the peer process */
-	int peer_portid;			/* PID of the peer process */
+	int peer_portid;			/* portid of the peer process */
 
 	/* configurable parameters */
 	unsigned int flushtimeout;	/* timeout until queue flush */
@@ -163,7 +163,7 @@ instance_create(u_int16_t group_num, int portid, struct user_namespace *user_ns)
 	setup_timer(&inst->timer, nfulnl_timer, (unsigned long)inst);
 
 	inst->peer_user_ns = user_ns;
-	inst->peer_pid = portid;
+	inst->peer_portid = portid;
 	inst->group_num = group_num;
 
 	inst->qthreshold 	= NFULNL_QTHRESH_DEFAULT;
@@ -767,7 +767,7 @@ nfulnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 			}
 
 			inst = instance_create(group_num,
-					       NETLINK_CB(skb).portid);
+					       NETLINK_CB(skb).portid,
 					       sk_user_ns(NETLINK_CB(skb).ssk));
 			if (IS_ERR(inst)) {
 				ret = PTR_ERR(inst);

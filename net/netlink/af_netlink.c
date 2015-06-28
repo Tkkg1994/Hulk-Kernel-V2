@@ -250,7 +250,7 @@ static struct sock *netlink_lookup(struct net *net, int protocol, u32 portid)
 	struct sock *sk;
 
 	read_lock(&nl_table_lock);
-	head = nl_pid_hashfn(hash, portid);
+	head = nl_portid_hashfn(hash, portid);
 	sk_for_each(sk, head) {
 		if (net_eq(sock_net(sk), net) && (nlk_sk(sk)->portid == portid)) {
 			sock_hold(sk);
