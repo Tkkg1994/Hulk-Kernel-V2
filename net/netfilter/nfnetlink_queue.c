@@ -47,7 +47,7 @@ struct nfqnl_instance {
 	struct hlist_node hlist;		/* global list of queues */
 	struct rcu_head rcu;
 
-	int peer_pid;
+	int peer_portid;
 	unsigned int queue_maxlen;
 	unsigned int copy_range;
 	unsigned int queue_dropped;
@@ -82,11 +82,10 @@ static struct nfqnl_instance *
 instance_lookup(u_int16_t queue_num)
 {
 	struct hlist_head *head;
-	struct hlist_node *pos;
 	struct nfqnl_instance *inst;
 
 	head = &instance_table[instance_hashfn(queue_num)];
-	hlist_for_each_entry_rcu(inst, pos, head, hlist) {
+	hlist_for_each_entry_rcu(inst, head, hlist) {
 		if (inst->queue_num == queue_num)
 			return inst;
 	}
@@ -94,7 +93,7 @@ instance_lookup(u_int16_t queue_num)
 }
 
 static struct nfqnl_instance *
-instance_create(u_int16_t queue_num, int pid)
+instance_create(u_int16_t queue_num, int portid)
 {
 	struct nfqnl_instance *inst;
 	unsigned int h;
@@ -113,7 +112,7 @@ instance_create(u_int16_t queue_num, int pid)
 	}
 
 	inst->queue_num = queue_num;
-	inst->peer_pid = pid;
+	inst->peer_portid = portid;
 	inst->queue_maxlen = NFQNL_QMAX_DEFAULT;
 	inst->copy_range = 0xfffff;
 	inst->copy_mode = NFQNL_COPY_NONE;
@@ -440,7 +439,7 @@ nfqnl_enqueue_packet(struct nf_queue_entry *entry, unsigned int queuenum)
 	}
 	spin_lock_bh(&queue->lock);
 
-	if (!queue->peer_pid) {
+	if (!queue->peer_portid) {
 		err = -EINVAL;
 		goto err_out_free_nskb;
 	}
@@ -454,7 +453,7 @@ nfqnl_enqueue_packet(struct nf_queue_entry *entry, unsigned int queuenum)
 	*packet_id_ptr = htonl(entry->id);
 
 	/* nfnetlink_unicast will either free the nskb or add it to a socket */
-	err = nfnetlink_unicast(nskb, &init_net, queue->peer_pid, MSG_DONTWAIT);
+	err = nfnetlink_unicast(nskb, &init_net, queue->peer_portid, MSG_DONTWAIT);
 	if (err < 0) {
 		queue->queue_user_dropped++;
 		goto err_out_unlock;
@@ -570,11 +569,10 @@ nfqnl_dev_drop(int ifindex)
 	rcu_read_lock();
 
 	for (i = 0; i < INSTANCE_BUCKETS; i++) {
-		struct hlist_node *tmp;
 		struct nfqnl_instance *inst;
 		struct hlist_head *head = &instance_table[i];
 
-		hlist_for_each_entry_rcu(inst, tmp, head, hlist)
+		hlist_for_each_entry_rcu(inst, head, hlist)
 			nfqnl_flush(inst, dev_cmp, ifindex);
 	}
 
@@ -611,16 +609,16 @@ nfqnl_rcv_nl_event(struct notifier_block *this,
 	if (event == NETLINK_URELEASE && n->protocol == NETLINK_NETFILTER) {
 		int i;
 
-		/* destroy all instances for this pid */
+		/* destroy all instances for this portid */
 		spin_lock(&instances_lock);
 		for (i = 0; i < INSTANCE_BUCKETS; i++) {
-			struct hlist_node *tmp, *t2;
+			struct hlist_node *t2;
 			struct nfqnl_instance *inst;
 			struct hlist_head *head = &instance_table[i];
 
-			hlist_for_each_entry_safe(inst, tmp, t2, head, hlist) {
+			hlist_for_each_entry_safe(inst, t2, head, hlist) {
 				if ((n->net == &init_net) &&
-				    (n->pid == inst->peer_pid))
+				    (n->portid == inst->peer_portid))
 					__instance_destroy(inst);
 			}
 		}
@@ -644,7 +642,7 @@ static const struct nla_policy nfqa_verdict_batch_policy[NFQA_MAX+1] = {
 	[NFQA_MARK]		= { .type = NLA_U32 },
 };
 
-static struct nfqnl_instance *verdict_instance_lookup(u16 queue_num, int nlpid)
+static struct nfqnl_instance *verdict_instance_lookup(u16 queue_num, int nlportid)
 {
 	struct nfqnl_instance *queue;
 
@@ -652,7 +650,7 @@ static struct nfqnl_instance *verdict_instance_lookup(u16 queue_num, int nlpid)
 	if (!queue)
 		return ERR_PTR(-ENODEV);
 
-	if (queue->peer_pid != nlpid)
+	if (queue->peer_portid != nlportid)
 		return ERR_PTR(-EPERM);
 
 	return queue;
@@ -692,7 +690,7 @@ nfqnl_recv_verdict_batch(struct sock *ctnl, struct sk_buff *skb,
 	LIST_HEAD(batch_list);
 	u16 queue_num = ntohs(nfmsg->res_id);
 
-	queue = verdict_instance_lookup(queue_num, NETLINK_CB(skb).pid);
+	queue = verdict_instance_lookup(queue_num, NETLINK_CB(skb).portid);
 	if (IS_ERR(queue))
 		return PTR_ERR(queue);
 
@@ -741,7 +739,7 @@ nfqnl_recv_verdict(struct sock *ctnl, struct sk_buff *skb,
 	queue = instance_lookup(queue_num);
 	if (!queue)
 
-	queue = verdict_instance_lookup(queue_num, NETLINK_CB(skb).pid);
+	queue = verdict_instance_lookup(queue_num, NETLINK_CB(skb).portid);
 	if (IS_ERR(queue))
 		return PTR_ERR(queue);
 
@@ -813,7 +811,7 @@ nfqnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 
 	rcu_read_lock();
 	queue = instance_lookup(queue_num);
-	if (queue && queue->peer_pid != NETLINK_CB(skb).pid) {
+	if (queue && queue->peer_portid != NETLINK_CB(skb).portid) {
 		ret = -EPERM;
 		goto err_out_unlock;
 	}
@@ -825,7 +823,7 @@ nfqnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 				ret = -EBUSY;
 				goto err_out_unlock;
 			}
-			queue = instance_create(queue_num, NETLINK_CB(skb).pid);
+			queue = instance_create(queue_num, NETLINK_CB(skb).portid);
 			if (IS_ERR(queue)) {
 				ret = PTR_ERR(queue);
 				goto err_out_unlock;
@@ -967,7 +965,7 @@ static int seq_show(struct seq_file *s, void *v)
 
 	return seq_printf(s, "%5d %6d %5d %1d %5d %5d %5d %8d %2d\n",
 			  inst->queue_num,
-			  inst->peer_pid, inst->queue_total,
+			  inst->peer_portid, inst->queue_total,
 			  inst->copy_mode, inst->copy_range,
 			  inst->queue_dropped, inst->queue_user_dropped,
 			  inst->id_sequence, 1);
