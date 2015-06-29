@@ -724,12 +724,7 @@ ssize_t ib_uverbs_open_xrcd(struct ib_uverbs_file *file,
 			ret = -EBADF;
 			goto err_tree_mutex_unlock;
 		}
-
-		inode = f->f_dentry->d_inode;
-		if (!inode) {
-			ret = -EBADF;
-			goto err_tree_mutex_unlock;
-		}
+		inode = file_inode(f.file);
 		xrcd = find_xrcd(file->device, inode);
 		if (!xrcd && !(cmd.oflags & O_CREAT)) {
 			/* no file descriptor. Need CREATE flag */
