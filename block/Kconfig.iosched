@@ -4,7 +4,7 @@ menu "IO Schedulers"
 
 config IOSCHED_NOOP
 	bool
-	default n
+	default y
 	---help---
 	  The no-op I/O scheduler is a minimal scheduler that does basic merging
 	  and sorting. Its main uses include non-disk based block devices like
@@ -25,13 +25,13 @@ config IOSCHED_TEST
 
 config IOSCHED_TRIPNDROID
 	tristate "Tripndroid"
-	default n
+	default y
 	---help---
 	  The Trip N Droid scheduler
 
 config IOSCHED_DEADLINE
 	tristate "Deadline I/O scheduler"
-	default n
+	default y
 	---help---
 	  The deadline I/O scheduler is simple and compact. It will provide
 	  CSCAN service with FIFO expiration of requests, switching to
@@ -40,7 +40,7 @@ config IOSCHED_DEADLINE
 
 config IOSCHED_ROW
 	tristate "ROW I/O scheduler"
-	default n
+	default y
 	---help---
 	  The ROW I/O scheduler gives priority to READ requests over the
 	  WRITE requests when dispatching, without starving WRITE requests.
@@ -63,13 +63,13 @@ config IOSCHED_CFQ
 config CFQ_GROUP_IOSCHED
 	bool "CFQ Group Scheduling support"
 	depends on IOSCHED_CFQ && BLK_CGROUP
-	default n
+	default y
 	---help---
 	  Enable group IO scheduling in CFQ.
 
 config IOSCHED_SIOPLUS
 	tristate "Simple I/O scheduler plus"
-	default n
+	default y
 	---help---
 	  The Simple I/O scheduler is an extremely simple scheduler,
 	  based on noop and deadline, that relies on deadlines to
@@ -79,7 +79,7 @@ config IOSCHED_SIOPLUS
 
 config IOSCHED_FIOPS
 	tristate "FIOPS I/O scheduler"
-	default n
+	default y
 
 config IOSCHED_SIO
 	tristate "Simple I/O scheduler"
@@ -93,21 +93,21 @@ config IOSCHED_SIO
 
 config IOSCHED_VR
 	tristate "V(R) I/O scheduler"
-	default n
+	default y
 	---help---
 	  Requests are chosen according to SSTF with a penalty of rev_penalty
 	  for switching head direction.
 
 config IOSCHED_ZEN
 	tristate "Zen I/O scheduler"
-	default n
+	default y
 	---help---
 	  FCFS, dispatches are back-inserted, deadlines ensure fairness.
 	  Should work best with devices where there is no travel delay.
 
 config IOSCHED_FIFO
 	bool
-	default n
+	default y
 	---help---
 	  Fifo is similar to no-op I/O scheduler and it's a minimal scheduler that does basic merging
 	  and sorting. Ported from: https://github.com/AndroidDeveloperAlliance/ZenKernel_TUNA/blob/master/block/fifo-iosched.c
@@ -115,7 +115,7 @@ config IOSCHED_FIFO
 config IOSCHED_BFQ
 	tristate "BFQ I/O scheduler"
 	depends on EXPERIMENTAL
-	default n
+	default y
 	---help---
 	  The BFQ I/O scheduler tries to distribute bandwidth among
 	  all processes according to their weights.
