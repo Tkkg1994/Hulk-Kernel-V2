@@ -370,7 +370,6 @@ static void ext3_blkdev_put(struct block_device *bdev)
 static void ext3_blkdev_remove(struct ext3_sb_info *sbi)
 {
 	struct block_device *bdev;
-
 	bdev = sbi->journal_bdev;
 	if (bdev) {
 		ext3_blkdev_put(bdev);
