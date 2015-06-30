@@ -1300,7 +1300,7 @@ cifs_setlk(struct file *file,  struct file_lock *flock, __u8 type,
 	__u64 length = 1 + flock->fl_end - flock->fl_start;
 	struct cifsFileInfo *cfile = (struct cifsFileInfo *)file->private_data;
 	struct cifs_tcon *tcon = tlink_tcon(cfile->tlink);
-	struct cifsInodeInfo *cinode = CIFS_I(file->f_path.dentry->d_inode);
+	struct cifsInodeInfo *cinode = CIFS_I(file_inode(file));
 	__u16 netfid = cfile->netfid;
 
 	if (posix_lck) {

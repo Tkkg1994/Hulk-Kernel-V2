@@ -51,7 +51,7 @@ static ssize_t sdcardfs_read(struct file *file, char __user *buf,
 	/* update our inode atime upon a successful lower read */
 	if (err >= 0)
 		fsstack_copy_attr_atime(dentry->d_inode,
-					lower_file->f_path.dentry->d_inode);
+					file_inode(lower_file));
 
 	return err;
 }
@@ -74,9 +74,9 @@ static ssize_t sdcardfs_write(struct file *file, const char __user *buf,
 	/* update our inode times+sizes upon a successful lower write */
 	if (err >= 0) {
 		fsstack_copy_inode_size(dentry->d_inode,
-					lower_file->f_path.dentry->d_inode);
+					file_inode(lower_file));
 		fsstack_copy_attr_times(dentry->d_inode,
-					lower_file->f_path.dentry->d_inode);
+					file_inode(lower_file));
 	}
 
 	return err;
@@ -95,7 +95,7 @@ static int sdcardfs_readdir(struct file *file, void *dirent, filldir_t filldir)
 	file->f_pos = lower_file->f_pos;
 	if (err >= 0)		/* copy the atime */
 		fsstack_copy_attr_atime(dentry->d_inode,
-					lower_file->f_path.dentry->d_inode);
+					file_inode(lower_file));
 	return err;
 }
 

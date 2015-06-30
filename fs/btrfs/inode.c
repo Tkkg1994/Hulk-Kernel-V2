@@ -4450,7 +4450,7 @@ int btrfs_dirty_inode(struct inode *inode)
  */
 int btrfs_update_time(struct file *file)
 {
-	struct inode *inode = file->f_path.dentry->d_inode;
+	struct inode *inode = file_inode(file);
 	struct timespec now;
 	int ret;
 	enum { S_MTIME = 1, S_CTIME = 2, S_VERSION = 4 } sync_it = 0;

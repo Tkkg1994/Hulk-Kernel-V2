@@ -880,7 +880,7 @@ static ssize_t tty_read(struct file *file, char __user *buf, size_t count,
 	struct tty_ldisc *ld;
 
 	tty = (struct tty_struct *)file->private_data;
-	inode = file->f_path.dentry->d_inode;
+	inode = file_inode(file);
 	if (tty_paranoia_check(tty, inode, "tty_read"))
 		return -EIO;
 	if (!tty || (test_bit(TTY_IO_ERROR, &tty->flags)))
@@ -995,7 +995,7 @@ static inline ssize_t do_tty_write(
 		cond_resched();
 	}
 	if (written) {
-		struct inode *inode = file->f_path.dentry->d_inode;
+		struct inode *inode = file_inode(file);
 		inode->i_mtime = current_fs_time(inode->i_sb);
 		ret = written;
 	}
@@ -1052,7 +1052,7 @@ static ssize_t tty_write(struct file *file, const char __user *buf,
 						size_t count, loff_t *ppos)
 {
 	struct tty_struct *tty;
-	struct inode *inode = file->f_path.dentry->d_inode;
+	struct inode *inode = file_inode(file);
 	ssize_t ret;
 	struct tty_ldisc *ld;
 
@@ -1916,7 +1916,7 @@ static unsigned int tty_poll(struct file *filp, poll_table *wait)
 	int ret = 0;
 
 	tty = (struct tty_struct *)filp->private_data;
-	if (tty_paranoia_check(tty, filp->f_path.dentry->d_inode, "tty_poll"))
+	if (tty_paranoia_check(tty, file_inode(filp);, "tty_poll"))
 		return 0;
 
 	ld = tty_ldisc_ref_wait(tty);
@@ -1934,7 +1934,7 @@ static int tty_fasync(int fd, struct file *filp, int on)
 
 	lock_kernel();
 	tty = (struct tty_struct *)filp->private_data;
-	if (tty_paranoia_check(tty, filp->f_path.dentry->d_inode, "tty_fasync"))
+	if (tty_paranoia_check(tty, file_inode(filp);, "tty_fasync"))
 		goto out;
 
 	retval = fasync_helper(fd, filp, on, &tty->fasync);
