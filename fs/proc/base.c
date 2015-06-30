@@ -1038,7 +1038,7 @@ static ssize_t hotness_adjust_write(struct file *file, const char __user *buf,
 	if (err)
 		goto out;
 
-	task = get_proc_task(file->f_path.dentry->d_inode);
+	task = get_proc_task(file_inode(file));
 	if (!task) {
 		err = -ESRCH;
 		goto out;

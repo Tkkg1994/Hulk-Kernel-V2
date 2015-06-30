@@ -400,8 +400,8 @@ ecryptfs_unlocked_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case FS_IOC_GETVERSION:
 	case FS_IOC_SETVERSION:
 		rc = lower_file->f_op->unlocked_ioctl(lower_file, cmd, arg);
-		fsstack_copy_attr_all(file->f_path.dentry->d_inode,
-				      lower_file->f_path.dentry->d_inode);
+		fsstack_copy_attr_all(file_inode(file),
+				      file_inode(lower_file));
 		return rc;
 	default:
 		return rc;
@@ -427,8 +427,8 @@ ecryptfs_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case FS_IOC32_GETVERSION:
 	case FS_IOC32_SETVERSION:
 		rc = lower_file->f_op->compat_ioctl(lower_file, cmd, arg);
-		fsstack_copy_attr_all(file->f_path.dentry->d_inode,
-				      lower_file->f_path.dentry->d_inode);
+		fsstack_copy_attr_all(file_inode(file),
+				      file_inode(lower_file));
 		return rc;
 	default:
 		return rc;
