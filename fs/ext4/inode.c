@@ -881,11 +881,9 @@ static int ext4_write_begin(struct file *file, struct address_space *mapping,
 		ret = ext4_try_to_write_inline_data(mapping, inode, pos, len,
 						    flags, pagep);
 		if (ret < 0)
-			goto out;
-		if (ret == 1) {
-			ret = 0;
-			goto out;
-		}
+			return ret;
+		if (ret == 1)
+			return 0;
 	}
 
 	/*
@@ -2584,11 +2582,9 @@ static int ext4_da_write_begin(struct file *file, struct address_space *mapping,
 						      pos, len, flags,
 						      pagep, fsdata);
 		if (ret < 0)
-			goto out;
-		if (ret == 1) {
-			ret = 0;
-			goto out;
-		}
+			return ret;
+		if (ret == 1)
+			return 0;
 	}
 
 	/*
@@ -2617,6 +2613,7 @@ retry_journal:
 		page_cache_release(page);
 		return PTR_ERR(handle);
 	}
+
 	lock_page(page);
 	if (page->mapping != mapping) {
 		/* The page got truncated from under us */

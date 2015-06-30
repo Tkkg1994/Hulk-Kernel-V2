@@ -49,6 +49,7 @@
 #include <linux/file.h>
 #include <linux/uaccess.h>
 #include <linux/module.h>
+#include <linux/ratelimit.h>
 
 
 /* number of characters left in xmit buffer before select has we have room */

@@ -613,7 +613,7 @@ recycle:
 		spin_lock_irq(&port->port_lock);
 
 		/* tty may have been closed */
-		tty = port->port_tty;
+		tty = port->port.tty;
 	}
 
 	/* We want our data queue to become empty ASAP, keeping data
@@ -764,7 +764,7 @@ static int gs_start_io(struct gs_port *port)
 		return -EIO;
 	/* unblock any pending writes into our circular buffer */
 	if (started) {
-		if(port->port_tty)
+		if(port->port.tty)
 			tty_wakeup(port->port.tty);
 	} else {
 		gs_free_requests(ep, head, &port->read_allocated);
@@ -1243,7 +1243,7 @@ static ssize_t debug_read_status(struct file *file, char __user *ubuf,
 		return -EINVAL;
 	}
 
-	tty = ui_dev->port_tty;
+	tty = ui_dev->port.tty;
 	gser = ui_dev->port_usb;
 
 	if(!tty || !gser) {

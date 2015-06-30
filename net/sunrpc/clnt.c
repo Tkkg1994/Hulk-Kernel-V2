@@ -1373,7 +1373,6 @@ call_refreshresult(struct rpc_task *task)
 		 */
 	case -ETIMEDOUT:
 		rpc_delay(task, 3*HZ);
-	case -EKEYEXPIRED:
 	case -EAGAIN:
 		status = -EACCES;
 	case -EKEYEXPIRED:

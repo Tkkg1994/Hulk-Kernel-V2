@@ -1010,11 +1010,20 @@ static inline int search_dirblock(struct buffer_head *bh,
 				  struct inode *dir,
 				  const struct qstr *d_name,
 				  unsigned int offset,
-				  struct ext4_dir_entry_2 **res_dir)
+#ifdef CONFIG_SDCARD_FS_CI_SEARCH
+				  struct ext4_dir_entry_2 ** res_dir,
+				  char *ci_name_buf)
+{
+	return search_dir(bh, bh->b_data, dir->i_sb->s_blocksize, dir,
+			  d_name, offset, res_dir, ci_name_buf);
+}
+#else
+				  struct ext4_dir_entry_2 ** res_dir)
 {
 	return search_dir(bh, bh->b_data, dir->i_sb->s_blocksize, dir,
 			  d_name, offset, res_dir);
 }
+#endif
 
 /*
  * Directory block splitting, compacting
@@ -1107,7 +1116,7 @@ static inline int ext4_match (int len, const char * const name,
 
 #ifdef CONFIG_SDCARD_FS_CI_SEARCH
 static inline int ext4_ci_match (int len, const char * const name,
-			      struct ext4_dir_entry_2 * de)
+					struct ext4_dir_entry_2 * de)
 {
 	if (len != de->name_len)
 		return 0;
@@ -1127,10 +1136,10 @@ int search_dir(struct buffer_head *bh,
 	       const struct qstr *d_name,
 	       unsigned int offset,
 #ifdef CONFIG_SDCARD_FS_CI_SEARCH
-	       struct ext4_dir_entry_2 ** res_dir,
+	       struct ext4_dir_entry_2 **res_dir,
 	       char *ci_name_buf)
 #else
-	       struct ext4_dir_entry_2 ** res_dir)
+	       struct ext4_dir_entry_2 **res_dir)
 #endif
 {
 	struct ext4_dir_entry_2 * de;
@@ -1150,7 +1159,8 @@ int search_dir(struct buffer_head *bh,
 			if (ci_name_buf) {
 				if (ext4_ci_match (namelen, name, de)) {
 					/* found a match - just to be sure, do a full check */
-					if (ext4_check_dir_entry(dir, NULL, de, bh, offset))
+					if (ext4_check_dir_entry(dir, NULL, de, bh, bh->b_data,
+								bh->b_size, offset))
 						return -1;
 					*res_dir = de;
 					memcpy(ci_name_buf, de->name, namelen);
@@ -1160,7 +1170,8 @@ int search_dir(struct buffer_head *bh,
 			} else {
 				if (ext4_match (namelen, name, de)) {
 					/* found a match - just to be sure, do a full check */
-					if (ext4_check_dir_entry(dir, NULL, de, bh, offset))
+					if (ext4_check_dir_entry(dir, NULL, de, bh, bh->b_data,
+								bh->b_size, offset))
 						return -1;
 					*res_dir = de;
 					return 1;
@@ -1169,7 +1180,7 @@ int search_dir(struct buffer_head *bh,
 		}
 #else
 		if ((char *) de + namelen <= dlimit &&
-			ext4_match (namelen, name, de)) {
+		    ext4_match (namelen, name, de)) {
 			/* found a match - just to be sure, do a full check */
 			if (ext4_check_dir_entry(dir, NULL, de, bh, bh->b_data,
 						 bh->b_size, offset))
@@ -1343,11 +1354,11 @@ restart:
 		set_buffer_verified(bh);
 #ifdef CONFIG_SDCARD_FS_CI_SEARCH
 		i = search_dirblock(bh, dir, d_name,
-			    block << EXT4_BLOCK_SIZE_BITS(sb), res_dir,
-			    ci_name_buf);
+				block << EXT4_BLOCK_SIZE_BITS(sb), res_dir,
+				ci_name_buf);
 #else
 		i = search_dirblock(bh, dir, d_name,
-			    block << EXT4_BLOCK_SIZE_BITS(sb), res_dir);
+				block << EXT4_BLOCK_SIZE_BITS(sb), res_dir);
 #endif
 		if (i == 1) {
 			EXT4_I(dir)->i_dir_start_lookup = block;
@@ -2460,7 +2471,6 @@ static int ext4_init_new_dir(handle_t *handle, struct inode *dir,
 	unsigned int blocksize = dir->i_sb->s_blocksize;
 	int err, credits, retries = 0;
 	int csum_size = 0;
-	int err;
 
 	if (EXT4_HAS_RO_COMPAT_FEATURE(dir->i_sb,
 				       EXT4_FEATURE_RO_COMPAT_METADATA_CSUM))
@@ -2511,7 +2521,7 @@ static int ext4_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	handle_t *handle;
 	struct inode *inode;
-	int err, retries = 0;
+	int err, credits, retries = 0;
 
 	if (EXT4_DIR_LINK_MAX(dir))
 		return -EMLINK;
@@ -2842,7 +2852,6 @@ static int ext4_rmdir(struct inode *dir, struct dentry *dentry)
 #endif
 	if (IS_ERR(bh))
 		return PTR_ERR(bh);
-	bh = ext4_find_entry(dir, &dentry->d_name, &de, NULL);
 	if (!bh)
 		goto end_rmdir;
 

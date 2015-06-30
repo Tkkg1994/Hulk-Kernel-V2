@@ -16,6 +16,7 @@
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/module.h>
+#include <linux/ratelimit.h>
 
 /**
  *	tty_buffer_free_all		-	free buffers used by a tty
@@ -125,7 +126,7 @@ static void __tty_buffer_flush(struct tty_port *port)
 		tty_buffer_free(port, buf->head);
 		buf->head = thead;
 	}
-	WARN_ON(tty->buf.head != buf->tail);
+	WARN_ON(buf->head != buf->tail);
 	buf->head->read = buf->head->commit;
 }
 
