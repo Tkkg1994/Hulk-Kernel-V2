@@ -45,6 +45,15 @@ static inline void tk_normalize_xtime(struct timekeeper *tk)
 	}
 }
 
+static struct timespec tk_xtime(struct timekeeper *tk)
+{
+	struct timespec ts;
+
+	ts.tv_sec = tk->xtime_sec;
+	ts.tv_nsec = (long)(tk->xtime_nsec >> tk->shift);
+	return ts;
+}
+
 static void tk_set_xtime(struct timekeeper *tk, const struct timespec *ts)
 {
 	tk->xtime_sec = ts->tv_sec;
@@ -229,11 +238,14 @@ EXPORT_SYMBOL_GPL(pvclock_gtod_unregister_notifier);
 /* must hold timekeeper_lock */
 static void timekeeping_update(struct timekeeper *tk, bool clearntp, bool mirror)
 {
+	struct timespec xt;
+
 	if (clearntp) {
 		tk->ntp_error = 0;
 		ntp_clear();
 	}
-	update_vsyscall(tk);
+	xt = tk_xtime(tk);
+	update_vsyscall_old(&xt, &tk->wall_to_monotonic, tk->clock, tk->mult);
 	update_pvclock_gtod(tk);
 
 	if (mirror)
