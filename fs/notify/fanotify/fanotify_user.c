@@ -485,8 +485,13 @@ static int fanotify_find_path(int dfd, const char __user *filename,
 
 		ret = -ENOTDIR;
 		if ((flags & FAN_MARK_ONLYDIR) &&
+<<<<<<< HEAD
 		   !(S_ISDIR(file_inode(f.file)->i_mode))) {
 			fput_light(file, fput_needed);
+=======
+		   !(S_ISDIR(file_inode(file)->i_mode))) {
+			fdput(f);
+>>>>>>> b775711... fix not booting problem, finally :D
 			goto out;
 		}
 
