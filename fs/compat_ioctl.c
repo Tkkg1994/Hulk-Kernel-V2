@@ -1583,7 +1583,7 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 	case FIBMAP:
 	case FIGETBSZ:
 	case FIONREAD:
-		if (S_ISREG(file_inode(f.file)->i_mode))
+		if (S_ISREG(file_inode(filp)->i_mode))
 			break;
 		/*FALL THROUGH*/
 

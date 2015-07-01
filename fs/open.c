@@ -150,7 +150,7 @@ COMPAT_SYSCALL_DEFINE2(truncate, const char __user *, path, compat_off_t, length
 
 static long do_sys_ftruncate(unsigned int fd, loff_t length, int small)
 {
-	struct inode * inode;
+	struct inode *inode;
 	struct dentry *dentry;
 	struct fd f;
 	int error;
@@ -631,7 +631,6 @@ SYSCALL_DEFINE3(fchown, unsigned int, fd, uid_t, user, gid_t, group)
 {
 	struct fd f = fdget(fd);
 	int error = -EBADF;
-	struct dentry * dentry;
 
 	if (!f.file)
 		goto out;
@@ -639,7 +638,6 @@ SYSCALL_DEFINE3(fchown, unsigned int, fd, uid_t, user, gid_t, group)
 	error = mnt_want_write_file(f.file);
 	if (error)
 		goto out_fput;
-
 	audit_inode(NULL, f.file->f_path.dentry, 0);
 	error = chown_common(&f.file->f_path, user, group);
 	mnt_drop_write_file(f.file);

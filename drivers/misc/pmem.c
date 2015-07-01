@@ -634,7 +634,7 @@ static void pmem_put_region(int id)
 
 static int get_id(struct file *file)
 {
-	return MINOR(file->f_dentry->d_inode->i_rdev);
+	return MINOR(file_inode(file)->i_rdev);
 }
 
 static char *get_name(struct file *file)
@@ -647,12 +647,12 @@ static int is_pmem_file(struct file *file)
 {
 	int id;
 
-	if (unlikely(!file || !file->f_dentry || !file->f_dentry->d_inode))
+	if (unlikely(!file || !file->f_dentry || !file_inode(file)))
 		return 0;
 
 	id = get_id(file);
 	return (unlikely(id >= PMEM_MAX_DEVICES ||
-		file->f_dentry->d_inode->i_rdev !=
+		file_inode(file)->i_rdev !=
 		     MKDEV(MISC_MAJOR, pmem[id].dev.minor))) ? 0 : 1;
 }
 
@@ -1821,7 +1821,7 @@ int get_pmem_file(unsigned int fd, unsigned long *start, unsigned long *vstart,
 #endif
 		DLOG("filp %p rdev %d pid %u(%s) file %p(%ld)"
 			" dev %s(id: %d)\n", filp,
-			file->f_dentry->d_inode->i_rdev,
+			file_inode(file)->i_rdev,
 			current->pid, get_task_comm(currtask_name, current),
 			file, file_count(file), get_name(file), get_id(file));
 
@@ -1850,7 +1850,7 @@ void put_pmem_file(struct file *file)
 	char currtask_name[FIELD_SIZEOF(struct task_struct, comm) + 1];
 #endif
 	DLOG("rdev %d pid %u(%s) file %p(%ld)" " dev %s(id: %d)\n",
-		file->f_dentry->d_inode->i_rdev, current->pid,
+		file_inode(file)->i_rdev, current->pid,
 		get_task_comm(currtask_name, current), file,
 		file_count(file), get_name(file), get_id(file));
 	if (is_pmem_file(file)) {
