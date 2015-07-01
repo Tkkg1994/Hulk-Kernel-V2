@@ -662,7 +662,8 @@ static struct socket *drbd_wait_for_connect(struct drbd_conf *mdev)
 	}
 
 	timeo = mdev->net_conf->try_connect_int * HZ;
-	timeo += (random32() & 1) ? timeo / 7 : -timeo / 7; /* 28.5% random jitter */
+	/* 28.5% random jitter */
+	timeo += (prandom_u32() & 1) ? timeo / 7 : -timeo / 7;
 
 	s_listen->sk->sk_reuse    = SK_CAN_REUSE; /* SO_REUSEADDR */
 	s_listen->sk->sk_rcvtimeo = timeo;
@@ -819,7 +820,7 @@ retry:
 			default:
 				dev_warn(DEV, "Error receiving initial packet\n");
 				sock_release(s);
-				if (random32() & 1)
+				if (prandom_u32() & 1)
 					goto retry;
 			}
 		}
