@@ -57,7 +57,7 @@ static loff_t lseek_execute(struct file *file, struct inode *inode,
  * @offset:	file offset to seek to
  * @whence:	type of seek
  * @size:	max size of this file in file system
- * @eof		offset used for SEEK_END position
+ * @eof:	offset used for SEEK_END position
  *
  * This is a variant of generic_file_llseek that allows passing in a custom
  * maximum file size and a custom EOF position, for e.g. hashed directories.
@@ -908,7 +908,6 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 	if (!(out.file->f_mode & FMODE_WRITE))
 		goto fput_out;
 	retval = -EINVAL;
-
 	in_inode = file_inode(in.file);
 	out_inode = file_inode(out.file);
 	retval = rw_verify_area(WRITE, out.file, &out.file->f_pos, count);

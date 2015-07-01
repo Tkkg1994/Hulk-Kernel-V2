@@ -569,4 +569,3 @@ module_exit(ramoops_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Marco Stornelli <marco.stornelli@gmail.com>");
 MODULE_DESCRIPTION("RAM Oops/Panic logger/driver");
-

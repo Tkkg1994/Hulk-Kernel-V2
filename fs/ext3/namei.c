@@ -1457,6 +1457,7 @@ static int ext3_add_entry (handle_t *handle, struct dentry *dentry,
 		bh = ext3_bread(handle, dir, block, 0, &retval);
 		if(!bh)
 			return retval;
+
 		retval = add_dirent_to_buf(handle, dentry, inode, NULL, bh);
 		if (retval != -ENOSPC)
 			return retval;
