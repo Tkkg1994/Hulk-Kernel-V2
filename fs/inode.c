@@ -1671,7 +1671,6 @@ int file_update_time(struct file *file)
 		return 0;
 
 	/* Finally allowed to write? Takes lock. */
-
 	if (__mnt_want_write_file(file))
 		return 0;
 
