@@ -18,7 +18,8 @@ void task_work_run(void);
 
 static inline void exit_task_work(struct task_struct *task)
 {
-	task_work_run();
+	if (unlikely(task->task_works))
+		task_work_run();
 }
 
 #endif	/* _LINUX_TASK_WORK_H */

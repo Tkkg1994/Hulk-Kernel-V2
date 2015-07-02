@@ -2,17 +2,16 @@
 #include <linux/task_work.h>
 #include <linux/tracehook.h>
 
-static struct callback_head work_exited; /* all we need is ->next == NULL */
-
 int
 task_work_add(struct task_struct *task, struct callback_head *work, bool notify)
 {
 	struct callback_head *head;
-
+	/*
+	 * Not inserting the new work if the task has already passed
+	 * exit_task_work() is the responisbility of callers.
+	 */
 	do {
 		head = ACCESS_ONCE(task->task_works);
-		if (unlikely(head == &work_exited))
-			return -ESRCH;
 		work->next = head;
 	} while (cmpxchg(&task->task_works, head, work) != head);
 
@@ -31,7 +30,7 @@ task_work_cancel(struct task_struct *task, task_work_func_t func)
 	 * If cmpxchg() fails we continue without updating pprev.
 	 * Either we raced with task_work_add() which added the
 	 * new entry before this work, we will find it again. Or
-	 * we raced with task_work_run(), *pprev == NULL/exited.
+	 * we raced with task_work_run(), *pprev == NULL.
 	 */
 	raw_spin_lock_irqsave(&task->pi_lock, flags);
 	while ((work = ACCESS_ONCE(*pprev))) {
@@ -52,16 +51,7 @@ void task_work_run(void)
 	struct callback_head *work, *head, *next;
 
 	for (;;) {
-		/*
-		 * work->func() can do task_work_add(), do not set
-		 * work_exited unless the list is empty.
-		 */
-		do {
-			work = ACCESS_ONCE(task->task_works);
-			head = !work && (task->flags & PF_EXITING) ?
-				&work_exited : NULL;
-		} while (cmpxchg(&task->task_works, work, head) != work);
-
+		work = xchg(&task->task_works, NULL);
 		if (!work)
 			break;
 		/*
