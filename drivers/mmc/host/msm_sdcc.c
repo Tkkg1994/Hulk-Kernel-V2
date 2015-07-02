@@ -1826,7 +1826,7 @@ static void msmsdcc_do_cmdirq(struct msmsdcc_host *host, uint32_t status)
 	}
 
 	if (status & (MCI_CMDTIMEOUT | MCI_AUTOCMD19TIMEOUT)) {
-		pr_err("%s: CMD%d: Command timeout\n",
+		pr_debug("%s: CMD%d: Command timeout\n",
 				mmc_hostname(host->mmc), cmd->opcode);
 		cmd->error = -ETIMEDOUT;
 	} else if ((status & MCI_CMDCRCFAIL && cmd->flags & MMC_RSP_CRC) &&
