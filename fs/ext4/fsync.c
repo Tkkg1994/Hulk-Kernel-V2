@@ -41,7 +41,7 @@ static void dump_completed_IO(struct inode * inode)
 	ext4_io_end_t *io, *io0, *io1;
 	unsigned long flags;
 
-	if (hlist_empty(&EXT4_I(inode)->i_completed_io_list)){
+	if (list_empty(&EXT4_I(inode)->i_completed_io_list)){
 		ext4_debug("inode %lu completed_io list is empty\n", inode->i_ino);
 		return;
 	}
@@ -85,7 +85,7 @@ int ext4_flush_completed_IO(struct inode *inode)
 
 	dump_completed_IO(inode);
 	spin_lock_irqsave(&ei->i_completed_io_lock, flags);
-	while (!hlist_empty(&ei->i_completed_io_list)){
+	while (!list_empty(&ei->i_completed_io_list)){
 		io = list_entry(ei->i_completed_io_list.next,
 				ext4_io_end_t, list);
 		list_del_init(&io->list);

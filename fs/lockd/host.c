@@ -596,7 +596,6 @@ void
 nlm_shutdown_hosts(void)
 {
 	struct hlist_head *chain;
-	struct hlist_node *pos;
 	struct nlm_host	*host;
 
 	nlm_shutdown_hosts_net(NULL);
@@ -605,7 +604,7 @@ nlm_shutdown_hosts(void)
 	if (nrhosts != 0) {
 		printk(KERN_WARNING "lockd: couldn't shutdown host module!\n");
 		dprintk("lockd: %lu hosts left:\n", nrhosts);
-		for_each_host(host, pos, chain, nlm_server_hosts) {
+		for_each_host(host, chain, nlm_server_hosts) {
 			dprintk("       %s (cnt %d use %d exp %ld net %p)\n",
 				host->h_name, atomic_read(&host->h_count),
 				host->h_inuse, host->h_expires, host->net);

@@ -135,6 +135,8 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb,
 			      get_unaligned((__le16 *)(skb->data + 4)))))
 				continue;
 		}
+
+clone:
 		nskb = skb_clone(skb, GFP_ATOMIC);
 		if (!nskb)
 			continue;
