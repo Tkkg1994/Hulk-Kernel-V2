@@ -506,12 +506,6 @@ struct transaction_s
 	 * How many handles used this transaction? [t_handle_lock]
 	 */
 	int t_handle_count;
-
-	/*
-	 * This transaction is being forced and some process is
-	 * waiting for it to finish.
-	 */
-	unsigned int t_synchronous_commit:1;
 };
 
 /**
@@ -558,6 +552,8 @@ struct transaction_s
  *  transaction
  * @j_commit_request: Sequence number of the most recent transaction wanting
  *     commit
+ * @j_commit_waited: Sequence number of the most recent transaction someone
+ *     is waiting for to commit.
  * @j_uuid: Uuid of client object.
  * @j_task: Pointer to the current commit thread for this journal
  * @j_max_transaction_buffers:  Maximum number of metadata buffers to allow in a
@@ -721,6 +717,13 @@ struct journal_s
 	 * [j_state_lock]
 	 */
 	tid_t			j_commit_request;
+
+	/*
+	 * Sequence number of the most recent transaction someone is waiting
+	 * for to commit.
+	 * [j_state_lock]
+	 */
+	tid_t                   j_commit_waited;
 
 	/*
 	 * Journal uuid: identifies the object (filesystem, LVM volume etc)
@@ -911,7 +914,7 @@ extern struct kmem_cache *jbd_handle_cache;
 
 static inline handle_t *jbd_alloc_handle(gfp_t gfp_flags)
 {
-	return kmem_cache_alloc(jbd_handle_cache, gfp_flags);
+	return kmem_cache_zalloc(jbd_handle_cache, gfp_flags);
 }
 
 static inline void jbd_free_handle(handle_t *handle)

@@ -1116,7 +1116,8 @@ int ocfs2_setattr(struct dentry *dentry, struct iattr *attr)
 			    (unsigned long long)OCFS2_I(inode)->ip_blkno,
 			    dentry->d_name.len, dentry->d_name.name,
 			    attr->ia_valid, attr->ia_mode,
-			    attr->ia_uid, attr->ia_gid);
+			    from_kuid(&init_user_ns, attr->ia_uid),
+			    from_kgid(&init_user_ns, attr->ia_gid));
 
 	/* ensuring we don't even attempt to truncate a symlink */
 	if (S_ISLNK(inode->i_mode))
@@ -1174,14 +1175,14 @@ int ocfs2_setattr(struct dentry *dentry, struct iattr *attr)
 		}
 	}
 
-	if ((attr->ia_valid & ATTR_UID && attr->ia_uid != inode->i_uid) ||
-	    (attr->ia_valid & ATTR_GID && attr->ia_gid != inode->i_gid)) {
+	if ((attr->ia_valid & ATTR_UID && !uid_eq(attr->ia_uid, inode->i_uid)) ||
+	    (attr->ia_valid & ATTR_GID && !gid_eq(attr->ia_gid, inode->i_gid))) {
 		/*
 		 * Gather pointers to quota structures so that allocation /
 		 * freeing of quota structures happens here and not inside
 		 * dquot_transfer() where we have problems with lock ordering
 		 */
-		if (attr->ia_valid & ATTR_UID && attr->ia_uid != inode->i_uid
+		if (attr->ia_valid & ATTR_UID && !uid_eq(attr->ia_uid, inode->i_uid)
 		    && OCFS2_HAS_RO_COMPAT_FEATURE(sb,
 		    OCFS2_FEATURE_RO_COMPAT_USRQUOTA)) {
 			transfer_to[USRQUOTA] = dqget(sb, make_kqid_uid(attr->ia_uid));
@@ -1190,7 +1191,7 @@ int ocfs2_setattr(struct dentry *dentry, struct iattr *attr)
 				goto bail_unlock;
 			}
 		}
-		if (attr->ia_valid & ATTR_GID && attr->ia_gid != inode->i_gid
+		if (attr->ia_valid & ATTR_GID && !gid_eq(attr->ia_gid, inode->i_gid)
 		    && OCFS2_HAS_RO_COMPAT_FEATURE(sb,
 		    OCFS2_FEATURE_RO_COMPAT_GRPQUOTA)) {
 			transfer_to[GRPQUOTA] = dqget(sb, make_kqid_gid(attr->ia_gid));
@@ -1215,24 +1216,6 @@ int ocfs2_setattr(struct dentry *dentry, struct iattr *attr)
 			status = PTR_ERR(handle);
 			mlog_errno(status);
 			goto bail_unlock;
-		}
-	}
-
-	/*
-	 * This will intentionally not wind up calling truncate_setsize(),
-	 * since all the work for a size change has been done above.
-	 * Otherwise, we could get into problems with truncate as
-	 * ip_alloc_sem is used there to protect against i_size
-	 * changes.
-	 *
-	 * XXX: this means the conditional below can probably be removed.
-	 */
-	if ((attr->ia_valid & ATTR_SIZE) &&
-	    attr->ia_size != i_size_read(inode)) {
-		status = vmtruncate(inode, attr->ia_size);
-		if (status) {
-			mlog_errno(status);
-			goto bail_commit;
 		}
 	}
 
@@ -1969,6 +1952,7 @@ int ocfs2_change_file_space(struct file *file, unsigned int cmd,
 {
 	struct inode *inode = file_inode(file);
 	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	int ret;
 
 	if ((cmd == OCFS2_IOC_RESVSP || cmd == OCFS2_IOC_RESVSP64) &&
 	    !ocfs2_writes_unwritten_extents(osb))
@@ -1983,7 +1967,12 @@ int ocfs2_change_file_space(struct file *file, unsigned int cmd,
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EBADF;
 
-	return __ocfs2_change_file_space(file, inode, file->f_pos, cmd, sr, 0);
+	ret = mnt_want_write_file(file);
+	if (ret)
+		return ret;
+	ret = __ocfs2_change_file_space(file, inode, file->f_pos, cmd, sr, 0);
+	mnt_drop_write_file(file);
+	return ret;
 }
 
 static long ocfs2_fallocate(struct file *file, int mode, loff_t offset,
@@ -2259,8 +2248,6 @@ static ssize_t ocfs2_file_aio_write(struct kiocb *iocb,
 	if (iocb->ki_left == 0)
 		return 0;
 
-	vfs_check_frozen(inode->i_sb, SB_FREEZE_WRITE);
-
 	appending = file->f_flags & O_APPEND ? 1 : 0;
 	direct_io = file->f_flags & O_DIRECT ? 1 : 0;
 
@@ -2301,7 +2288,7 @@ relock:
 		ret = ocfs2_inode_lock(inode, NULL, 1);
 		if (ret < 0) {
 			mlog_errno(ret);
-			goto out_sems;
+			goto out;
 		}
 
 		ocfs2_inode_unlock(inode, 1);
@@ -2385,14 +2372,10 @@ out_dio:
 	/* buffered aio wouldn't have proper lock coverage today */
 	BUG_ON(ret == -EIOCBQUEUED && !(file->f_flags & O_DIRECT));
 
-	if (unlikely(written <= 0))
-		goto no_sync;
-
 	if (((file->f_flags & O_DSYNC) && !direct_io) || IS_SYNC(inode) ||
 	    ((file->f_flags & O_DIRECT) && !direct_io)) {
-		ret = filemap_fdatawrite_range(file->f_mapping,
-					       iocb->ki_pos - written,
-					       iocb->ki_pos - 1);
+		ret = filemap_fdatawrite_range(file->f_mapping, *ppos,
+					       *ppos + count - 1);
 		if (ret < 0)
 			written = ret;
 
@@ -2405,12 +2388,10 @@ out_dio:
 		}
 
 		if (!ret)
-			ret = filemap_fdatawait_range(file->f_mapping,
-						      iocb->ki_pos - written,
-						      iocb->ki_pos - 1);
+			ret = filemap_fdatawait_range(file->f_mapping, *ppos,
+						      *ppos + count - 1);
 	}
 
-no_sync:
 	/*
 	 * deep in g_f_a_w_n()->ocfs2_direct_IO we pass in a ocfs2_dio_end_io
 	 * function pointer which is called when o_direct io completes so that
@@ -2472,7 +2453,9 @@ static ssize_t ocfs2_file_splice_write(struct pipe_inode_info *pipe,
 	struct address_space *mapping = out->f_mapping;
 	struct inode *inode = mapping->host;
 	struct splice_desc sd = {
+		.total_len = len,
 		.flags = flags,
+		.pos = *ppos,
 		.u.file = out,
 	};
 
@@ -2482,14 +2465,7 @@ static ssize_t ocfs2_file_splice_write(struct pipe_inode_info *pipe,
 			out->f_path.dentry->d_name.len,
 			out->f_path.dentry->d_name.name, len);
 
-	ret = generic_write_checks(out, ppos, &len, 0);
-	if (ret)
-		return ret;
-	sd.total_len = len;
-	sd.pos = *ppos;
-
-	if (pipe->inode)
-		mutex_lock_nested(&pipe->inode->i_mutex, I_MUTEX_PARENT);
+	pipe_lock(pipe);
 
 	splice_from_pipe_begin(&sd);
 	do {
@@ -2509,8 +2485,7 @@ static ssize_t ocfs2_file_splice_write(struct pipe_inode_info *pipe,
 	} while (ret > 0);
 	splice_from_pipe_end(pipe, &sd);
 
-	if (pipe->inode)
-		mutex_unlock(&pipe->inode->i_mutex);
+	pipe_unlock(pipe);
 
 	if (sd.num_spliced)
 		ret = sd.num_spliced;

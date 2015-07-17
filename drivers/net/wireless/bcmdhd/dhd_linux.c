@@ -2695,7 +2695,6 @@ dhd_rxf_thread(void *data)
 
 	/*  signal: thread has started */
 	complete(&tsk->completed);
-
 #if defined(CUSTOMER_HW4) && defined(ARGOS_CPU_SCHEDULER)
 	if (!zalloc_cpumask_var(&dhd->pub.rxf_affinity_cpu_mask, GFP_KERNEL)) {
 		DHD_ERROR(("rxthread zalloc_cpumask_var error\n"));

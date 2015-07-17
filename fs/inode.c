@@ -547,7 +547,7 @@ static void evict(struct inode *inode)
 	 * Wait for flusher thread to be done with the inode so that filesystem
 	 * does not start destroying it while writeback is still running. Since
 	 * the inode has I_FREEING set, flusher thread won't start new work on
-	 * the inode. We just have to wait for running writeback to finish.
+	 * the inode.  We just have to wait for running writeback to finish.
 	 */
 	inode_wait_for_writeback(inode);
 
@@ -1560,6 +1560,8 @@ void touch_atime(struct path *path)
 	 * Btrfs), but since we touch atime while walking down the path we
 	 * really don't care if we failed to update the atime of the file,
 	 * so just ignore the return value.
+	 * We may also fail on filesystems that have the ability to make parts
+	 * of the fs read only, e.g. subvolumes in Btrfs.
 	 */
 	update_time(inode, &now, S_ATIME);
 	__mnt_drop_write(mnt);
@@ -1801,7 +1803,7 @@ void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)
 		inode->i_fop = &def_blk_fops;
 		inode->i_rdev = rdev;
 	} else if (S_ISFIFO(mode))
-		inode->i_fop = &def_fifo_fops;
+		inode->i_fop = &pipefifo_fops;
 	else if (S_ISSOCK(mode))
 		inode->i_fop = &bad_sock_fops;
 	else
@@ -1835,14 +1837,18 @@ EXPORT_SYMBOL(inode_init_owner);
  * inode_owner_or_capable - check current task permissions to inode
  * @inode: inode being checked
  *
- * Return true if current either has CAP_FOWNER to the inode, or
- * owns the file.
+ * Return true if current either has CAP_FOWNER in a namespace with the
+ * inode owner uid mapped, or owns the file.
  */
 bool inode_owner_or_capable(const struct inode *inode)
 {
+	struct user_namespace *ns;
+
 	if (uid_eq(current_fsuid(), inode->i_uid))
 		return true;
-	if (inode_capable(inode, CAP_FOWNER))
+
+	ns = current_user_ns();
+	if (ns_capable(ns, CAP_FOWNER) && kuid_has_mapping(ns, inode->i_uid))
 		return true;
 	return false;
 }

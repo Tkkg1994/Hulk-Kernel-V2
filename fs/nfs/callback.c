@@ -72,7 +72,7 @@ out_err:
 static int
 nfs4_callback_svc(void *vrqstp)
 {
-	int err, preverr = 0;
+	int err;
 	struct svc_rqst *rqstp = vrqstp;
 
 	set_freezable();
@@ -82,20 +82,8 @@ nfs4_callback_svc(void *vrqstp)
 		 * Listen for a request on the socket
 		 */
 		err = svc_recv(rqstp, MAX_SCHEDULE_TIMEOUT);
-		if (err == -EAGAIN || err == -EINTR) {
-			preverr = err;
+		if (err == -EAGAIN || err == -EINTR)
 			continue;
-		}
-		if (err < 0) {
-			if (err != preverr) {
-				printk(KERN_WARNING "NFS: %s: unexpected error "
-					"from svc_recv (%d)\n", __func__, err);
-				preverr = err;
-			}
-			schedule_timeout_uninterruptible(HZ);
-			continue;
-		}
-		preverr = err;
 		svc_process(rqstp);
 	}
 	return 0;
@@ -137,6 +125,9 @@ nfs41_callback_svc(void *vrqstp)
 	set_freezable();
 
 	while (!kthread_should_stop()) {
+		if (try_to_freeze())
+			continue;
+
 		prepare_to_wait(&serv->sv_cb_waitq, &wq, TASK_INTERRUPTIBLE);
 		spin_lock_bh(&serv->sv_cb_lock);
 		if (!list_empty(&serv->sv_cb_list)) {
@@ -253,7 +244,7 @@ static int nfs_callback_start_svc(int minorversion, struct rpc_xprt *xprt,
 		svc_exit_thread(cb_info->rqst);
 		cb_info->rqst = NULL;
 		cb_info->task = NULL;
-		return PTR_ERR(cb_info->task);
+		return ret;
 	}
 	dprintk("nfs_callback_up: service started\n");
 	return 0;
@@ -423,7 +414,7 @@ void nfs_callback_down(int minorversion, struct net *net)
 int
 check_gss_callback_principal(struct nfs_client *clp, struct svc_rqst *rqstp)
 {
-	char *p = svc_gss_principal(rqstp);
+	char *p = rqstp->rq_cred.cr_principal;
 
 	if (rqstp->rq_authop->flavour != RPC_AUTH_GSS)
 		return 1;

@@ -103,8 +103,6 @@ jbd2_get_transaction(journal_t *journal, transaction_t *transaction)
 	transaction->t_max_wait = 0;
 	transaction->t_start = jiffies;
 	transaction->t_requested = 0;
-	transaction->t_callbacked = 0;
-	transaction->t_dropped = 0;
 
 	return transaction;
 }
@@ -334,7 +332,6 @@ static handle_t *new_handle(int nblocks)
 	handle_t *handle = jbd2_alloc_handle(GFP_NOFS);
 	if (!handle)
 		return NULL;
-	memset(handle, 0, sizeof(*handle));
 	handle->h_buffer_credits = nblocks;
 	handle->h_ref = 1;
 
@@ -384,7 +381,7 @@ handle_t *jbd2__journal_start(journal_t *journal, int nblocks, gfp_t gfp_mask,
 	if (err < 0) {
 		jbd2_free_handle(handle);
 		current->journal_info = NULL;
-		handle = ERR_PTR(err);
+		return ERR_PTR(err);
 	}
 	handle->h_type = type;
 	handle->h_line_no = line_no;
@@ -648,6 +645,7 @@ do_get_write_access(handle_t *handle, struct journal_head *jh,
 	int error;
 	char *frozen_buffer = NULL;
 	int need_copy = 0;
+	unsigned long start_lock, time_lock;
 
 	if (is_handle_aborted(handle))
 		return -EROFS;
@@ -663,8 +661,15 @@ repeat:
 
 	/* @@@ Need to check for errors here at some point. */
 
+ 	start_lock = jiffies;
 	lock_buffer(bh);
 	jbd_lock_bh_state(bh);
+
+	/* If it takes too long to lock the buffer, trace it */
+	time_lock = jbd2_time_diff(start_lock, jiffies);
+	if (time_lock > HZ/10)
+		trace_jbd2_lock_buffer_stall(bh->b_bdev->bd_dev,
+			jiffies_to_msecs(time_lock));
 
 	/* We now hold the buffer lock so it is safe to query the buffer
 	 * state.  Is the buffer dirty?
@@ -1511,6 +1516,29 @@ int jbd2_journal_stop(handle_t *handle)
 
 	jbd2_free_handle(handle);
 	return err;
+}
+
+/**
+ * int jbd2_journal_force_commit() - force any uncommitted transactions
+ * @journal: journal to force
+ *
+ * For synchronous operations: force any uncommitted transactions
+ * to disk.  May seem kludgy, but it reuses all the handle batching
+ * code in a very simple manner.
+ */
+int jbd2_journal_force_commit(journal_t *journal)
+{
+	handle_t *handle;
+	int ret;
+
+	handle = jbd2_journal_start(journal, 1);
+	if (IS_ERR(handle)) {
+		ret = PTR_ERR(handle);
+	} else {
+		handle->h_sync = 1;
+		ret = jbd2_journal_stop(handle);
+	}
+	return ret;
 }
 
 /*

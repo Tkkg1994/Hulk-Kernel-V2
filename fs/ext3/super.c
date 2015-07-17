@@ -1000,7 +1000,7 @@ static int parse_options (char *options, struct super_block *sb,
 			uid = make_kuid(current_user_ns(), option);
 			if (!uid_valid(uid)) {
 				ext3_msg(sb, KERN_ERR, "Invalid uid value %d", option);
-				return -1;
+				return 0;
 
 			}
 			sbi->s_resuid = uid;
@@ -1011,7 +1011,7 @@ static int parse_options (char *options, struct super_block *sb,
 			gid = make_kgid(current_user_ns(), option);
 			if (!gid_valid(gid)) {
 				ext3_msg(sb, KERN_ERR, "Invalid gid value %d", option);
-				return -1;
+				return 0;
 			}
 			sbi->s_resgid = gid;
 			break;
@@ -1298,6 +1298,13 @@ set_qf_format:
 		if (!sbi->s_jquota_fmt) {
 			ext3_msg(sb, KERN_ERR, "error: journaled quota format "
 					"not specified.");
+			return 0;
+		}
+	} else {
+		if (sbi->s_jquota_fmt) {
+			ext3_msg(sb, KERN_ERR, "error: journaled quota format "
+					"specified with no journaling "
+					"enabled.");
 			return 0;
 		}
 	}
@@ -2057,7 +2064,6 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		test_opt(sb,DATA_FLAGS) == EXT3_MOUNT_JOURNAL_DATA ? "journal":
 		test_opt(sb,DATA_FLAGS) == EXT3_MOUNT_ORDERED_DATA ? "ordered":
 		"writeback");
-	sb->s_flags |= MS_SNAP_STABLE;
 
 	return 0;
 
@@ -3058,6 +3064,7 @@ static struct file_system_type ext3_fs_type = {
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
+MODULE_ALIAS_FS("ext3");
 
 static int __init init_ext3_fs(void)
 {

@@ -236,7 +236,7 @@ static int f_getowner_uids(struct file *filp, unsigned long arg)
 	src[1] = from_kuid(user_ns, filp->f_owner.euid);
 	read_unlock(&filp->f_owner.lock);
 
-	err = put_user(src[0], &dst[0]);
+	err  = put_user(src[0], &dst[0]);
 	err |= put_user(src[1], &dst[1]);
 
 	return err;

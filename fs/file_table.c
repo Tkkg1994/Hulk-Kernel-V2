@@ -176,6 +176,7 @@ struct file *alloc_file(struct path *path, fmode_t mode,
 		return file;
 
 	file->f_path = *path;
+	file->f_inode = path->dentry->d_inode;
 	file->f_mapping = path->dentry->d_inode->i_mapping;
 	file->f_mode = mode;
 	file->f_op = fop;
@@ -210,10 +211,10 @@ static void drop_file_write_access(struct file *file)
 	struct dentry *dentry = file->f_path.dentry;
 	struct inode *inode = dentry->d_inode;
 
-	put_write_access(inode);
-
 	if (special_file(inode->i_mode))
 		return;
+
+	put_write_access(inode);
 	if (file_check_writeable(file) != 0)
 		return;
 	__mnt_drop_write(mnt);
@@ -258,6 +259,7 @@ static void __fput(struct file *file)
 		drop_file_write_access(file);
 	file->f_path.dentry = NULL;
 	file->f_path.mnt = NULL;
+	file->f_inode = NULL;
 	file_free(file);
 	dput(dentry);
 	mntput(mnt);
@@ -304,17 +306,18 @@ void fput(struct file *file)
 {
 	if (atomic_long_dec_and_test(&file->f_count)) {
 		struct task_struct *task = current;
+		unsigned long flags;
+
 		file_sb_list_del(file);
-		if (unlikely(in_interrupt() || task->flags & PF_KTHREAD)) {
-			unsigned long flags;
-			spin_lock_irqsave(&delayed_fput_lock, flags);
-			list_add(&file->f_u.fu_list, &delayed_fput_list);
-			schedule_work(&delayed_fput_work);
-			spin_unlock_irqrestore(&delayed_fput_lock, flags);
-			return;
+		if (likely(!in_interrupt() && !(task->flags & PF_KTHREAD))) {
+			init_task_work(&file->f_u.fu_rcuhead, ____fput);
+			if (!task_work_add(task, &file->f_u.fu_rcuhead, true))
+				return;
 		}
-		init_task_work(&file->f_u.fu_rcuhead, ____fput);
-		task_work_add(task, &file->f_u.fu_rcuhead, true);
+		spin_lock_irqsave(&delayed_fput_lock, flags);
+		list_add(&file->f_u.fu_list, &delayed_fput_list);
+		schedule_work(&delayed_fput_work);
+		spin_unlock_irqrestore(&delayed_fput_lock, flags);
 	}
 }
 

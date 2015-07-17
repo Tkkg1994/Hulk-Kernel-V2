@@ -57,11 +57,12 @@ struct idr_layer {
 };
 
 struct idr {
-	struct idr_layer __rcu *top;
-	struct idr_layer *id_free;
-	int		  layers; /* only valid without concurrent changes */
-	int		  id_free_cnt;
-	spinlock_t	  lock;
+	struct idr_layer __rcu	*top;
+	struct idr_layer	*id_free;
+	int			layers; /* only valid without concurrent changes */
+	int			id_free_cnt;
+	int			cur;	/* current pos for cyclic allocation */
+	spinlock_t		lock;
 };
 
 #define IDR_INIT(name)						\
@@ -100,6 +101,7 @@ int idr_pre_get(struct idr *idp, gfp_t gfp_mask);
 int idr_get_new_above(struct idr *idp, void *ptr, int starting_id, int *id);
 void idr_preload(gfp_t gfp_mask);
 int idr_alloc(struct idr *idp, void *ptr, int start, int end, gfp_t gfp_mask);
+int idr_alloc_cyclic(struct idr *idr, void *ptr, int start, int end, gfp_t gfp_mask);
 int idr_for_each(struct idr *idp,
 		 int (*fn)(int id, void *p, void *data), void *data);
 void *idr_get_next(struct idr *idp, int *nextid);
@@ -139,11 +141,13 @@ static inline int idr_get_new(struct idr *idp, void *ptr, int *id)
  * @idp:     idr handle
  * @entry:   the type * to use as cursor
  * @id:      id entry's key
+ *
+ * @entry and @id do not need to be initialized before the loop, and
+ * after normal terminatinon @entry is left with the value NULL.  This
+ * is convenient for a "not found" value.
  */
-#define idr_for_each_entry(idp, entry, id)				\
-	for (id = 0, entry = (typeof(entry))idr_get_next((idp), &(id)); \
-	     entry != NULL;                                             \
-	     ++id, entry = (typeof(entry))idr_get_next((idp), &(id)))
+#define idr_for_each_entry(idp, entry, id)			\
+	for (id = 0; ((entry) = idr_get_next(idp, &(id))) != NULL; ++id)
 
 /*
  * IDA - IDR based id allocator, use when translation from id to

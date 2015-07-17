@@ -5,7 +5,7 @@
 obj-y   += proc.o
 
 proc-y			:= nommu.o task_nommu.o
-proc-$(CONFIG_MMU)	:= mmu.o task_mmu.o
+proc-$(CONFIG_MMU)	:= task_mmu.o
 
 proc-y       += inode.o root.o base.o generic.o array.o \
 		fd.o
@@ -23,7 +23,6 @@ proc-y	+= version.o
 proc-y	+= softirqs.o
 proc-y	+= namespaces.o
 proc-y	+= self.o
-
 proc-$(CONFIG_PROC_STLOG)	+= stlog.o
 proc-$(CONFIG_PROC_SYSCTL)	+= proc_sysctl.o
 proc-$(CONFIG_NET)		+= proc_net.o

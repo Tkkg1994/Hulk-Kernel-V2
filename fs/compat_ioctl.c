@@ -608,7 +608,6 @@ struct serial_struct32 {
 static int serial_struct_ioctl(unsigned fd, unsigned cmd,
 			struct serial_struct32 __user *ss32)
 {
-        typedef struct serial_struct SS;
         typedef struct serial_struct32 SS32;
         int err;
         struct serial_struct ss;
@@ -1227,7 +1226,6 @@ COMPATIBLE_IOCTL(HCIGETDEVINFO)
 COMPATIBLE_IOCTL(HCIGETCONNLIST)
 COMPATIBLE_IOCTL(HCIGETCONNINFO)
 COMPATIBLE_IOCTL(HCIGETAUTHINFO)
-COMPATIBLE_IOCTL(HCISETAUTHINFO)
 COMPATIBLE_IOCTL(HCISETRAW)
 COMPATIBLE_IOCTL(HCISETSCAN)
 COMPATIBLE_IOCTL(HCISETAUTH)

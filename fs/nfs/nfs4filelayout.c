@@ -125,12 +125,20 @@ static void filelayout_reset_read(struct nfs_read_data *data)
 	}
 }
 
+static void filelayout_fenceme(struct inode *inode, struct pnfs_layout_hdr *lo)
+{
+	if (!test_and_clear_bit(NFS_LAYOUT_RETURN, &lo->plh_flags))
+		return;
+	pnfs_return_layout(inode);
+}
+
 static int filelayout_async_handle_error(struct rpc_task *task,
 					 struct nfs4_state *state,
 					 struct nfs_client *clp,
 					 struct pnfs_layout_segment *lseg)
 {
-	struct inode *inode = lseg->pls_layout->plh_inode;
+	struct pnfs_layout_hdr *lo = lseg->pls_layout;
+	struct inode *inode = lo->plh_inode;
 	struct nfs_server *mds_server = NFS_SERVER(inode);
 	struct nfs4_deviceid_node *devid = FILELAYOUT_DEVID_NODE(lseg);
 	struct nfs_client *mds_client = mds_server->nfs_client;
@@ -150,11 +158,14 @@ static int filelayout_async_handle_error(struct rpc_task *task,
 	case -NFS4ERR_OPENMODE:
 		if (state == NULL)
 			break;
-		nfs4_schedule_stateid_recovery(mds_server, state);
+		if (nfs4_schedule_stateid_recovery(mds_server, state) < 0)
+			goto out_bad_stateid;
 		goto wait_on_recovery;
 	case -NFS4ERR_EXPIRED:
-		if (state != NULL)
-			nfs4_schedule_stateid_recovery(mds_server, state);
+		if (state != NULL) {
+			if (nfs4_schedule_stateid_recovery(mds_server, state) < 0)
+				goto out_bad_stateid;
+		}
 		nfs4_schedule_lease_recovery(mds_client);
 		goto wait_on_recovery;
 	/* DS session errors */
@@ -206,10 +217,8 @@ static int filelayout_async_handle_error(struct rpc_task *task,
 		dprintk("%s DS connection error %d\n", __func__,
 			task->tk_status);
 		nfs4_mark_deviceid_unavailable(devid);
-		clear_bit(NFS_INO_LAYOUTCOMMIT, &NFS_I(inode)->flags);
-		_pnfs_return_layout(inode);
+		set_bit(NFS_LAYOUT_RETURN, &lo->plh_flags);
 		rpc_wake_up(&tbl->slot_tbl_waitq);
-		nfs4_ds_disconnect(clp);
 		/* fall through */
 	default:
 reset:
@@ -220,6 +229,9 @@ reset:
 out:
 	task->tk_status = 0;
 	return -EAGAIN;
+out_bad_stateid:
+	task->tk_status = -EIO;
+	return 0;
 wait_on_recovery:
 	rpc_sleep_on(&mds_client->cl_rpcwaitq, task, NULL);
 	if (test_bit(NFS4CLNT_MANAGER_RUNNING, &mds_client->cl_state) == 0)
@@ -293,6 +305,10 @@ static void filelayout_read_prepare(struct rpc_task *task, void *data)
 {
 	struct nfs_read_data *rdata = data;
 
+	if (unlikely(test_bit(NFS_CONTEXT_BAD, &rdata->args.context->flags))) {
+		rpc_exit(task, -EIO);
+		return;
+	}
 	if (filelayout_reset_to_mds(rdata->header->lseg)) {
 		dprintk("%s task %u reset io to MDS\n", __func__, task->tk_pid);
 		filelayout_reset_read(rdata);
@@ -301,10 +317,13 @@ static void filelayout_read_prepare(struct rpc_task *task, void *data)
 	}
 	rdata->read_done_cb = filelayout_read_done_cb;
 
-	nfs41_setup_sequence(rdata->ds_clp->cl_session,
+	if (nfs41_setup_sequence(rdata->ds_clp->cl_session,
 			&rdata->args.seq_args,
 			&rdata->res.seq_res,
-			task);
+			task))
+		return;
+	nfs4_set_rw_stateid(&rdata->args.stateid, rdata->args.context,
+			rdata->args.lock_context, FMODE_READ);
 }
 
 static void filelayout_read_call_done(struct rpc_task *task, void *data)
@@ -331,7 +350,9 @@ static void filelayout_read_count_stats(struct rpc_task *task, void *data)
 static void filelayout_read_release(void *data)
 {
 	struct nfs_read_data *rdata = data;
+	struct pnfs_layout_hdr *lo = rdata->header->lseg->pls_layout;
 
+	filelayout_fenceme(lo->plh_inode, lo);
 	nfs_put_client(rdata->ds_clp);
 	rdata->header->mds_ops->rpc_release(data);
 }
@@ -393,16 +414,23 @@ static void filelayout_write_prepare(struct rpc_task *task, void *data)
 {
 	struct nfs_write_data *wdata = data;
 
+	if (unlikely(test_bit(NFS_CONTEXT_BAD, &wdata->args.context->flags))) {
+		rpc_exit(task, -EIO);
+		return;
+	}
 	if (filelayout_reset_to_mds(wdata->header->lseg)) {
 		dprintk("%s task %u reset io to MDS\n", __func__, task->tk_pid);
 		filelayout_reset_write(wdata);
 		rpc_exit(task, 0);
 		return;
 	}
-	nfs41_setup_sequence(wdata->ds_clp->cl_session,
+	if (nfs41_setup_sequence(wdata->ds_clp->cl_session,
 			&wdata->args.seq_args,
 			&wdata->res.seq_res,
-			task);
+			task))
+		return;
+	nfs4_set_rw_stateid(&wdata->args.stateid, wdata->args.context,
+			wdata->args.lock_context, FMODE_WRITE);
 }
 
 static void filelayout_write_call_done(struct rpc_task *task, void *data)
@@ -427,7 +455,9 @@ static void filelayout_write_count_stats(struct rpc_task *task, void *data)
 static void filelayout_write_release(void *data)
 {
 	struct nfs_write_data *wdata = data;
+	struct pnfs_layout_hdr *lo = wdata->header->lseg->pls_layout;
 
+	filelayout_fenceme(lo->plh_inode, lo);
 	nfs_put_client(wdata->ds_clp);
 	wdata->header->mds_ops->rpc_release(data);
 }
@@ -731,7 +761,7 @@ filelayout_decode_layout(struct pnfs_layout_hdr *flo,
 		goto out_err;
 
 	if (fl->num_fh > 0) {
-		fl->fh_array = kzalloc(fl->num_fh * sizeof(struct nfs_fh *),
+		fl->fh_array = kcalloc(fl->num_fh, sizeof(fl->fh_array[0]),
 				       gfp_flags);
 		if (!fl->fh_array)
 			goto out_err;
@@ -1282,7 +1312,12 @@ filelayout_free_layout_hdr(struct pnfs_layout_hdr *lo)
 static struct pnfs_ds_commit_info *
 filelayout_get_ds_info(struct inode *inode)
 {
-	return &FILELAYOUT_FROM_HDR(NFS_I(inode)->layout)->commit_info;
+	struct pnfs_layout_hdr *layout = NFS_I(inode)->layout;
+
+	if (layout == NULL)
+		return NULL;
+	else
+		return &FILELAYOUT_FROM_HDR(layout)->commit_info;
 }
 
 static struct pnfs_layoutdriver_type filelayout_type = {

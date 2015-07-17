@@ -124,6 +124,76 @@ rpcauth_unregister(const struct rpc_authops *ops)
 EXPORT_SYMBOL_GPL(rpcauth_unregister);
 
 /**
+ * rpcauth_get_pseudoflavor - check if security flavor is supported
+ * @flavor: a security flavor
+ * @info: a GSS mech OID, quality of protection, and service value
+ *
+ * Verifies that an appropriate kernel module is available or already loaded.
+ * Returns an equivalent pseudoflavor, or RPC_AUTH_MAXFLAVOR if "flavor" is
+ * not supported locally.
+ */
+rpc_authflavor_t
+rpcauth_get_pseudoflavor(rpc_authflavor_t flavor, struct rpcsec_gss_info *info)
+{
+	const struct rpc_authops *ops;
+	rpc_authflavor_t pseudoflavor;
+
+	ops = auth_flavors[flavor];
+	if (ops == NULL)
+		request_module("rpc-auth-%u", flavor);
+	spin_lock(&rpc_authflavor_lock);
+	ops = auth_flavors[flavor];
+	if (ops == NULL || !try_module_get(ops->owner)) {
+		spin_unlock(&rpc_authflavor_lock);
+	return RPC_AUTH_MAXFLAVOR;
+	}
+	spin_unlock(&rpc_authflavor_lock);
+
+	pseudoflavor = flavor;
+	if (ops->info2flavor != NULL)
+		pseudoflavor = ops->info2flavor(info);
+
+	module_put(ops->owner);
+	return pseudoflavor;
+}
+EXPORT_SYMBOL_GPL(rpcauth_get_pseudoflavor);
+
+/**
+ * rpcauth_get_gssinfo - find GSS tuple matching a GSS pseudoflavor
+ * @pseudoflavor: GSS pseudoflavor to match
+ * @info: rpcsec_gss_info structure to fill in
+ *
+ * Returns zero and fills in "info" if pseudoflavor matches a
+ * supported mechanism.
+ */
+int
+rpcauth_get_gssinfo(rpc_authflavor_t pseudoflavor, struct rpcsec_gss_info *info)
+{
+	rpc_authflavor_t flavor = pseudoflavor_to_flavor(pseudoflavor);
+	const struct rpc_authops *ops;
+	int result;
+
+	ops = auth_flavors[flavor];
+	if (ops == NULL)
+		request_module("rpc-auth-%u", flavor);
+	spin_lock(&rpc_authflavor_lock);
+	ops = auth_flavors[flavor];
+	if (ops == NULL || !try_module_get(ops->owner)) {
+		spin_unlock(&rpc_authflavor_lock);
+		return -ENOENT;
+	}
+	spin_unlock(&rpc_authflavor_lock);
+
+	result = -ENOENT;
+	if (ops->flavor2info != NULL)
+		result = ops->flavor2info(pseudoflavor, info);
+
+	module_put(ops->owner);
+	return result;
+}
+EXPORT_SYMBOL_GPL(rpcauth_get_gssinfo);
+
+/**
  * rpcauth_list_flavors - discover registered flavors and pseudoflavors
  * @array: array to fill in
  * @size: size of "array"

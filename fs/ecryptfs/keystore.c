@@ -35,6 +35,10 @@
 #include <linux/slab.h>
 #include "ecryptfs_kernel.h"
 
+#ifdef CONFIG_SDP
+#include "ecryptfs_dek.h"
+#endif
+
 /**
  * request_key returned an error instead of a valid key address;
  * determine the type of error, make appropriate log entries, and
@@ -1180,7 +1184,7 @@ decrypt_pki_encrypted_session_key(struct ecryptfs_auth_tok *auth_tok,
 	rc = ecryptfs_send_message(payload, payload_len, &msg_ctx);
 	if (rc) {
 		ecryptfs_printk(KERN_ERR, "Error sending message to "
-				"ecryptfsd\n");
+				"ecryptfsd: %d\n", rc);
 		goto out;
 	}
 	rc = ecryptfs_wait_for_response(msg_ctx, &msg);
@@ -1214,7 +1218,8 @@ decrypt_pki_encrypted_session_key(struct ecryptfs_auth_tok *auth_tok,
 				  crypt_stat->key_size);
 	}
 out:
-	kfree(msg);
+	if (msg)
+		kfree(msg);
 	if (payload)
 		kfree(payload);
 	return rc;
@@ -1751,16 +1756,38 @@ decrypt_passphrase_encrypted_session_key(struct ecryptfs_auth_tok *auth_tok,
 #if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
 	if (crypt_stat->mount_crypt_stat->flags & ECRYPTFS_ENABLE_CC)
 		crypto_blkcipher_set_iv(desc.tfm, iv, ECRYPTFS_DEFAULT_IV_BYTES);
-#endif
+	if (unlikely(rc)) {
+		mutex_unlock(tfm_mutex);
+		printk(KERN_ERR "Error decrypting; rc = [%d]\n", rc);
+		goto out;
+	}
+	/* Session key(the key to decrypt file encryption keys) CLEAR! */
+	memset(auth_tok->token.password.session_key_encryption_key, 0, ECRYPTFS_MAX_KEY_BYTES);
+	rc = crypto_blkcipher_setkey(desc.tfm, auth_tok->token.password.session_key_encryption_key, crypt_stat->key_size);
+	mutex_unlock(tfm_mutex);
+	if (unlikely(rc < 0)) {
+		printk(KERN_ERR "Error(decrypt) Session Key CLEAR in desc.tfm; rc = [%d]\n", rc);
+	}
+	rc = 0;
+#else
 	mutex_unlock(tfm_mutex);
 	if (unlikely(rc)) {
 		printk(KERN_ERR "Error decrypting; rc = [%d]\n", rc);
 		goto out;
 	}
+#endif
 	auth_tok->session_key.flags |= ECRYPTFS_CONTAINS_DECRYPTED_KEY;
 	memcpy(crypt_stat->key, auth_tok->session_key.decrypted_key,
 	       auth_tok->session_key.decrypted_key_size);
 	crypt_stat->flags |= ECRYPTFS_KEY_VALID;
+
+#if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
+	/* File encryption key CLEAR! */
+	memset(auth_tok->session_key.decrypted_key, 0, auth_tok->session_key.decrypted_key_size);
+	auth_tok->session_key.decrypted_key_size = 0;
+	auth_tok->session_key.flags &= ~ECRYPTFS_CONTAINS_DECRYPTED_KEY;
+#endif
+
 	if (unlikely(ecryptfs_verbosity > 0)) {
 		ecryptfs_printk(KERN_DEBUG, "FEK of size [%zd]:\n",
 				crypt_stat->key_size);
@@ -1876,6 +1903,22 @@ int ecryptfs_parse_packet_set(struct ecryptfs_crypt_stat *crypt_stat,
 			rc = -EIO;
 			goto out_wipe_list;
 			break;
+#ifdef CONFIG_SDP
+		case ECRYPTFS_DEK_PACKET_TYPE:
+			printk("%s() ECRYPTFS_DEK_PACKET_TYPE \n",
+					__func__);
+			rc = parse_dek_packet(
+					(unsigned char *)&src[i], crypt_stat,
+					&packet_size);
+			if (rc) {
+				ecryptfs_printk(KERN_ERR, "Error parsing "
+						"dek packet\n");
+			rc = -EIO;
+			goto out_wipe_list;
+			}
+			i += packet_size;
+			break;
+#endif
 		default:
 			ecryptfs_printk(KERN_DEBUG, "No packet at offset [%zd] "
 					"of the file header; hex value of "
@@ -1974,6 +2017,16 @@ found_matching_auth_tok:
 		}
 		BUG();
 	}
+
+#ifdef CONFIG_SDP
+	if((crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE)) {
+		rc = ecryptfs_get_sdp_dek(crypt_stat);
+		if (rc) {
+			ecryptfs_printk(KERN_ERR, "Error setting sdp key after parse\n");
+			goto out_wipe_list;
+		}
+	}
+#endif
 	rc = ecryptfs_compute_root_iv(crypt_stat);
 	if (rc) {
 		ecryptfs_printk(KERN_ERR, "Error computing "
@@ -2018,7 +2071,7 @@ pki_encrypt_session_key(struct key *auth_tok_key,
 	rc = ecryptfs_send_message(payload, payload_len, &msg_ctx);
 	if (rc) {
 		ecryptfs_printk(KERN_ERR, "Error sending message to "
-				"ecryptfsd\n");
+				"ecryptfsd: %d\n", rc);
 		goto out;
 	}
 	rc = ecryptfs_wait_for_response(msg_ctx, &msg);
@@ -2343,12 +2396,26 @@ write_tag_3_packet(char *dest, size_t *remaining_bytes,
 #if defined(CONFIG_CRYPTO_FIPS) && !defined(CONFIG_FORCE_DISABLE_FIPS)
 	if (crypt_stat->mount_crypt_stat->flags & ECRYPTFS_ENABLE_CC)
 		crypto_blkcipher_set_iv(desc.tfm, iv, ECRYPTFS_DEFAULT_IV_BYTES);
-#endif
+	if (rc) {
+		mutex_unlock(tfm_mutex);
+		printk(KERN_ERR "Error encrypting; rc = [%d]\n", rc);
+		goto out;
+	}
+	/* Session key(the key to encrypt file encryption keys) CLEAR! */
+	memset( session_key_encryption_key, 0, ECRYPTFS_MAX_KEY_BYTES );
+	rc = crypto_blkcipher_setkey(desc.tfm, session_key_encryption_key, crypt_stat->key_size);
+	mutex_unlock(tfm_mutex);
+	if (rc) {
+		printk(KERN_ERR "Error(encrypt) Session Key CLEAR in desc.tfm; rc = [%d]\n", rc);
+	}
+	rc = 0;
+#else
 	mutex_unlock(tfm_mutex);
 	if (rc) {
 		printk(KERN_ERR "Error encrypting; rc = [%d]\n", rc);
 		goto out;
 	}
+#endif
 	ecryptfs_printk(KERN_DEBUG, "This should be the encrypted key:\n");
 	if (ecryptfs_verbosity > 0) {
 		ecryptfs_printk(KERN_DEBUG, "EFEK of size [%zd]:\n",
@@ -2405,9 +2472,20 @@ encrypted_session_key_set:
 	       ECRYPTFS_SALT_SIZE);
 	(*packet_size) += ECRYPTFS_SALT_SIZE;	/* salt */
 	dest[(*packet_size)++] = 0x60;	/* hash iterations (65536) */
+#ifdef CONFIG_SDP
+	if ((crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE)) {
+		ecryptfs_printk(KERN_DEBUG, "Sensitive file, tag_3 to zeroes\n");
+		memset(&dest[(*packet_size)], 0, key_rec->enc_key_size);
+	} else {
+		memcpy(&dest[(*packet_size)], key_rec->enc_key,
+		       key_rec->enc_key_size);
+	}
+	(*packet_size) += key_rec->enc_key_size;
+#else
 	memcpy(&dest[(*packet_size)], key_rec->enc_key,
 	       key_rec->enc_key_size);
 	(*packet_size) += key_rec->enc_key_size;
+#endif
 out:
 	if (rc)
 		(*packet_size) = 0;
@@ -2492,6 +2570,19 @@ ecryptfs_generate_key_packet_set(char *dest_base,
 				goto out_free;
 			}
 			(*len) += written;
+#ifdef CONFIG_SDP
+			if (crypt_stat->flags & ECRYPTFS_DEK_SDP_ENABLED &&
+				crypt_stat->flags & ECRYPTFS_DEK_IS_SENSITIVE) {
+				rc = write_dek_packet(dest_base + (*len), crypt_stat,
+						&written);
+				if (rc) {
+					ecryptfs_printk(KERN_WARNING, "Error "
+							"writing dek packet\n");
+					goto out_free;
+				}
+				(*len) += written;
+			}
+#endif
 		} else if (auth_tok->token_type == ECRYPTFS_PRIVATE_KEY) {
 			rc = write_tag_1_packet(dest_base + (*len), &max,
 						auth_tok_key, auth_tok,

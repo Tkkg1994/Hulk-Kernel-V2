@@ -622,7 +622,6 @@ static struct inode *qnx6_alloc_inode(struct super_block *sb)
 static void qnx6_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
-	INIT_LIST_HEAD(&inode->i_dentry);
 	kmem_cache_free(qnx6_inode_cachep, QNX6_I(inode));
 }
 
@@ -673,6 +672,7 @@ static struct file_system_type qnx6_fs_type = {
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
+MODULE_ALIAS_FS("qnx6");
 
 static int __init init_qnx6_fs(void)
 {

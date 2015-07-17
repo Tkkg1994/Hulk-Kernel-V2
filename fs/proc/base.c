@@ -411,6 +411,37 @@ static const struct file_operations proc_lstats_operations = {
 
 #endif
 
+#ifdef CONFIG_CGROUPS
+static int cgroup_open(struct inode *inode, struct file *file)
+{
+	struct pid *pid = PROC_I(inode)->pid;
+	return single_open(file, proc_cgroup_show, pid);
+}
+
+static const struct file_operations proc_cgroup_operations = {
+	.open		= cgroup_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+#endif
+
+#ifdef CONFIG_PROC_PID_CPUSET
+
+static int cpuset_open(struct inode *inode, struct file *file)
+{
+	struct pid *pid = PROC_I(inode)->pid;
+	return single_open(file, proc_cpuset_show, pid);
+}
+
+static const struct file_operations proc_cpuset_operations = {
+	.open		= cpuset_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+#endif
+
 static int proc_oom_score(struct task_struct *task, char *buffer)
 {
 	unsigned long totalpages = totalram_pages + total_swap_pages;
@@ -964,13 +995,7 @@ static ssize_t oom_adj_write(struct file *file, const char __user *buf,
 		  current->comm, task_pid_nr(current), task_pid_nr(task),
 		  task_pid_nr(task));
 
-#ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
-	delete_from_adj_tree(task);
-#endif
 	task->signal->oom_score_adj = oom_adj;
-#ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
-	add_2_adj_tree(task);
-#endif
 	trace_oom_score_adj_update(task);
 err_sighand:
 	unlock_task_sighand(task, &flags);
@@ -980,41 +1005,6 @@ err_task_lock:
 out:
 	return err < 0 ? err : count;
 }
-
-static int oom_adjust_permission(struct inode *inode, int mask)
-{
-	uid_t uid;
-	struct task_struct *p;
-
-	p = get_proc_task(inode);
-	if(p) {
-		uid = task_uid(p);
-		put_task_struct(p);
-	}
-
-	/*
-	 * System Server (uid == 1000) is granted access to oom_adj of all 
-	 * android applications (uid > 10000) as and services (uid >= 1000)
-	 */
-	if (p && (current_fsuid() == 1000) && (uid >= 1000)) {
-		if (inode->i_mode >> 6 & mask) {
-			return 0;
-		}
-	}
-
-	/* Fall back to default. */
-	return generic_permission(inode, mask);
-}
-
-static const struct inode_operations proc_oom_adj_inode_operations = {
-	.permission	= oom_adjust_permission,
-};
-
-static const struct file_operations proc_oom_adj_operations = {
-	.read		= oom_adj_read,
-	.write		= oom_adj_write,
-	.llseek		= generic_file_llseek,
-};
 
 #ifdef CONFIG_SAMP_HOTNESS
 static ssize_t hotness_adjust_write(struct file *file, const char __user *buf,
@@ -1038,7 +1028,7 @@ static ssize_t hotness_adjust_write(struct file *file, const char __user *buf,
 	if (err)
 		goto out;
 
-	task = get_proc_task(file_inode(file));
+	task = get_proc_task(file->f_path.dentry->d_inode);
 	if (!task) {
 		err = -ESRCH;
 		goto out;
@@ -1077,7 +1067,37 @@ out:
 }
 #endif
 
-static const struct file_operations proc_oom_adjust_operations = {
+
+static int oom_adjust_permission(struct inode *inode, int mask)
+{
+	uid_t uid;
+	struct task_struct *p;
+
+	p = get_proc_task(inode);
+	if(p) {
+		uid = task_uid(p);
+		put_task_struct(p);
+	}
+
+	/*
+	 * System Server (uid == 1000) is granted access to oom_adj of all 
+	 * android applications (uid > 10000) as and services (uid >= 1000)
+	 */
+	if (p && (current_fsuid() == 1000) && (uid >= 1000)) {
+		if (inode->i_mode >> 6 & mask) {
+			return 0;
+		}
+	}
+
+	/* Fall back to default. */
+	return generic_permission(inode, mask);
+}
+
+static const struct inode_operations proc_oom_adj_inode_operations = {
+	.permission	= oom_adjust_permission,
+};
+
+static const struct file_operations proc_oom_adj_operations = {
 	.read		= oom_adj_read,
 	.write		= oom_adj_write,
 	.llseek		= generic_file_llseek,
@@ -1159,13 +1179,7 @@ static ssize_t oom_score_adj_write(struct file *file, const char __user *buf,
 		goto err_sighand;
 	}
 
-#ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
-	delete_from_adj_tree(task);
-#endif
 	task->signal->oom_score_adj = (short)oom_score_adj;
-#ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
-	add_2_adj_tree(task);
-#endif
 	if (has_capability_noaudit(current, CAP_SYS_RESOURCE))
 		task->signal->oom_score_adj_min = (short)oom_score_adj;
 	trace_oom_score_adj_update(task);
@@ -1469,11 +1483,10 @@ static ssize_t comm_write(struct file *file, const char __user *buf,
 	struct inode *inode = file_inode(file);
 	struct task_struct *p;
 	char buffer[TASK_COMM_LEN];
+	const size_t maxlen = sizeof(buffer) - 1;
 
 	memset(buffer, 0, sizeof(buffer));
-	if (count > sizeof(buffer) - 1)
-		count = sizeof(buffer) - 1;
-	if (copy_from_user(buffer, buf, count))
+	if (copy_from_user(buffer, buf, count > maxlen ? maxlen : count))
 		return -EFAULT;
 
 	p = get_proc_task(inode);
@@ -1741,6 +1754,15 @@ int pid_revalidate(struct dentry *dentry, unsigned int flags)
 	}
 	d_drop(dentry);
 	return 0;
+}
+
+int pid_delete_dentry(const struct dentry *dentry)
+{
+	/* Is the task we represent dead?
+	 * If so, then don't put the dentry on the lru list,
+	 * kill it immediately.
+	 */
+	return !proc_pid(dentry->d_inode)->tasks[PIDTYPE_PID].first;
 }
 
 const struct dentry_operations pid_dentry_operations =
@@ -2201,6 +2223,7 @@ static int show_timer(struct seq_file *m, void *v)
 		nstr[notify & ~SIGEV_THREAD_ID],
 		(notify & SIGEV_THREAD_ID) ? "tid" : "pid",
 		pid_nr_ns(timer->it_pid, tp->ns));
+	seq_printf(m, "ClockID: %d\n", timer->it_clock);
 
 	return 0;
 }
@@ -2779,11 +2802,8 @@ static const struct pid_entry tgid_base_stuff[] = {
 	REG("cgroup",  S_IRUGO, proc_cgroup_operations),
 #endif
 	INF("oom_score",  S_IRUGO, proc_oom_score),
-	REG("oom_adj",    S_IRUGO|S_IWUSR, proc_oom_adj_operations),
 	ANDROID("oom_adj", S_IRUGO|S_IWUSR, oom_adj),
-#ifdef CONFIG_SAMP_HOTNESS
-	REG("hotness_adj", S_IWUGO, proc_hotness_adjust_operations),
-#endif
+	REG("oom_score_adj", S_IRUGO|S_IWUSR, proc_oom_score_adj_operations),
 #ifdef CONFIG_AUDITSYSCALL
 	REG("loginuid",   S_IWUSR|S_IRUGO, proc_loginuid_operations),
 	REG("sessionid",  S_IRUGO, proc_sessionid_operations),
@@ -3140,6 +3160,9 @@ static const struct pid_entry tid_base_stuff[] = {
 	INF("oom_score", S_IRUGO, proc_oom_score),
 	REG("oom_adj",   S_IRUGO|S_IWUSR, proc_oom_adj_operations),
 	REG("oom_score_adj", S_IRUGO|S_IWUSR, proc_oom_score_adj_operations),
+#ifdef CONFIG_SAMP_HOTNESS
+	REG("hotness_adj", S_IWUGO, proc_hotness_adjust_operations),
+#endif
 #ifdef CONFIG_AUDITSYSCALL
 	REG("loginuid",  S_IWUSR|S_IRUGO, proc_loginuid_operations),
 	REG("sessionid",  S_IRUGO, proc_sessionid_operations),

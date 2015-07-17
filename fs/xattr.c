@@ -1,4 +1,4 @@
-	/*
+/*
   File: fs/xattr.c
 
   Extended attribute handling.

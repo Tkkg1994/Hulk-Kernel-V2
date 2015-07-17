@@ -330,7 +330,6 @@ struct rsc {
 	struct svc_cred		cred;
 	struct gss_svc_seq_data	seqdata;
 	struct gss_ctx		*mechctx;
-	char			*client_name;
 };
 
 static struct rsc *rsc_update(struct cache_detail *cd, struct rsc *new, struct rsc *old);
@@ -341,9 +340,7 @@ static void rsc_free(struct rsc *rsci)
 	kfree(rsci->handle.data);
 	if (rsci->mechctx)
 		gss_delete_sec_context(&rsci->mechctx);
-	if (rsci->cred.cr_group_info)
-		put_group_info(rsci->cred.cr_group_info);
-	kfree(rsci->client_name);
+	free_svc_cred(&rsci->cred);
 }
 
 static void rsc_put(struct kref *ref)
@@ -381,7 +378,7 @@ rsc_init(struct cache_head *cnew, struct cache_head *ctmp)
 	tmp->handle.data = NULL;
 	new->mechctx = NULL;
 	new->cred.cr_group_info = NULL;
-	new->client_name = NULL;
+	new->cred.cr_principal = NULL;
 }
 
 static void
@@ -396,8 +393,8 @@ update_rsc(struct cache_head *cnew, struct cache_head *ctmp)
 	spin_lock_init(&new->seqdata.sd_lock);
 	new->cred = tmp->cred;
 	tmp->cred.cr_group_info = NULL;
-	new->client_name = tmp->client_name;
-	tmp->client_name = NULL;
+	new->cred.cr_principal = tmp->cred.cr_principal;
+	tmp->cred.cr_principal = NULL;
 }
 
 static struct cache_head *
@@ -495,8 +492,8 @@ static int rsc_parse(struct cache_detail *cd,
 		/* get client name */
 		len = qword_get(&mesg, buf, mlen);
 		if (len > 0) {
-			rsci.client_name = kstrdup(buf, GFP_KERNEL);
-			if (!rsci.client_name)
+			rsci.cred.cr_principal = kstrdup(buf, GFP_KERNEL);
+			if (!rsci.cred.cr_principal)
 				goto out;
 		}
 
@@ -932,16 +929,6 @@ struct gss_svc_data {
 	struct rsc			*rsci;
 };
 
-char *svc_gss_principal(struct svc_rqst *rqstp)
-{
-	struct gss_svc_data *gd = (struct gss_svc_data *)rqstp->rq_auth_data;
-
-	if (gd && gd->rsci)
-		return gd->rsci->client_name;
-	return NULL;
-}
-EXPORT_SYMBOL_GPL(svc_gss_principal);
-
 static int
 svcauth_gss_set_client(struct svc_rqst *rqstp)
 {
@@ -1192,8 +1179,10 @@ svcauth_gss_accept(struct svc_rqst *rqstp, __be32 *authp)
 		}
 		svcdata->rsci = rsci;
 		cache_get(&rsci->h);
-		rqstp->rq_flavor = gss_svc_to_pseudoflavor(
-					rsci->mechctx->mech_type, gc->gc_svc);
+		rqstp->rq_cred.cr_flavor = gss_svc_to_pseudoflavor(
+					rsci->mechctx->mech_type,
+					GSS_C_QOP_DEFAULT,
+					gc->gc_svc);
 		ret = SVC_OK;
 		goto out;
 	}

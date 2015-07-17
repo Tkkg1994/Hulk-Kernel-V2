@@ -26,6 +26,13 @@
 struct persistent_ram_buffer;
 struct rs_control;
 
+struct persistent_ram_ecc_info {
+	int block_size;
+	int ecc_size;
+	int symsize;
+	int poly;
+};
+
 struct persistent_ram_zone {
 	phys_addr_t paddr;
 	size_t size;
@@ -39,16 +46,14 @@ struct persistent_ram_zone {
 	struct rs_control *rs_decoder;
 	int corrected_bytes;
 	int bad_blocks;
-	int ecc_block_size;
-	int ecc_size;
+	struct persistent_ram_ecc_info ecc_info;
 
 	char *old_log;
 	size_t old_log_size;
 };
 
-struct persistent_ram_zone * __devinit persistent_ram_new(phys_addr_t start,
-							  size_t size, u32 sig,
-							  int ecc_size);
+struct persistent_ram_zone *persistent_ram_new(phys_addr_t start, size_t size,
+			u32 sig, struct persistent_ram_ecc_info *ecc_info);
 void persistent_ram_free(struct persistent_ram_zone *prz);
 void persistent_ram_zap(struct persistent_ram_zone *prz);
 
@@ -61,6 +66,19 @@ void *persistent_ram_old(struct persistent_ram_zone *prz);
 void persistent_ram_free_old(struct persistent_ram_zone *prz);
 ssize_t persistent_ram_ecc_string(struct persistent_ram_zone *prz,
 	char *str, size_t len);
+#ifdef CONFIG_PSTORE_RAM_ANNOTATION_APPEND
+__printf(1, 2)  int persistent_ram_annotation_append(const char *fmt, ...);
+void persistent_ram_annotation_merge(struct persistent_ram_zone *prz);
+#else
+static inline __printf(1, 2) void persistent_ram_annotation_append(
+			const char *fmt, ...) { };
+static inline void persistent_ram_annotation_merge(
+			struct persistent_ram_zone *prz) { };
+#endif
+void *persistent_ram_map(phys_addr_t start, phys_addr_t size);
+void persistent_ram_unmap(void *vaddr, phys_addr_t start, phys_addr_t size);
+
+void ramoops_console_write_buf(const char *buf, size_t size);
 
 /*
  * Ramoops platform data
@@ -74,8 +92,10 @@ struct ramoops_platform_data {
 	unsigned long	record_size;
 	unsigned long	console_size;
 	unsigned long	ftrace_size;
+	unsigned long	annotate_size;
+	unsigned long	pmsg_size;
 	int		dump_oops;
-	int		ecc_size;
+	struct persistent_ram_ecc_info ecc_info;
 };
 
 #endif

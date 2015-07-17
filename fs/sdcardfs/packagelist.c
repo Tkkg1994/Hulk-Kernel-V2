@@ -422,7 +422,7 @@ void * packagelist_create(gid_t write_gid)
 void packagelist_destroy(void *pkgl_id)
 {
 	struct packagelist_data *pkgl_dat = (struct packagelist_data *)pkgl_id;
-	pid_t pkgl_pid = pkgl_dat->thread_id->pid;
+	pid_t pkgl_pid = pkgl_dat->thread_id->pid;	
 
 	force_sig_info(SIGINT, SEND_SIG_PRIV, pkgl_dat->thread_id);
 	kthread_stop(pkgl_dat->thread_id);

@@ -82,56 +82,6 @@ unsigned long task_statm(struct mm_struct *mm,
 	return mm->total_vm;
 }
 
-static void seq_print_vma_name(struct seq_file *m, struct vm_area_struct *vma)
-{
-	const char __user *name = vma_get_anon_name(vma);
-	struct mm_struct *mm = vma->vm_mm;
-
-	unsigned long page_start_vaddr;
-	unsigned long page_offset;
-	unsigned long num_pages;
-	unsigned long max_len = NAME_MAX;
-	int i;
-
-	page_start_vaddr = (unsigned long)name & PAGE_MASK;
-	page_offset = (unsigned long)name - page_start_vaddr;
-	num_pages = DIV_ROUND_UP(page_offset + max_len, PAGE_SIZE);
-
-	seq_puts(m, "[anon:");
-
-	for (i = 0; i < num_pages; i++) {
-		int len;
-		int write_len;
-		const char *kaddr;
-		long pages_pinned;
-		struct page *page;
-
-		pages_pinned = get_user_pages(current, mm, page_start_vaddr,
-				1, 0, 0, &page, NULL);
-		if (pages_pinned < 1) {
-			seq_puts(m, "<fault>]");
-			return;
-		}
-
-		kaddr = (const char *)kmap(page);
-		len = min(max_len, PAGE_SIZE - page_offset);
-		write_len = strnlen(kaddr + page_offset, len);
-		seq_write(m, kaddr + page_offset, write_len);
-		kunmap(page);
-		put_page(page);
-
-		/* if strnlen hit a null terminator then we're done */
-		if (write_len != len)
-			break;
-
-		max_len -= len;
-		page_offset = 0;
-		page_start_vaddr += PAGE_SIZE;
-	}
-
-	seq_putc(m, ']');
-}
-
 #ifdef CONFIG_NUMA
 /*
  * These functions are for numa_maps but called in generic **maps seq_file
@@ -377,11 +327,6 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 				seq_pad(m, ' ');
 				seq_printf(m, "[stack:%d]", tid);
 			}
-			goto done;
-		}
-
-		if (vma_get_anon_name(vma)) {
-			seq_print_vma_name(m, vma);
 		}
 	}
 
@@ -680,12 +625,6 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 				mss.nonlinear >> 10);
 
 	show_smap_vma_flags(m, vma);
-
-	if (vma_get_anon_name(vma)) {
-		seq_puts(m, "Name:           ");
-		seq_print_vma_name(m, vma);
-		seq_putc(m, '\n');
-	}
 
 	if (m->count < m->size)  /* vma is copied successfully */
 		m->version = (vma != get_gate_vma(task->mm))
@@ -1163,19 +1102,9 @@ out:
 	return ret;
 }
 
-static int pagemap_open(struct inode *inode, struct file *file)
-{
-	/* do not disclose physical addresses to unprivileged
-	   userspace (closes a rowhammer attack vector) */
-	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
-	return 0;
-}
-
 const struct file_operations proc_pagemap_operations = {
 	.llseek		= mem_lseek, /* borrow this */
 	.read		= pagemap_read,
-	.open		= pagemap_open,
 };
 #endif /* CONFIG_PROC_PAGE_MONITOR */
 
@@ -1320,6 +1249,7 @@ static int show_numa_map(struct seq_file *m, void *v, int is_pid)
 	struct vm_area_struct *vma = v;
 	struct numa_maps *md = &numa_priv->md;
 	struct file *file = vma->vm_file;
+	struct task_struct *task = proc_priv->task;
 	struct mm_struct *mm = vma->vm_mm;
 	struct mm_walk walk = {};
 	struct mempolicy *pol;
@@ -1339,7 +1269,7 @@ static int show_numa_map(struct seq_file *m, void *v, int is_pid)
 	walk.private = md;
 	walk.mm = mm;
 
-	pol = get_vma_policy(proc_priv->task, vma, vma->vm_start);
+	pol = get_vma_policy(task, vma, vma->vm_start);
 	mpol_to_str(buffer, sizeof(buffer), pol);
 	mpol_cond_put(pol);
 
@@ -1351,7 +1281,7 @@ static int show_numa_map(struct seq_file *m, void *v, int is_pid)
 	} else if (vma->vm_start <= mm->brk && vma->vm_end >= mm->start_brk) {
 		seq_printf(m, " heap");
 	} else {
-		pid_t tid = vm_is_stack(proc_priv->task, vma, is_pid);
+		pid_t tid = vm_is_stack(task, vma, is_pid);
 		if (tid != 0) {
 			/*
 			 * Thread stack in /proc/PID/task/TID/maps or

@@ -38,13 +38,13 @@ change_conf(struct TCP_Server_Info *server)
 	case 1:
 		server->echoes = false;
 		server->oplocks = false;
-		cERROR(1, "disabling echoes and oplocks");
+		cifs_dbg(VFS, "disabling echoes and oplocks\n");
 		break;
 	case 2:
 		server->echoes = true;
 		server->oplocks = false;
 		server->echo_credits = 1;
-		cFYI(1, "disabling oplocks");
+		cifs_dbg(FYI, "disabling oplocks\n");
 		break;
 	default:
 		server->echoes = true;
@@ -147,10 +147,10 @@ smb2_dump_detail(void *buf)
 #ifdef CONFIG_CIFS_DEBUG2
 	struct smb2_hdr *smb = (struct smb2_hdr *)buf;
 
-	cERROR(1, "Cmd: %d Err: 0x%x Flags: 0x%x Mid: %llu Pid: %d",
-		  smb->Command, smb->Status, smb->Flags, smb->MessageId,
-		  smb->ProcessId);
-	cERROR(1, "smb buf %p len %u", smb, smb2_calc_size(smb));
+	cifs_dbg(VFS, "Cmd: %d Err: 0x%x Flags: 0x%x Mid: %llu Pid: %d\n",
+		 smb->Command, smb->Status, smb->Flags, smb->MessageId,
+		 smb->ProcessId);
+	cifs_dbg(VFS, "smb buf %p len %u\n", smb, smb2_calc_size(smb));
 #endif
 }
 
@@ -181,11 +181,8 @@ smb2_negotiate_wsize(struct cifs_tcon *tcon, struct smb_vol *volume_info)
 	/* start with specified wsize, or default */
 	wsize = volume_info->wsize ? volume_info->wsize : CIFS_DEFAULT_IOSIZE;
 	wsize = min_t(unsigned int, wsize, server->max_write);
-	/*
-	 * limit write size to 2 ** 16, because we don't support multicredit
-	 * requests now.
-	 */
-	wsize = min_t(unsigned int, wsize, 2 << 15);
+	/* set it to the maximum buffer size value we can send with 1 credit */
+	wsize = min_t(unsigned int, wsize, SMB2_MAX_BUFFER_SIZE);
 
 	return wsize;
 }
@@ -199,11 +196,8 @@ smb2_negotiate_rsize(struct cifs_tcon *tcon, struct smb_vol *volume_info)
 	/* start with specified rsize, or default */
 	rsize = volume_info->rsize ? volume_info->rsize : CIFS_DEFAULT_IOSIZE;
 	rsize = min_t(unsigned int, rsize, server->max_read);
-	/*
-	 * limit write size to 2 ** 16, because we don't support multicredit
-	 * requests now.
-	 */
-	rsize = min_t(unsigned int, rsize, 2 << 15);
+	/* set it to the maximum buffer size value we can send with 1 credit */
+	rsize = min_t(unsigned int, rsize, SMB2_MAX_BUFFER_SIZE);
 
 	return rsize;
 }
@@ -436,7 +430,7 @@ smb2_query_dir_first(const unsigned int xid, struct cifs_tcon *tcon,
 		       &oplock, NULL);
 	kfree(utf16_path);
 	if (rc) {
-		cERROR(1, "open dir failed");
+		cifs_dbg(VFS, "open dir failed\n");
 		return rc;
 	}
 
@@ -448,7 +442,7 @@ smb2_query_dir_first(const unsigned int xid, struct cifs_tcon *tcon,
 	rc = SMB2_query_directory(xid, tcon, persistent_fid, volatile_fid, 0,
 				  srch_inf);
 	if (rc) {
-		cERROR(1, "query directory failed");
+		cifs_dbg(VFS, "query directory failed\n");
 		SMB2_close(xid, tcon, persistent_fid, volatile_fid);
 	}
 	return rc;
@@ -744,4 +738,5 @@ struct smb_version_values smb30_values = {
 	.cap_unix = 0,
 	.cap_nt_find = SMB2_NT_FIND,
 	.cap_large_files = SMB2_LARGE_FILES,
+	.oplock_read = SMB2_OPLOCK_LEVEL_II,
 };

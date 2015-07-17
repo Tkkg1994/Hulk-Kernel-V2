@@ -151,28 +151,6 @@ _data_server_lookup_locked(const struct list_head *dsaddrs)
 }
 
 /*
- * Lookup DS by nfs_client pointer. Zero data server client pointer
- */
-void nfs4_ds_disconnect(struct nfs_client *clp)
-{
-	struct nfs4_pnfs_ds *ds;
-	struct nfs_client *found = NULL;
-
-	dprintk("%s clp %p\n", __func__, clp);
-	spin_lock(&nfs4_ds_cache_lock);
-	list_for_each_entry(ds, &nfs4_data_server_cache, ds_node)
-		if (ds->ds_clp && ds->ds_clp == clp) {
-			found = ds->ds_clp;
-			ds->ds_clp = NULL;
-		}
-	spin_unlock(&nfs4_ds_cache_lock);
-	if (found) {
-		set_bit(NFS_CS_STOP_RENEW, &clp->cl_res_state);
-		nfs_put_client(clp);
-	}
-}
-
-/*
  * Create an rpc connection to the nfs4_pnfs_ds data server
  * Currently only supports IPv4 and IPv6 addresses
  */
@@ -797,34 +775,56 @@ nfs4_fl_select_ds_fh(struct pnfs_layout_segment *lseg, u32 j)
 	return flseg->fh_array[i];
 }
 
+static void nfs4_wait_ds_connect(struct nfs4_pnfs_ds *ds)
+{
+	might_sleep();
+	wait_on_bit(&ds->ds_state, NFS4DS_CONNECTING,
+			nfs_wait_bit_killable, TASK_KILLABLE);
+}
+
+static void nfs4_clear_ds_conn_bit(struct nfs4_pnfs_ds *ds)
+{
+	smp_mb__before_atomic();
+	clear_bit(NFS4DS_CONNECTING, &ds->ds_state);
+	smp_mb__after_atomic();
+	wake_up_bit(&ds->ds_state, NFS4DS_CONNECTING);
+}
+
+
 struct nfs4_pnfs_ds *
 nfs4_fl_prepare_ds(struct pnfs_layout_segment *lseg, u32 ds_idx)
 {
 	struct nfs4_file_layout_dsaddr *dsaddr = FILELAYOUT_LSEG(lseg)->dsaddr;
 	struct nfs4_pnfs_ds *ds = dsaddr->ds_list[ds_idx];
 	struct nfs4_deviceid_node *devid = FILELAYOUT_DEVID_NODE(lseg);
-
-	if (filelayout_test_devid_unavailable(devid))
-		return NULL;
+	struct nfs4_pnfs_ds *ret = ds;
 
 	if (ds == NULL) {
 		printk(KERN_ERR "NFS: %s: No data server for offset index %d\n",
 			__func__, ds_idx);
 		filelayout_mark_devid_invalid(devid);
-		return NULL;
+		goto out;
 	}
+	if (ds->ds_clp)
+		goto out_test_devid;
 
-	if (!ds->ds_clp) {
+	if (test_and_set_bit(NFS4DS_CONNECTING, &ds->ds_state) == 0) {
 		struct nfs_server *s = NFS_SERVER(lseg->pls_layout->plh_inode);
 		int err;
 
 		err = nfs4_ds_connect(s, ds);
-		if (err) {
+		if (err)
 			nfs4_mark_deviceid_unavailable(devid);
-			return NULL;
-		}
+		nfs4_clear_ds_conn_bit(ds);
+	} else {
+		/* Either ds is connected, or ds is NULL */
+		nfs4_wait_ds_connect(ds);
 	}
-	return ds;
+out_test_devid:
+	if (filelayout_test_devid_unavailable(devid))
+		ret = NULL;
+out:
+	return ret;
 }
 
 module_param(dataserver_retrans, uint, 0644);

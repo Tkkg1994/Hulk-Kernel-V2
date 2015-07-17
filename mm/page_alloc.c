@@ -2726,6 +2726,32 @@ out:
 	if (unlikely(!put_mems_allowed(cpuset_mems_cookie) && !page))
 		goto retry_cpuset;
 
+#ifdef CONFIG_SDP_CACHE_CLEANUP
+	if(page) {
+		uid_t uid = task_uid(current);
+		if (((uid/PER_USER_RANGE) <= 199)  && ((uid/PER_USER_RANGE) >= 100)) {
+			if (dek_is_sdp_uid(uid)) {
+				switch (current->sensitive) {
+				case SENSITIVITY_UNKNOWN:
+					if ((0 == strcmp(current->comm, "m.android.email")) ||
+						(0 == strcmp(current->comm, "ndroid.exchange"))) {
+						SetPageSensitive(page);
+						current->sensitive = SENSITIVE;
+					} else {
+						current->sensitive = NOT_SENSITIVE;
+					}
+					break;
+				case SENSITIVE:
+						SetPageSensitive(page);
+					break;
+				case NOT_SENSITIVE:
+				default:
+					break;
+				}
+			}
+		}
+	}
+#endif
 	return page;
 }
 EXPORT_SYMBOL(__alloc_pages_nodemask);
@@ -6250,12 +6276,16 @@ static const struct trace_print_flags pageflag_names[] = {
 #ifdef CONFIG_MEMORY_FAILURE
 	{1UL << PG_hwpoison,		"hwpoison"	},
 #endif
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	{1UL << PG_compound_lock,	"compound_lock"	},
+#endif
 #ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
 	{1UL << PG_scfslower,		"scfslower"	},
 	{1UL << PG_nocache,		"nocache"	},
 #endif
-#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-	{1UL << PG_compound_lock,	"compound_lock"	},
+	{1UL << PG_readahead,           "PG_readahead"  },
+#ifdef CONFIG_SDP
+	{1UL << PG_sensitive,		"sensitive"	},
 #endif
 };
 

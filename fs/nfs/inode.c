@@ -79,7 +79,7 @@ int nfs_wait_bit_killable(void *word)
 {
 	if (fatal_signal_pending(current))
 		return -ERESTARTSYS;
-	freezable_schedule();
+	freezable_schedule_unsafe();
 	return 0;
 }
 EXPORT_SYMBOL_GPL(nfs_wait_bit_killable);
@@ -519,7 +519,7 @@ int nfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
 	struct inode *inode = dentry->d_inode;
 	int need_atime = NFS_I(inode)->cache_validity & NFS_INO_INVALID_ATIME;
-	int err = 0;
+	int err;
 
 	/* Flush out writes to the server in order to update c/mtime.  */
 	if (S_ISREG(inode->i_mode)) {
@@ -561,20 +561,22 @@ static void nfs_init_lock_context(struct nfs_lock_context *l_ctx)
 	l_ctx->lockowner.l_owner = current->files;
 	l_ctx->lockowner.l_pid = current->tgid;
 	INIT_LIST_HEAD(&l_ctx->list);
+	nfs_iocounter_init(&l_ctx->io_count);
 }
 
 static struct nfs_lock_context *__nfs_find_lock_context(struct nfs_open_context *ctx)
 {
-	struct nfs_lock_context *pos;
+	struct nfs_lock_context *head = &ctx->lock_context;
+	struct nfs_lock_context *pos = head;
 
-	list_for_each_entry(pos, &ctx->lock_context.list, list) {
+	do {
 		if (pos->lockowner.l_owner != current->files)
 			continue;
 		if (pos->lockowner.l_pid != current->tgid)
 			continue;
 		atomic_inc(&pos->count);
 		return pos;
-	}
+	} while ((pos = list_entry(pos->list.next, typeof(*pos), list)) != head);
 	return NULL;
 }
 

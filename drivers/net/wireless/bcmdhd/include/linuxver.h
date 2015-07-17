@@ -103,12 +103,12 @@
 #endif
 #endif	/* LINUX_VERSION_CODE > KERNEL_VERSION(2, 5, 41) */
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0))
 #define DAEMONIZE(a)	do { \
 		allow_signal(SIGKILL);	\
 		allow_signal(SIGTERM);	\
 	} while (0)
-#elif ((LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)) && \
+#elif ((LINUX_VERSION_CODE < KERNEL_VERSION(3, 4, 0)) && \
 	(LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 0)))
 #define DAEMONIZE(a) daemonize(a); \
 	allow_signal(SIGKILL); \

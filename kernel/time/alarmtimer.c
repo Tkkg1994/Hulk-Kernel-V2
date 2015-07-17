@@ -26,6 +26,8 @@
 #include <linux/workqueue.h>
 #include <linux/freezer.h>
 
+#define ALARM_DELTA 120
+
 /**
  * struct alarm_base - Alarm timer bases
  * @lock:		Lock for syncrhonized access to the base
@@ -52,7 +54,76 @@ static struct wakeup_source *ws;
 static struct rtc_timer		rtctimer;
 static struct rtc_device	*rtcdev;
 static DEFINE_SPINLOCK(rtcdev_lock);
+static unsigned long power_on_alarm;
+static struct mutex power_on_alarm_lock;
 
+void set_power_on_alarm(long secs, bool enable)
+{
+	int rc;
+	struct timespec wall_time;
+	long rtc_secs, alarm_time, alarm_delta;
+	struct rtc_time rtc_time;
+	struct rtc_wkalrm alarm;
+
+	rc = mutex_lock_interruptible(&power_on_alarm_lock);
+	if (rc != 0)
+		return;
+
+	if (enable) {
+			power_on_alarm = secs;
+	} else {
+		if (power_on_alarm == secs)
+			power_on_alarm = 0;
+		else
+			goto exit;
+	}
+
+	if (!power_on_alarm)
+		goto disable_alarm;
+
+	rtc_read_time(rtcdev, &rtc_time);
+	getnstimeofday(&wall_time);
+	rtc_tm_to_time(&rtc_time, &rtc_secs);
+	alarm_delta = wall_time.tv_sec - rtc_secs;
+	alarm_time = power_on_alarm - alarm_delta;
+
+	/*
+	 *Substract ALARM_DELTA from actual alarm time
+	 *to power up the device before actual alarm
+	 *expiration
+	 */
+	if ((alarm_time - ALARM_DELTA) > rtc_secs)
+		alarm_time -= ALARM_DELTA;
+	else
+		goto disable_alarm;
+
+	rtc_time_to_tm(alarm_time, &alarm.time);
+	alarm.enabled = 1;
+	rc = rtc_set_alarm(rtcdev, &alarm);
+	if (rc)
+		goto disable_alarm;
+
+	mutex_unlock(&power_on_alarm_lock);
+	return;
+
+disable_alarm:
+	power_on_alarm = 0;
+	rtc_alarm_irq_enable(rtcdev, 0);
+exit:
+	mutex_unlock(&power_on_alarm_lock);
+}
+
+static void alarmtimer_triggered_func(void *p)
+{
+	struct rtc_device *rtc = rtcdev;
+	if (!(rtc->irq_data & RTC_AF))
+		return;
+	__pm_wakeup_event(ws, 2 * MSEC_PER_SEC);
+}
+
+static struct rtc_task alarmtimer_rtc_task = {
+	.func = alarmtimer_triggered_func
+};
 /**
  * alarmtimer_get_rtcdev - Return selected rtcdevice
  *
@@ -71,7 +142,6 @@ struct rtc_device *alarmtimer_get_rtcdev(void)
 
 	return ret;
 }
-
 
 static int alarmtimer_rtc_add_device(struct device *dev,
 				struct class_interface *class_intf)
@@ -99,6 +169,8 @@ static int alarmtimer_rtc_add_device(struct device *dev,
 
 static inline void alarmtimer_rtc_timer_init(void)
 {
+	mutex_init(&power_on_alarm_lock);
+
 	rtc_timer_init(&rtctimer, NULL, NULL);
 }
 
@@ -270,8 +342,24 @@ static int alarmtimer_suspend(struct device *dev)
 		__pm_wakeup_event(ws, MSEC_PER_SEC);
 	return ret;
 }
+static int alarmtimer_resume(struct device *dev)
+{
+	struct rtc_device *rtc;
+
+	rtc = alarmtimer_get_rtcdev();
+	/* If we have no rtcdev, just return */
+	if (!rtc)
+		return 0;
+	rtc_timer_cancel(rtc, &rtctimer);
+	return 0;
+}
 #else
 static int alarmtimer_suspend(struct device *dev)
+{
+	return 0;
+}
+
+static int alarmtimer_resume(struct device *dev)
 {
 	return 0;
 }
@@ -795,6 +883,7 @@ out:
 /* Suspend hook structures */
 static const struct dev_pm_ops alarmtimer_pm_ops = {
 	.suspend = alarmtimer_suspend,
+	.resume = alarmtimer_resume,
 };
 
 static struct platform_driver alarmtimer_driver = {

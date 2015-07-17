@@ -6,6 +6,7 @@ genhdr-y += version.h
 header-y += dm-ioctl.h
 header-y += types.h
 header-y += fs.h
+header-y += fuse.h
 header-y += sched.h
 header-y += loop.h
 header-y += ioprio.h

@@ -1179,7 +1179,7 @@ extern struct kmem_cache *jbd2_handle_cache;
 
 static inline handle_t *jbd2_alloc_handle(gfp_t gfp_flags)
 {
-	return kmem_cache_alloc(jbd2_handle_cache, gfp_flags);
+	return kmem_cache_zalloc(jbd2_handle_cache, gfp_flags);
 }
 
 static inline void jbd2_free_handle(handle_t *handle)
@@ -1327,14 +1327,20 @@ static inline int jbd_space_needed(journal_t *journal)
 
 extern int jbd_blocks_per_page(struct inode *inode);
 
+/* JBD uses a CRC32 checksum */
+#define JBD_MAX_CHECKSUM_SIZE 4
+
 static inline u32 jbd2_chksum(journal_t *journal, u32 crc,
 			      const void *address, unsigned int length)
 {
 	struct {
 		struct shash_desc shash;
-		char ctx[crypto_shash_descsize(journal->j_chksum_driver)];
+		char ctx[JBD_MAX_CHECKSUM_SIZE];
 	} desc;
 	int err;
+
+	BUG_ON(crypto_shash_descsize(journal->j_chksum_driver) >
+		JBD_MAX_CHECKSUM_SIZE);
 
 	desc.shash.tfm = journal->j_chksum_driver;
 	desc.shash.flags = 0;

@@ -574,7 +574,7 @@ static long exfat_generic_ioctl(struct file *filp,
 {
 #if EXFAT_CONFIG_KERNEL_DEBUG
 #if !(LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36))
-	struct inode *inode = file_inode(filp);
+	struct inode *inode = filp->f_dentry->d_inode;
 #endif
 	unsigned int flags;
 #endif
@@ -2414,4 +2414,3 @@ module_init(init_exfat_fs);
 module_exit(exit_exfat_fs);
 
 MODULE_LICENSE("GPL");
-

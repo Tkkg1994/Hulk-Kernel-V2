@@ -23,6 +23,7 @@
 #include <linux/mutex.h>
 #include <linux/pm.h>
 #include <linux/atomic.h>
+#include <linux/ratelimit.h>
 #include <linux/uidgid.h>
 #include <asm/device.h>
 
@@ -909,8 +910,9 @@ extern const char *dev_driver_string(const struct device *dev);
 
 #ifdef CONFIG_PRINTK
 
-extern int dev_vprintk_emit(int level, const struct device *dev,
-			    const char *fmt, va_list args);
+extern __printf(3, 0)
+int dev_vprintk_emit(int level, const struct device *dev,
+		     const char *fmt, va_list args);
 extern __printf(3, 4)
 int dev_printk_emit(int level, const struct device *dev, const char *fmt, ...);
 
@@ -934,8 +936,9 @@ int _dev_info(const struct device *dev, const char *fmt, ...);
 
 #else
 
-static int dev_vprintk_emit(int level, const struct device *dev,
-			    const char *fmt, va_list args)
+static inline __printf(3, 0)
+int dev_vprintk_emit(int level, const struct device *dev,
+		     const char *fmt, va_list args)
 { return 0; }
 static inline __printf(3, 4)
 int dev_printk_emit(int level, const struct device *dev, const char *fmt, ...)

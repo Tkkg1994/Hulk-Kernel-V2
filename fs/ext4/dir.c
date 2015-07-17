@@ -46,7 +46,8 @@ static int is_dx_dir(struct inode *inode)
 	if (EXT4_HAS_COMPAT_FEATURE(inode->i_sb,
 		     EXT4_FEATURE_COMPAT_DIR_INDEX) &&
 	    ((ext4_test_inode_flag(inode, EXT4_INODE_INDEX)) ||
-	     ((inode->i_size >> sb->s_blocksize_bits) == 1)))
+	     ((inode->i_size >> sb->s_blocksize_bits) == 1) ||
+	     ext4_has_inline_data(inode)))
 		return 1;
 
 	return 0;
@@ -84,7 +85,9 @@ int __ext4_check_dir_entry(const char *function, unsigned int line,
 	else
 		return 0;
 
+	/* for debugging, sangwoo2.lee */
 	print_bh(dir->i_sb, bh, 0, EXT4_BLOCK_SIZE(dir->i_sb));
+	/* for debugging */
 
 	if (filp)
 		ext4_error_file(filp, function, line, bh->b_blocknr,
@@ -117,14 +120,6 @@ static int ext4_readdir(struct file *filp,
 	int ret = 0;
 	int dir_has_error = 0;
 
-	if (ext4_has_inline_data(inode)) {
-		int has_inline_data = 1;
-		ret = ext4_read_inline_dir(filp, dirent, filldir,
-					   &has_inline_data);
-		if (has_inline_data)
-			return ret;
-	}
-
 	if (is_dx_dir(inode)) {
 		err = ext4_dx_readdir(filp, dirent, filldir);
 		if (err != ERR_BAD_DX_DIR) {
@@ -138,6 +133,15 @@ static int ext4_readdir(struct file *filp,
 		ext4_clear_inode_flag(file_inode(filp),
 				      EXT4_INODE_INDEX);
 	}
+
+	if (ext4_has_inline_data(inode)) {
+		int has_inline_data = 1;
+		ret = ext4_read_inline_dir(filp, dirent, filldir,
+					   &has_inline_data);
+		if (has_inline_data)
+			return ret;
+	}
+
 	stored = 0;
 	offset = filp->f_pos & (sb->s_blocksize - 1);
 
@@ -336,7 +340,7 @@ static inline loff_t ext4_get_htree_eof(struct file *filp)
  *
  * For non-htree, ext4_llseek already chooses the proper max offset.
  */
-loff_t ext4_dir_llseek(struct file *file, loff_t offset, int whence)
+static loff_t ext4_dir_llseek(struct file *file, loff_t offset, int whence)
 {
 	struct inode *inode = file->f_mapping->host;
 	int dx_dir = is_dx_dir(inode);

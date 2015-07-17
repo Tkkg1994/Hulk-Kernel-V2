@@ -73,12 +73,8 @@ static int gfs2_set_mode(struct inode *inode, umode_t mode)
 	int error = 0;
 
 	if (mode != inode->i_mode) {
-		struct iattr iattr;
-
-		iattr.ia_valid = ATTR_MODE;
-		iattr.ia_mode = mode;
-
-		error = gfs2_setattr_simple(inode, &iattr);
+		inode->i_mode = mode;
+		mark_inode_dirty(inode);
 	}
 
 	return error;
@@ -126,9 +122,7 @@ int gfs2_acl_create(struct gfs2_inode *dip, struct inode *inode)
 		return PTR_ERR(acl);
 	if (!acl) {
 		mode &= ~current_umask();
-		if (mode != inode->i_mode)
-			error = gfs2_set_mode(inode, mode);
-		return error;
+		return gfs2_set_mode(inode, mode);
 	}
 
 	if (S_ISDIR(inode->i_mode)) {
@@ -243,7 +237,7 @@ static int gfs2_xattr_system_set(struct dentry *dentry, const char *name,
 		return -EINVAL;
 	if (type == ACL_TYPE_DEFAULT && !S_ISDIR(inode->i_mode))
 		return value ? -EACCES : 0;
-	if ((current_fsuid() != inode->i_uid) && !capable(CAP_FOWNER))
+	if (!uid_eq(current_fsuid(), inode->i_uid) && !capable(CAP_FOWNER))
 		return -EPERM;
 	if (S_ISLNK(inode->i_mode))
 		return -EOPNOTSUPP;

@@ -19,7 +19,7 @@
  * current->executable is only used by the procfs.  This allows a dispatch
  * table to check for several different types  of binary formats.  We keep
  * trying until we recognize the file or we run out of supported binary
- * formats.
+ * formats. 
  */
 
 #include <linux/slab.h>
@@ -55,7 +55,6 @@
 #include <linux/pipe_fs_i.h>
 #include <linux/oom.h>
 #include <linux/compat.h>
-#include <linux/ksm.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -625,7 +624,7 @@ static int shift_arg_pages(struct vm_area_struct *vma, unsigned long shift)
 		free_pgd_range(&tlb, old_start, old_end, new_end,
 			vma->vm_next ? vma->vm_next->vm_start : USER_PGTABLES_CEILING);
 	}
-	tlb_finish_mmu(&tlb, new_end, old_end);
+	tlb_finish_mmu(&tlb, old_start, old_end);
 
 	/*
 	 * Shrink the vma to just the new range.  Always succeeds.
@@ -634,7 +633,10 @@ static int shift_arg_pages(struct vm_area_struct *vma, unsigned long shift)
 
 	return 0;
 }
-
+#ifdef CONFIG_TIMA_RKP
+unsigned long tima_switch_count = 0;
+DEFINE_SPINLOCK(tima_switch_count_lock);
+#endif
 /*
  * Finalizes the stack vm_area_struct. The flags and permissions are updated,
  * the stack is optionally relocated, and some extra space is added.
@@ -655,10 +657,10 @@ int setup_arg_pages(struct linux_binprm *bprm,
 	unsigned long rlim_stack;
 
 #ifdef CONFIG_STACK_GROWSUP
-	/* Limit stack size to 1GB */
+	/* Limit stack size */
 	stack_base = rlimit_max(RLIMIT_STACK);
-	if (stack_base > (1 << 30))
-		stack_base = 1 << 30;
+	if (stack_base > STACK_SIZE_MAX)
+		stack_base = STACK_SIZE_MAX;
 
 	/* Make sure we didn't let the argument array grow too large. */
 	if (vma->vm_end - vma->vm_start > stack_base)
@@ -803,6 +805,15 @@ int kernel_read(struct file *file, loff_t offset,
 
 EXPORT_SYMBOL(kernel_read);
 
+ssize_t read_code(struct file *file, unsigned long addr, loff_t pos, size_t len)
+{
+	ssize_t res = file->f_op->read(file, (void __user *)addr, len, &pos);
+	if (res > 0)
+		flush_icache_range(addr, addr + len);
+	return res;
+}
+EXPORT_SYMBOL(read_code);
+
 static int exec_mmap(struct mm_struct *mm)
 {
 	struct task_struct *tsk;
@@ -944,10 +955,6 @@ static int de_thread(struct task_struct *tsk)
 		transfer_pid(leader, tsk, PIDTYPE_SID);
 
 		list_replace_rcu(&leader->tasks, &tsk->tasks);
-#ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
-		delete_from_adj_tree(leader);
-		add_2_adj_tree(tsk);
-#endif
 		list_replace_init(&leader->sibling, &tsk->sibling);
 
 		tsk->group_leader = tsk;
@@ -1035,17 +1042,7 @@ EXPORT_SYMBOL_GPL(get_task_comm);
 void set_task_comm(struct task_struct *tsk, char *buf)
 {
 	task_lock(tsk);
-
 	trace_task_rename(tsk, buf);
-
-	/*
-	 * Threads may access current->comm without holding
-	 * the task lock, so write the string carefully.
-	 * Readers without a lock may see incomplete new
-	 * names but are safe from non-terminating string reads.
-	 */
-	memset(tsk->comm, 0, TASK_COMM_LEN);
-	wmb();
 	strlcpy(tsk->comm, buf, sizeof(tsk->comm));
 	task_unlock(tsk);
 	perf_event_comm(tsk);
@@ -1088,6 +1085,9 @@ int flush_old_exec(struct linux_binprm * bprm)
 	retval = exec_mmap(bprm->mm);
 	if (retval)
 		goto out;
+#ifdef CONFIG_TIMA_RKP_RO_CRED
+	tima_send_cmd2((unsigned int)current_cred(), (unsigned int)bprm->mm->pgd, 0x3f843221);
+#endif /*CONFIG_TIMA_RKP_RO_CRED*/
 
 	bprm->mm = NULL;		/* We're using it now */
 
@@ -1145,7 +1145,7 @@ void setup_new_exec(struct linux_binprm * bprm)
 	   group */
 
 	current->self_exec_id++;
-
+			
 	flush_signal_handlers(current, 0);
 	do_close_on_exec(current->files);
 }
@@ -1223,45 +1223,6 @@ void install_exec_creds(struct linux_binprm *bprm)
 }
 EXPORT_SYMBOL(install_exec_creds);
 
-static void bprm_fill_uid(struct linux_binprm *bprm)
-{
-	struct inode *inode;
-	unsigned int mode;
-	uid_t uid;
-	gid_t gid;
-
-	/* clear any previous set[ug]id data from a previous binary */
-	bprm->cred->euid = current_euid();
-	bprm->cred->egid = current_egid();
-
-	if (bprm->file->f_path.mnt->mnt_flags & MNT_NOSUID)
-		return;
-
-	inode = file_inode(bprm->file);
-	mode = ACCESS_ONCE(inode->i_mode);
-	if (!(mode & (S_ISUID|S_ISGID)))
-		return;
-
-	/* Be careful if suid/sgid is set */
-	mutex_lock(&inode->i_mutex);
-
-	/* reload atomically mode/uid/gid now that lock held */
-	mode = inode->i_mode;
-	uid = inode->i_uid;
-	gid = inode->i_gid;
-	mutex_unlock(&inode->i_mutex);
-
-	if (mode & S_ISUID) {
-		bprm->per_clear |= PER_CLEAR_ON_SETID;
-		bprm->cred->euid = uid;
-	}
-
-	if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) {
-		bprm->per_clear |= PER_CLEAR_ON_SETID;
-		bprm->cred->egid = gid;
-	}
-}
-
 /*
  * determine how safe it is to execute the proposed program
  * - the caller must hold ->cred_guard_mutex to protect against
@@ -1310,20 +1271,47 @@ static int check_unsafe_exec(struct linux_binprm *bprm)
 	return res;
 }
 
-/*
- * Fill the binprm structure from the inode.
+/* 
+ * Fill the binprm structure from the inode. 
  * Check permissions, then read the first 128 (BINPRM_BUF_SIZE) bytes
  *
  * This may be called multiple times for binary chains (scripts for example).
  */
 int prepare_binprm(struct linux_binprm *bprm)
 {
+	umode_t mode;
+	struct inode * inode = file_inode(bprm->file);
 	int retval;
 
+	mode = inode->i_mode;
 	if (bprm->file->f_op == NULL)
 		return -EACCES;
 
-	bprm_fill_uid(bprm);
+	/* clear any previous set[ug]id data from a previous binary */
+	bprm->cred->euid = current_euid();
+	bprm->cred->egid = current_egid();
+
+	if (!(bprm->file->f_path.mnt->mnt_flags & MNT_NOSUID) &&
+	    !current->no_new_privs &&
+	    kuid_has_mapping(bprm->cred->user_ns, inode->i_uid) &&
+	    kgid_has_mapping(bprm->cred->user_ns, inode->i_gid)) {
+		/* Set-uid? */
+		if (mode & S_ISUID) {
+			bprm->per_clear |= PER_CLEAR_ON_SETID;
+			bprm->cred->euid = inode->i_uid;
+		}
+
+		/* Set-gid? */
+		/*
+		 * If setgid is set but no group execute bit then this
+		 * is a candidate for mandatory locking, not a setgid
+		 * executable.
+		 */
+		if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) {
+			bprm->per_clear |= PER_CLEAR_ON_SETID;
+			bprm->cred->egid = inode->i_gid;
+		}
+	}
 
 	/* fill in binprm security blob */
 	retval = security_bprm_set_creds(bprm);
@@ -1468,6 +1456,132 @@ int search_binary_handler(struct linux_binprm *bprm)
 }
 
 EXPORT_SYMBOL(search_binary_handler);
+
+
+#if defined CONFIG_SEC_RESTRICT_FORK
+#if defined CONFIG_SEC_RESTRICT_ROOTING_LOG
+#define PRINT_LOG(...)	printk(KERN_ERR __VA_ARGS__)
+#else
+#define PRINT_LOG(...)
+#endif	// End of CONFIG_SEC_RESTRICT_ROOTING_LOG
+
+#define CHECK_ROOT_UID(x) (x->cred->uid == 0 || x->cred->gid == 0 || \
+			x->cred->euid == 0 || x->cred->egid == 0 || \
+			x->cred->suid == 0 || x->cred->sgid == 0)
+
+/*  sec_check_execpath
+    return value : give task's exec path is matched or not
+*/
+int sec_check_execpath(struct mm_struct *mm, char *denypath)
+{
+	struct file *exe_file;
+	char *path, *pathbuf = NULL;
+	unsigned int path_length = 0, denypath_length = 0;
+	int ret = 0;
+
+	if (mm == NULL)
+		return 0;
+
+	if (!(exe_file = get_mm_exe_file(mm))) {
+		PRINT_LOG("Cannot get exe from task->mm.\n");
+		goto out_nofile;
+	}
+
+	if (!(pathbuf = kmalloc(PATH_MAX, GFP_TEMPORARY))) {
+		PRINT_LOG("failed to kmalloc for pathbuf\n");
+		goto out;
+	}
+
+	path = d_path(&exe_file->f_path, pathbuf, PATH_MAX);
+	if (IS_ERR(path)) {
+		PRINT_LOG("Error get path..\n");
+		goto out;
+	}
+
+	path_length = strlen(path);
+	denypath_length = strlen(denypath);
+
+	if (!strncmp(path, denypath, (path_length < denypath_length) ?
+				path_length : denypath_length)) {
+		ret = 1;
+	}
+out:
+	fput(exe_file);
+out_nofile:
+	if (pathbuf)
+		kfree(pathbuf);
+
+	return ret;
+}
+EXPORT_SYMBOL(sec_check_execpath);
+
+static int sec_restrict_fork(void)
+{
+	struct cred *shellcred;
+	int ret = 0;
+	struct task_struct *parent_tsk;
+	struct mm_struct *parent_mm = NULL;
+	const struct cred *parent_cred;
+
+	read_lock(&tasklist_lock);
+	parent_tsk = current->parent;
+	if (!parent_tsk) {
+		read_unlock(&tasklist_lock);
+		return 0;
+	}
+
+	get_task_struct(parent_tsk);
+	/* holding on to the task struct is enough so just release
+	 * the tasklist lock here */
+	read_unlock(&tasklist_lock);
+
+	if (current->pid == 1 || parent_tsk->pid == 1)
+		goto out;
+
+	/* get current->parent's mm struct to access it's mm
+	 * and to keep it alive */
+	parent_mm = get_task_mm(parent_tsk);
+
+	if (current->mm == NULL || parent_mm == NULL)
+		goto out;
+
+	if (sec_check_execpath(parent_mm, "/sbin/adbd")) {
+		shellcred = prepare_creds();
+		if (!shellcred) {
+			ret = 1;
+			goto out;
+		}
+
+		shellcred->uid = 2000;
+		shellcred->gid = 2000;
+		shellcred->euid = 2000;
+		shellcred->egid = 2000;
+		commit_creds(shellcred);
+		ret = 0;
+		goto out;
+	}
+
+	if (sec_check_execpath(current->mm, "/data/")) {
+		ret = 1;
+		goto out;
+	}
+
+	parent_cred = get_task_cred(parent_tsk);
+	if (!parent_cred)
+		goto out;
+	if (!CHECK_ROOT_UID(parent_tsk))
+	{
+		ret = 1;
+	}
+	put_cred(parent_cred);
+out:
+	if (parent_mm)
+		mmput(parent_mm);
+	put_task_struct(parent_tsk);
+
+	return ret;
+}
+#endif	/* End of CONFIG_SEC_RESTRICT_FORK */
 
 /*
  * sys_execve() executes a new program.
@@ -1698,7 +1812,6 @@ int get_dumpable(struct mm_struct *mm)
 	return __get_dumpable(mm->flags);
 }
 
-#ifdef __ARCH_WANT_SYS_EXECVE
 SYSCALL_DEFINE3(execve,
 		const char __user *, filename,
 		const char __user *const __user *, argv,
@@ -1707,6 +1820,19 @@ SYSCALL_DEFINE3(execve,
 	struct filename *path = getname(filename);
 	int error = PTR_ERR(path);
 	if (!IS_ERR(path)) {
+
+#if defined CONFIG_SEC_RESTRICT_FORK
+		if(CHECK_ROOT_UID(current)){
+			if(sec_restrict_fork()){
+				PRINT_LOG("Restricted making process. PID = %d(%s) "
+								"PPID = %d(%s)\n",
+				current->pid, current->comm,
+				current->parent->pid, current->parent->comm);
+				return -EACCES;
+			}
+		}
+#endif	// End of CONFIG_SEC_RESTRICT_FORK
+
 		error = do_execve(path->name, argv, envp);
 		putname(path);
 	}
@@ -1724,25 +1850,5 @@ asmlinkage long compat_sys_execve(const char __user * filename,
 		putname(path);
 	}
 	return error;
-}
-#endif
-#endif
-
-#ifdef __ARCH_WANT_KERNEL_EXECVE
-int kernel_execve(const char *filename,
-		  const char *const argv[],
-		  const char *const envp[])
-{
-	int ret = do_execve(filename,
-			(const char __user *const __user *)argv,
-			(const char __user *const __user *)envp);
-	if (ret < 0)
-		return ret;
-
-	/*
-	 * We were successful.  We won't be returning to our caller, but
-	 * instead to user space by manipulating the kernel stack.
-	 */
-	ret_from_kernel_execve(current_pt_regs());
 }
 #endif

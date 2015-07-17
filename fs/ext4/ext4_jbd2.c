@@ -43,8 +43,10 @@ handle_t *__ext4_journal_start_sb(struct super_block *sb, unsigned int line,
 {
 	journal_t *journal;
 
+	might_sleep();
+
 	trace_ext4_journal_start(sb, nblocks, _RET_IP_);
-	if (sb->s_flags & MS_RDONLY)
+	if (sb->s_flags & MS_RDONLY && !journal_current_handle())
 		return ERR_PTR(-EROFS);
 
 	WARN_ON(sb->s_writers.frozen == SB_FREEZE_COMPLETE);
@@ -112,6 +114,8 @@ int __ext4_journal_get_write_access(const char *where, unsigned int line,
 				    handle_t *handle, struct buffer_head *bh)
 {
 	int err = 0;
+
+	might_sleep();
 
 	if (ext4_handle_valid(handle)) {
 		err = jbd2_journal_get_write_access(handle, bh);
@@ -209,12 +213,25 @@ int __ext4_handle_dirty_metadata(const char *where, unsigned int line,
 {
 	int err = 0;
 
+	might_sleep();
+
+	set_buffer_meta(bh);
+	set_buffer_prio(bh);
 	if (ext4_handle_valid(handle)) {
 		err = jbd2_journal_dirty_metadata(handle, bh);
 		/* Errors can only happen if there is a bug */
 		if (WARN_ON_ONCE(err)) {
 			ext4_journal_abort_handle(where, line, __func__, bh,
 						  handle, err);
+			ext4_error_inode(inode, where, line,
+					 bh->b_blocknr,
+					 "journal_dirty_metadata failed: "
+					 "handle type %u started at line %u, "
+					 "credits %u/%u, errcode %d",
+					 handle->h_type,
+					 handle->h_line_no,
+					 handle->h_requested_credits,
+					 handle->h_buffer_credits, err);
 		}
 	} else {
 		if (inode)
@@ -245,17 +262,13 @@ int __ext4_handle_dirty_super(const char *where, unsigned int line,
 	struct buffer_head *bh = EXT4_SB(sb)->s_sbh;
 	int err = 0;
 
+	ext4_superblock_csum_set(sb);
 	if (ext4_handle_valid(handle)) {
-		ext4_superblock_csum_set(sb,
-				(struct ext4_super_block *)bh->b_data);
 		err = jbd2_journal_dirty_metadata(handle, bh);
 		if (err)
 			ext4_journal_abort_handle(where, line, __func__,
 						  bh, handle, err);
-	} else {
-		ext4_superblock_csum_set(sb,
-				(struct ext4_super_block *)bh->b_data);
+	} else
 		mark_buffer_dirty(bh);
-	}
 	return err;
 }

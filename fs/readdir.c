@@ -194,7 +194,6 @@ SYSCALL_DEFINE3(getdents, unsigned int, fd,
 	struct getdents_callback buf;
 	int error;
 
-	error = -EFAULT;
 	if (!access_ok(VERIFY_WRITE, dirent, count))
 		return -EFAULT;
 
@@ -275,7 +274,6 @@ SYSCALL_DEFINE3(getdents64, unsigned int, fd,
 	struct getdents_callback64 buf;
 	int error;
 
-	error = -EFAULT;
 	if (!access_ok(VERIFY_WRITE, dirent, count))
 		return -EFAULT;
 

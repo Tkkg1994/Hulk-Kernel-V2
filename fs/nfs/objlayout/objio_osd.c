@@ -234,7 +234,7 @@ static int __alloc_objio_seg(unsigned numdevs, gfp_t gfp_flags,
 
 	lseg = kzalloc(lseg_size, gfp_flags);
 	if (unlikely(!lseg)) {
-		dprintk("%s: Faild allocation numdevs=%d size=%zd\n", __func__,
+		dprintk("%s: Failed allocation numdevs=%d size=%zd\n", __func__,
 			numdevs, lseg_size);
 		return -ENOMEM;
 	}
@@ -369,7 +369,7 @@ void objio_free_result(struct objlayout_io_res *oir)
 	kfree(objios);
 }
 
-enum pnfs_osd_errno osd_pri_2_pnfs_err(enum osd_err_priority oep)
+static enum pnfs_osd_errno osd_pri_2_pnfs_err(enum osd_err_priority oep)
 {
 	switch (oep) {
 	case OSD_ERR_PRI_NO_ERROR:
@@ -497,9 +497,9 @@ static struct page *__r4w_get_page(void *priv, u64 offset, bool *uptodate)
 		*uptodate = true;
 		dprintk("%s: g_zero_page index=0x%lx\n", __func__, index);
 		return ZERO_PAGE(0);
-	}	
+	}
 
-	page = find_get_page(wdata->inode->i_mapping, index);
+	page = find_get_page(mapping, index);
 	if (!page) {
 		page = find_or_create_page(mapping, index, GFP_NOFS);
 		if (unlikely(!page)) {
@@ -574,7 +574,7 @@ static bool objio_pg_test(struct nfs_pageio_descriptor *pgio,
 			(unsigned long)pgio->pg_layout_private;
 }
 
-void objio_init_read(struct nfs_pageio_descriptor *pgio, struct nfs_page *req)
+static void objio_init_read(struct nfs_pageio_descriptor *pgio, struct nfs_page *req)
 {
 	pnfs_generic_pg_init_read(pgio, req);
 	if (unlikely(pgio->pg_lseg == NULL))
@@ -604,7 +604,7 @@ static bool aligned_on_raid_stripe(u64 offset, struct ore_layout *layout,
 	return false;
 }
 
-void objio_init_write(struct nfs_pageio_descriptor *pgio, struct nfs_page *req)
+static void objio_init_write(struct nfs_pageio_descriptor *pgio, struct nfs_page *req)
 {
 	unsigned long stripe_end = 0;
 	u64 wb_size;

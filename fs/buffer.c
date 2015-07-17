@@ -635,8 +635,6 @@ static void __set_page_dirty(struct page *page,
 		account_page_dirtied(page, mapping);
 		radix_tree_tag_set(&mapping->page_tree,
 				page_index(page), PAGECACHE_TAG_DIRTY);
-		/* Save the task that is dirtying this page */
-		page->tsk_dirty = current;
 	}
 	spin_unlock_irqrestore(&mapping->tree_lock, flags);
 	__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
@@ -876,8 +874,6 @@ try_again:
 
 		/* Link the buffer to its page */
 		set_bh_page(bh, page, offset);
-
-		init_buffer(bh, NULL, NULL);
 	}
 	return head;
 /*
@@ -2092,7 +2088,6 @@ int generic_write_end(struct file *file, struct address_space *mapping,
 			struct page *page, void *fsdata)
 {
 	struct inode *inode = mapping->host;
-	loff_t old_size = inode->i_size;
 	int i_size_changed = 0;
 
 	copied = block_write_end(file, mapping, pos, len, copied, page, fsdata);
@@ -2112,8 +2107,6 @@ int generic_write_end(struct file *file, struct address_space *mapping,
 	unlock_page(page);
 	page_cache_release(page);
 
-	if (old_size < pos)
-		pagecache_isize_extended(inode, old_size, pos);
 	/*
 	 * Don't mark the inode dirty under page lock. First, it unnecessarily
 	 * makes the holding time of page lock longer. Second, it forces lock
@@ -2331,11 +2324,6 @@ static int cont_expand_zero(struct file *file, struct address_space *mapping,
 		err = 0;
 
 		balance_dirty_pages_ratelimited(mapping);
-
-		if (unlikely(fatal_signal_pending(current))) {
-			err = -EINTR;
-			goto out;
-		}
 	}
 
 	/* page covers the boundary, find the boundary offset */
@@ -3033,7 +3021,7 @@ static void guard_bh_eod(int rw, struct bio *bio, struct buffer_head *bh)
 	}
 }
 
-int submit_bh(int rw, struct buffer_head * bh)
+int _submit_bh(int rw, struct buffer_head *bh, unsigned long bio_flags)
 {
 	struct bio *bio;
 	int ret = 0;
@@ -3063,11 +3051,11 @@ int submit_bh(int rw, struct buffer_head * bh)
 	bio->bi_io_vec[0].bv_offset = bh_offset(bh);
 
 	bio->bi_vcnt = 1;
-	bio->bi_idx = 0;
 	bio->bi_size = bh->b_size;
 
 	bio->bi_end_io = end_bio_bh_io_sync;
 	bio->bi_private = bh;
+	bio->bi_flags |= bio_flags;
 
 	/* Take care of bh's that straddle the end of the device */
 	guard_bh_eod(rw, bio, bh);
@@ -3090,6 +3078,12 @@ int submit_bh(int rw, struct buffer_head * bh)
 
 	bio_put(bio);
 	return ret;
+}
+EXPORT_SYMBOL_GPL(_submit_bh);
+
+int submit_bh(int rw, struct buffer_head *bh)
+{
+	return _submit_bh(rw, bh, 0);
 }
 EXPORT_SYMBOL(submit_bh);
 
@@ -3225,11 +3219,17 @@ drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 
 	bh = head;
 	do {
-		evict_bh_lrus(bh);
 		if (buffer_write_io_error(bh) && page->mapping)
 			set_bit(AS_EIO, &page->mapping->flags);
-		if (buffer_busy(bh))
-			goto failed;
+		if (buffer_busy(bh)) {
+			/*
+			 * Check if the busy failure was due to an
+			 * outstanding LRU reference
+			 */
+			evict_bh_lrus(bh);
+			if (buffer_busy(bh))
+				goto failed;
+		}
 		bh = bh->b_this_page;
 	} while (bh != head);
 
