@@ -246,7 +246,7 @@ static void timekeeping_update(struct timekeeper *tk, bool clearntp, bool mirror
 	}
 
 	xt = tk_xtime(tk);
-	update_vsyscall_old(&xt, &tk->wall_to_monotonic, tk->clock, tk->mult);
+	update_vsyscall(&xt, &tk->wall_to_monotonic, tk->clock, tk->mult);
 	update_pvclock_gtod(tk);
 
 	if (mirror)
