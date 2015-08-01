@@ -8,5 +8,8 @@ else
 obj-$(CONFIG_SEC_FPGA)	+= barcode_emul_ice4_8930.o
 endif
 else
+ifeq ($(CONFIG_GED_BUILD),y)
+obj-$(CONFIG_SEC_FPGA)	+= barcode_emul_ice4_ged.o
+else
 obj-$(CONFIG_SEC_FPGA)	+= barcode_emul_ice4.o
 endif
