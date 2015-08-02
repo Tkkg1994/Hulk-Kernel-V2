@@ -7,3 +7,4 @@ obj-$(CONFIG_SEC_FPGA)	+= barcode_emul_ice4_ge.o
 else
 obj-$(CONFIG_SEC_FPGA)	+= barcode_emul_ice4.o
 endif
+endif
