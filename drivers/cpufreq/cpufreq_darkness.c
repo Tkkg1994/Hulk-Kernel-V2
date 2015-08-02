@@ -265,7 +265,9 @@ static void do_darkness_timer(struct work_struct *work)
 	 * same jiffy
 	 */
 	if (num_online_cpus() > 1) {
-		delay = max(delay - (jiffies % delay), usecs_to_jiffies(darkness_tuners_ins.sampling_rate / 2));
+		delay -= jiffies % delay;
+		if (delay < 0)
+			delay = 0;
 	}
 
 	mod_delayed_work_on(this_darkness_cpuinfo->cpu,
@@ -321,7 +323,9 @@ static int cpufreq_governor_darkness(struct cpufreq_policy *policy,
 		delay = usecs_to_jiffies(darkness_tuners_ins.sampling_rate);
 		/* We want all CPUs to do sampling nearly on same jiffy */
 		if (num_online_cpus() > 1) {
-			delay = max(delay - (jiffies % delay), usecs_to_jiffies(darkness_tuners_ins.sampling_rate / 2));
+			delay -= jiffies % delay;
+			if (delay < 0)
+				delay = 0;
 		}
 
 		INIT_DELAYED_WORK_DEFERRABLE(&this_darkness_cpuinfo->work, do_darkness_timer);
