@@ -424,11 +424,20 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 #endif
 	struct zone_avail zall[MAX_NUMNODES][MAX_NR_ZONES];
 
+	rcu_read_lock();
 	tsk = current->group_leader;
 	if ((tsk->flags & PF_EXITING) && test_task_flag(tsk, TIF_MEMDIE)) {
 		set_tsk_thread_flag(current, TIF_MEMDIE);
+		rcu_read_unlock();
 		return 0;
 	}
+	rcu_read_unlock();
+
+ 	if (nr_to_scan > 0) {
+ 		if (mutex_lock_interruptible(&scan_mutex) < 0)
+ 			return 0;
+ 	}
+
 #ifndef CONFIG_CMA
 	other_free = global_page_state(NR_FREE_PAGES);
 #else
@@ -485,7 +494,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	selected_oom_score_adj = min_score_adj;
 #endif
 
-	read_lock(&tasklist_lock);
+	rcu_read_lock();
 #ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
 	for (tsk = pick_first_task();
 		tsk != pick_last_task();
@@ -510,7 +519,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 
 		if (time_before_eq(jiffies, lowmem_deathpending_timeout)) {
 			if (test_task_flag(tsk, TIF_MEMDIE)) {
-				read_unlock(&tasklist_lock);
+				rcu_read_unlock();
 				/* give the system time to free up the memory */
 				if (!same_thread_group(current, tsk))
 					msleep_interruptible(20);
@@ -719,14 +728,14 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		send_sig(SIGKILL, selected, 0);
 		set_tsk_thread_flag(selected, TIF_MEMDIE);
 		rem -= selected_tasksize;
-		read_unlock(&tasklist_lock);
+		rcu_read_unlock();
 		/* give the system time to free up the memory */
 		msleep_interruptible(20);
 #ifdef LMK_COUNT_READ
 		lmk_count++;
 #endif
 	} else
-		read_unlock(&tasklist_lock);
+		rcu_read_unlock();
 #endif
 #ifdef CONFIG_SEC_DEBUG_LMK_MEMINFO
 	if (__ratelimit(&lmk_rs)) {
