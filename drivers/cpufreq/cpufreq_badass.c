@@ -1480,6 +1480,7 @@ static struct notifier_block bds_migration_nb = {
 	.notifier_call = bds_migration_notify,
 };
 
+#if !defined(CONFIG_SEC_DVFS)
 static void bds_input_event(struct input_handle *handle, unsigned int type,
 		unsigned int code, int value)
 {
@@ -1565,6 +1566,7 @@ static struct input_handler bds_input_handler = {
 	.name		= "cpufreq_bad",
 	.id_table	= bds_ids,
 };
+#endif
 
 static int sync_pending(struct cpu_bds_info_s *this_bds_info)
 {
@@ -1727,8 +1729,10 @@ static int cpufreq_governor_bds(struct cpufreq_policy *policy,
 			atomic_notifier_chain_register(&migration_notifier_head,
 					&bds_migration_nb);
 		}
+#if !defined(CONFIG_SEC_DVFS)
 		if (!cpu)
 			rc = input_register_handler(&bds_input_handler);
+#endif
 		mutex_unlock(&bds_mutex);
 
 
@@ -1754,8 +1758,10 @@ static int cpufreq_governor_bds(struct cpufreq_policy *policy,
 		/* If device is being removed, policy is no longer
 		 * valid. */
 		this_bds_info->cur_policy = NULL;
+#if !defined(CONFIG_SEC_DVFS)
 		if (!cpu)
 			input_unregister_handler(&bds_input_handler);
+#endif
 		if (!bds_enable) {
 			sysfs_remove_group(cpufreq_global_kobject,
 					   &bds_attr_group);
