@@ -244,7 +244,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	read_lock(&tasklist_lock);
 #ifdef CONFIG_ANDROID_LMK_ADJ_RBTREE
 	for (tsk = pick_first_task();
-		tsk != pick_last_task();
+		tsk != pick_last_task() && tsk != NULL;
 		tsk = pick_next_from_adj_tree(tsk)) {
 #else
 	for_each_process(tsk) {
@@ -710,14 +710,16 @@ DEFINE_SPINLOCK(lmk_lock);
 struct rb_root tasks_scoreadj = RB_ROOT;
 void add_2_adj_tree(struct task_struct *task)
 {
-	struct rb_node **link = &tasks_scoreadj.rb_node;
+	struct rb_node **link;
 	struct rb_node *parent = NULL;
 	struct task_struct *task_entry;
 	s64 key = task->signal->oom_score_adj;
+
 	/*
 	 * Find the right place in the rbtree:
 	 */
 	spin_lock(&lmk_lock);
+	link =  &tasks_scoreadj.rb_node;
 	while (*link) {
 		parent = *link;
 		task_entry = rb_entry(parent, struct task_struct, adj_node);
@@ -736,7 +738,10 @@ void add_2_adj_tree(struct task_struct *task)
 void delete_from_adj_tree(struct task_struct *task)
 {
 	spin_lock(&lmk_lock);
-	rb_erase(&task->adj_node, &tasks_scoreadj);
+	if (!RB_EMPTY_NODE(&task->adj_node)) {
+		rb_erase(&task->adj_node, &tasks_scoreadj);
+		RB_CLEAR_NODE(&task->adj_node);
+	}
 	spin_unlock(&lmk_lock);
 }
 
