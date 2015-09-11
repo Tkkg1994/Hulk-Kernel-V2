@@ -273,6 +273,7 @@ static DEFINE_MUTEX(smsm_cb_lock);
 static DEFINE_MUTEX(delayed_ul_vote_lock);
 static int need_delayed_ul_vote;
 static int power_management_only_mode;
+static int in_ssr;
 static int ssr_skipped_disconnect;
 static struct completion shutdown_completion;
 
