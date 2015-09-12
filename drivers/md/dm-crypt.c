@@ -839,8 +839,7 @@ static void crypt_free_buffer_pages(struct crypt_config *cc, struct bio *clone)
 	unsigned int i;
 	struct bio_vec *bv;
 
-	for (i = 0; i < clone->bi_vcnt; i++) {
-		bv = bio_iovec_idx(clone, i);
+	bio_for_each_segment_all(bv, clone, i) {
 		BUG_ON(!bv->bv_page);
 		mempool_free(bv->bv_page, cc->page_pool);
 		bv->bv_page = NULL;
@@ -964,19 +963,14 @@ static int kcryptd_io_read(struct dm_crypt_io *io, gfp_t gfp)
 	 * copy the required bvecs because we need the original
 	 * one in order to decrypt the whole bio data *afterwards*.
 	 */
-	clone = bio_alloc_bioset(gfp, bio_segments(base_bio), cc->bs);
+	clone = bio_clone_bioset(base_bio, gfp, cc->bs);
 	if (!clone)
 		return 1;
 
 	crypt_inc_pending(io);
 
 	clone_init(io, clone);
-	clone->bi_idx = 0;
-	clone->bi_vcnt = bio_segments(base_bio);
-	clone->bi_size = base_bio->bi_size;
 	clone->bi_sector = cc->start + io->sector;
-	memcpy(clone->bi_io_vec, bio_iovec(base_bio),
-	       sizeof(struct bio_vec) * clone->bi_vcnt);
 
 	generic_make_request(clone);
 	return 0;
