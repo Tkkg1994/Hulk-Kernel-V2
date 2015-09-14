@@ -133,8 +133,7 @@ static void zram_set_disksize(struct zram *zram)
 		);
 	}
 
-	/* can't use PAGE_MASK because it does not extend correctly to 64 bit */
-	zram->disksize &= ~((1ULL << PAGE_SHIFT) - 1);
+	zram->disksize &= PAGE_MASK;
 }
 
 static void zram_free_page(struct zram *zram, size_t index)
