@@ -19,7 +19,6 @@
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/clkdev.h>
-#include <linux/device.h>
 #include <linux/spinlock.h>
 #include <linux/mutex.h>
 #include <linux/regulator/consumer.h>
@@ -187,8 +186,6 @@ void __clk_post_reparent(struct clk *c, struct clk *old, unsigned long *flags);
 
 /* Register clocks with the MSM clock driver */
 int msm_clock_register(struct clk_lookup *table, size_t size);
-int of_msm_clock_register(struct device_node *np, struct clk_lookup *table,
-				size_t size);
 
 extern struct clk dummy_clk;
 
@@ -199,7 +196,5 @@ extern struct clk dummy_clk;
 	}
 
 #define CLK_LOOKUP(con, c, dev) { .con_id = con, .clk = &c, .dev_id = dev }
-#define CLK_LOOKUP_OF(con, _c, dev) { .con_id = con, .clk = &(&_c)->c, \
-				      .dev_id = dev, .of_idx = clk_##_c }
 
 #endif
