@@ -29,7 +29,7 @@
 #include <crypto/hash.h>
 #include <crypto/sha.h>
 #include <mach/dma.h>
-#include <mach/clk.h>
+#include <linux/clk/msm-clk.h>
 #include <mach/socinfo.h>
 
 #include "qce.h"
