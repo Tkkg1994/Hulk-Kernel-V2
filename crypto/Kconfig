@@ -194,7 +194,7 @@ config CRYPTO_AUTHENC
 
 config CRYPTO_TEST
 	tristate "Testing module"
-	default n
+	depends on m
 	select CRYPTO_MANAGER
 	help
 	  Quick & dirty crypto test module.
@@ -752,6 +752,7 @@ config CRYPTO_CAST5
 	help
 	  The CAST5 encryption algorithm (synonymous with CAST-128) is
 	  described in RFC2144.
+
 config CRYPTO_CAST6
 	tristate "CAST6 (CAST-256) cipher algorithm"
 	select CRYPTO_ALGAPI
