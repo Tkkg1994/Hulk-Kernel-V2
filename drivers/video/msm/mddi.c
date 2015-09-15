@@ -23,7 +23,6 @@
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/delay.h>
-#include <linux/clk/msm-clk.h>
 #include <mach/hardware.h>
 #include <asm/io.h>
 
@@ -38,6 +37,7 @@
 #include "mddihosti.h"
 #include "mddihost.h"
 #include <mach/gpio.h>
+#include <mach/clk.h>
 
 static int mddi_probe(struct platform_device *pdev);
 static int mddi_remove(struct platform_device *pdev);

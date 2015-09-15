@@ -28,7 +28,7 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/debugfs.h>
-#include <linux/clk/msm-clk.h>
+#include <mach/clk.h>
 #include <linux/pm_runtime.h>
 #include <mach/msm_subsystem_map.h>
 #include <media/msm/vcd_api.h>
