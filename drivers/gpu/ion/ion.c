@@ -463,7 +463,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		return ERR_PTR(-ENODEV);
 
 	if (IS_ERR(buffer)) {
-		pr_info("ION is unable to allocate 0x%x bytes (alignment: "
+		pr_debug("ION is unable to allocate 0x%x bytes (alignment: "
 			 "0x%x) from heap(s) %sfor client %s with heap "
 			 "mask 0x%x\n",
 			len, align, dbg_str, client->name, client->heap_mask);
