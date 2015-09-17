@@ -8,10 +8,10 @@
 **     to control PWM duty cycle, amp enable/disable, save IVT file, etc...
 **
 ** Portions Copyright (c) 2008-2010 Immersion Corporation. All Rights Reserved.
-** Copyright (c) 2013 The CyanogenMod Project
-** Daniel Hillenbrand <codeworkx@cyanogenmod.com>
-** Dan Pasanen <dan.pasanen@gmail.com>
-** Shareef Ali <shareefalis@cyanogenmod.org>
+**          Copyright (c) 2013 The CyanogenMod Project
+**                        Daniel Hillenbrand <codeworkx@cyanogenmod.com>
+**                        Dan Pasanen <dan.pasanen@gmail.com>
+**                        Shareef Ali <shareefalis@cyanogenmod.org>
 **
 ** This file contains Original Code and/or Modifications of Original Code
 ** as defined in and that are subject to the GNU Public License v2 -
@@ -34,10 +34,10 @@
 #include <linux/gpio.h>
 #include "tspdrv.h"
 
-#define LEVEL_MAX	100
-#define LEVEL_MIN	0
-#define LEVEL_DEFAULT	50
-#define LEVEL_THRESHOLD	75
+#define LEVEL_MAX           100
+#define LEVEL_MIN           0
+#define LEVEL_DEFAULT       50
+#define LEVEL_THRESHOLD     75
 
 /*
 ** This SPI supports only one actuator.
@@ -58,6 +58,7 @@ struct pm_gpio vib_pwm = {
 				.function = PM_GPIO_FUNC_1,
 				.inv_int_pol = 0,
 			};
+
 
 unsigned long pwm_val = 100;
 

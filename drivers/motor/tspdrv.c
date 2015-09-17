@@ -217,12 +217,12 @@ static void vibetonz_start(void)
 		DbgOut((KERN_ERR
 		"tspdrv: timed_output_dev_register fail\n"));
 
-	ret = device_create_file(timed_output_vt.dev, &dev_attr_pwm_value);
+    ret = device_create_file(timed_output_vt.dev, &dev_attr_pwm_value);
 	if (ret < 0)
 		DbgOut((KERN_ERR
 		"tspdrv: device_create_file fail: pwm_value\n"));
-
-	ret = device_create_file(timed_output_vt.dev, &dev_attr_pwm_max);
+    
+    ret = device_create_file(timed_output_vt.dev, &dev_attr_pwm_max);
 	if (ret < 0) {
 		pr_err("vibrator_init(): create sysfs fail: pwm_max\n");
 	}
@@ -502,7 +502,6 @@ static ssize_t write(struct file *file, const char *buf, size_t count,
 			** (Should never happen).
 			*/
 			DbgOut((KERN_EMERG "tspdrv: invalid buffer index.\n"));
-			return 0;
 		}
 
 		/* Check bit depth */
@@ -523,7 +522,6 @@ static ssize_t write(struct file *file, const char *buf, size_t count,
 			** (Should never happen).
 			*/
 			DbgOut((KERN_EMERG "tspdrv: invalid data size.\n"));
-			return 0;
 		}
 
 		/* Check actuator index */
@@ -641,10 +639,8 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		** If a stop was requested, ignore the request as the amp
 		** will be disabled by the timer proc when it's ready
 		*/
-		g_bstoprequested = true;
-		/* Last data processing to disable amp and stop timer */
-		VibeOSKernelProcessData(NULL);
-		g_bisplaying = false;
+		if (!g_bstoprequested)
+			ImmVibeSPI_ForceOut_AmpDisable(arg);
 		wake_unlock(&vib_wake_lock);
 		break;
 

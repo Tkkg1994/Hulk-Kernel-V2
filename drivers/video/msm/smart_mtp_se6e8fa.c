@@ -283,7 +283,7 @@ static int v203_adjustment(struct SMART_DIM *pSmart)
 	add_mtp = LSB + V203_300CD_B;
 	result_1 = (pSmart->GRAY.VT_TABLE.B_Gray)
 				- (pSmart->RGB_OUTPUT.B_VOLTAGE.level_255);
-	result_2 = (v203_coefficient + add_mtp) << BIT_SHIFT;
+	result_2 = (v203_coefficient+add_mtp) << BIT_SHIFT;
 	do_div(result_2, v203_denominator);
 	result_3 = (result_1 * result_2) >> BIT_SHIFT;
 	result_4 = (pSmart->GRAY.VT_TABLE.B_Gray) - result_3;
@@ -3446,8 +3446,8 @@ static void mtp_sorting(struct SMART_DIM *psmart)
 		pdest[loop] = pfrom[sorting[loop]];
 
 	if (get_ldi_chip() == LDI_MAGNA) {
-		pdest[10] = 3;
-		pdest[21] = 2;
+		pdest[10] = 2;
+		pdest[21] = 3;
 		pdest[32] = 2;
 	}
 }
