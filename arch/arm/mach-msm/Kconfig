@@ -3120,12 +3120,6 @@ config PCM_ROUTE_VOICE_STUB
 	 To compile this option, choose M here:
 	 If unsure, say N here.
 
-config GED_BUILD
-	bool "Use Google Experience Device"
-	default n
-	help
-	Use Google Experience Device.
-
 config SEC_FACTORY
 	bool "Enable FACTORY Features"
 	default n
@@ -3160,12 +3154,11 @@ config BRICKED_HOTPLUG
 	  This enables kernel based multi core control.
 	  (up/down hotplug based on load)
 
-config MSM_LIMITER
-	bool "MSM Frequency Limiter Driver"
-	default y
+config GED_BUILD
+	bool "Use Google Experience Device"
+	default n
 	help
-	  The MSM Frequency Limiter Driver controls max frequency limit for each CPU
-	  to desired value on suspend/resume
+	Use Google Experience Device.
 
 endif
 
