@@ -193,6 +193,7 @@ static int max77693_i2c_probe(struct i2c_client *i2c,
 #endif
 
 #endif
+#endif
 	max77693_update_reg(i2c, MAX77693_CHG_REG_SAFEOUT_CTRL, 0x00, 0x30);
 
 	max77693->muic = i2c_new_dummy(i2c->adapter, I2C_ADDR_MUIC);
