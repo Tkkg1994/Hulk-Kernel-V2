@@ -13,7 +13,7 @@
 #include <linux/module.h>
 #include <linux/pm_qos.h>
 #include <linux/clk.h>
-#include <mach/clk.h>
+#include <linux/clk/msm-clk.h>
 #include <linux/io.h>
 #include <linux/android_pmem.h>
 #include <mach/camera.h>
