@@ -139,15 +139,25 @@ static void mcapi_callback(struct sk_buff *skb)
 
 static int __init mcapi_init(void)
 {
+	struct netlink_kernel_cfg cfg = {
+		.input  = mcapi_callback,
+	};
+
 	dev_set_name(mc_kapi, "mcapi");
 
 	dev_info(mc_kapi, "Mobicore API module initialized!\n");
 
 	mod_ctx = kzalloc(sizeof(struct mc_kernelapi_ctx), GFP_KERNEL);
 
+	if (mod_ctx == NULL) {
+		MCDRV_DBG_ERROR(mc_kapi, "Allocation failure");
+		return -ENOMEM;
+	}
+
 	/* start kernel thread */
-	mod_ctx->sk = netlink_kernel_create(&init_net, MC_DAEMON_NETLINK, 0,
-					    mcapi_callback, NULL, THIS_MODULE);
+
+	mod_ctx->sk = netlink_kernel_create(&init_net, MC_DAEMON_NETLINK,
+					    &cfg);
 
 	if (!mod_ctx->sk) {
 		MCDRV_ERROR(mc_kapi, "register of receive handler failed");
