@@ -8,10 +8,10 @@
 **     to control PWM duty cycle, amp enable/disable, save IVT file, etc...
 **
 ** Portions Copyright (c) 2008-2010 Immersion Corporation. All Rights Reserved.
-**          Copyright (c) 2013 The CyanogenMod Project
-**                        Daniel Hillenbrand <codeworkx@cyanogenmod.com>
-**                        Dan Pasanen <dan.pasanen@gmail.com>
-**                        Shareef Ali <shareefalis@cyanogenmod.org>
+** Copyright (c) 2013 The CyanogenMod Project
+** Daniel Hillenbrand <codeworkx@cyanogenmod.com>
+** Dan Pasanen <dan.pasanen@gmail.com>
+** Shareef Ali <shareefalis@cyanogenmod.org>
 **
 ** This file contains Original Code and/or Modifications of Original Code
 ** as defined in and that are subject to the GNU Public License v2 -
@@ -34,10 +34,10 @@
 #include <linux/gpio.h>
 #include "tspdrv.h"
 
-#define LEVEL_MAX           100
-#define LEVEL_MIN           0
-#define LEVEL_DEFAULT       50
-#define LEVEL_THRESHOLD     75
+#define LEVEL_MAX	100
+#define LEVEL_MIN	0
+#define LEVEL_DEFAULT	50
+#define LEVEL_THRESHOLD	75
 
 /*
 ** This SPI supports only one actuator.
@@ -77,6 +77,8 @@ static int32_t vibe_set_pwm_freq(int nForce)
 #if defined(CONFIG_MOTOR_DRV_MAX77693)
 #if defined(CONFIG_MACH_JF_DCM)
 		g_nforce_32 = ((nForce * g_nlra_gp_clk_pwm_mul) >> 8) + 22;
+#elif defined(CONFIG_MACH_JACTIVE_EUR) || defined(CONFIG_MACH_JACTIVE_ATT)
+		g_nforce_32 = ((nForce * g_nlra_gp_clk_pwm_mul) >> 8) + 1;
 #else
 		g_nforce_32 = ((nForce * g_nlra_gp_clk_pwm_mul) >> 8) + 10;
 #endif
