@@ -22,13 +22,6 @@ ip_no_pmtu_disc - BOOLEAN
 min_pmtu - INTEGER
 	default 552 - minimum discovered Path MTU
 
-fwmark_reflect - BOOLEAN
-	Controls the fwmark of kernel-generated IPv4 reply packets that are not
-	associated with a socket for example, TCP RSTs or ICMP echo replies).
-	If unset, these packets have a fwmark of zero. If set, they have the
-	fwmark of the packet they are replying to.
-	Default: 0
-
 route/max_size - INTEGER
 	Maximum number of routes allowed in the kernel.  Increase
 	this when using large numbers of interfaces and/or routes.
@@ -1060,13 +1053,6 @@ proxy_ndp - INTEGER
 		2 NDP packets are sent to userspace, where a userspace proxy
                   can be implemented
 
-fwmark_reflect - BOOLEAN
-	Controls the fwmark of kernel-generated IPv6 reply packets that are not
-	associated with a socket for example, TCP RSTs or ICMPv6 echo replies).
-	If unset, these packets have a fwmark of zero. If set, they have the
-	fwmark of the packet they are replying to.
-	Default: 0
-
 conf/interface/*:
 	Change special settings per interface.
 
@@ -1296,6 +1282,14 @@ use_optimistic - BOOLEAN
 	address selection algorithm.
 		0: disabled (default)
 		1: enabled
+
+icmp/*:
+ratelimit - INTEGER
+	Limit the maximal rates for sending ICMPv6 packets.
+	0 to disable any limiting,
+	otherwise the minimal space between responses in milliseconds.
+	Default: 1000
+
 
 IPv6 Update by:
 Pekka Savola <pekkas@netcore.fi>

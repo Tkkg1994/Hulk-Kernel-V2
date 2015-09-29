@@ -55,7 +55,7 @@
  * specific registers and some other data for resume.
  *  r0 = suspend function arg0
  *  r1 = suspend function
- * r2 = MPIDR value the resuming CPU will use
+ *  r2 = MPIDR value the resuming CPU will use
  */
 ENTRY(__cpu_suspend)
 	stmfd	sp!, {r4 - r11, lr}
@@ -74,7 +74,7 @@ ENTRY(__cpu_suspend)
 	ALT_SMP(ldr r0, =mpidr_hash)
 	ALT_UP_B(1f)
 	/* This ldmia relies on the memory layout of the mpidr_hash struct */
-	ldmia	r0, {r1, r6-r8}		@ r1 = mpidr mask (r6,r7,r8) = l[0,1,2] shifts
+	ldmia	r0, {r1, r6-r8}	@ r1 = mpidr mask (r6,r7,r8) = l[0,1,2] shifts
 	compute_mpidr_hash	r0, r6, r7, r8, r2, r1
 	add	r3, r3, r0, lsl #2
 1:	mov	r2, r5			@ virtual SP
@@ -126,7 +126,7 @@ ENDPROC(cpu_resume_after_mmu)
 	.data
 	.align
 ENTRY(cpu_resume)
-mov	r1, #0
+	mov	r1, #0
 	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
 	ALT_UP_B(1f)
 	adr	r2, mpidr_hash_ptr
@@ -159,3 +159,4 @@ mpidr_hash_ptr:
 ENTRY(sleep_save_sp)
 _sleep_save_sp:
 	.space	SLEEP_SAVE_SP_SZ		@ struct sleep_save_sp
+ 

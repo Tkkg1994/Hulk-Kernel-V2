@@ -218,9 +218,9 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 
 #define pte_clear(mm,addr,ptep)	set_pte_ext(ptep, __pte(0), 0)
 
-#define pte_isset(pte, val) ((u32)(val) == (val) ? pte_val(pte) & (val) \
-					    : !!(pte_val(pte) & (val)))
-#define pte_isclear(pte, val) (!(pte_val(pte) & (val)))
+#define pte_isset(pte, val)	((u32)(val) == (val) ? pte_val(pte) & (val) \
+						: !!(pte_val(pte) & (val)))
+#define pte_isclear(pte, val)	(!(pte_val(pte) & (val)))
 
 #define pte_none(pte)		(!pte_val(pte))
 #define pte_present(pte)	(pte_isset((pte), L_PTE_PRESENT))

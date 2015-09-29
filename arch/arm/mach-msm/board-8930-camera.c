@@ -204,11 +204,7 @@ static struct msm_gpiomux_config msm8930_cam_common_configs[] = {
 	{
 		.gpio = GPIO_CAM_CORE_EN,
 		.settings = {
-#if defined(CONFIG_MACH_WILCOX_EUR_LTE)
-			[GPIOMUX_ACTIVE]    = &cam_settings[0],
-#else
 			[GPIOMUX_ACTIVE]    = &cam_settings[2],
-#endif
 			[GPIOMUX_SUSPENDED] = &cam_settings[0],
 		},
 	},
@@ -1362,7 +1358,7 @@ static struct msm_camera_sensor_info msm_camera_sensor_sr200pc20m_data = {
 };
 #endif
 
-#if defined(CONFIG_SR030PC50) || defined(CONFIG_SR030PC50_V2)
+#ifdef CONFIG_SR030PC50
 static struct msm_camera_sensor_flash_data flash_sr030pc50 = {
 	.flash_type     = MSM_CAMERA_FLASH_NONE,
 };
@@ -1435,7 +1431,7 @@ static ssize_t front_camera_type_show(struct device *dev,
 	char cam_type[] = "SR130PC20\n";
 #elif defined(CONFIG_SR200PC20M)
 	char cam_type[] = "SR200PC20m\n";
-#elif defined(CONFIG_SR030PC50) || defined(CONFIG_SR030PC50_V2)
+#elif defined(CONFIG_SR030PC50)
 	char cam_type[] = "SILICON_SR030PC50\n";
 #else
 	char cam_type[] = "N\n";
@@ -1474,7 +1470,7 @@ static ssize_t front_camera_firmware_show(struct device *dev,
 	char cam_fw[] = "SR130PC20\n";
 #elif defined(CONFIG_SR200PC20M)
 	char cam_fw[] = "SR200PC20M\n";
-#elif defined(CONFIG_SR030PC50) || defined(CONFIG_SR030PC50_V2)
+#elif defined(CONFIG_SR030PC50)
 	char cam_fw[] = "SR030PC50\n";
 #else
 	char cam_fw[] = "N\n";
@@ -1841,13 +1837,13 @@ static ssize_t cameraflash_file_cmd_store(struct device *dev,
 }
 
 
-static DEVICE_ATTR(rear_flash, S_IRUGO | S_IWUGO,
+static DEVICE_ATTR(rear_flash, S_IRUGO | S_IWUSR | S_IWGRP,
 		NULL, cameraflash_file_cmd_store);
 
 void msm8930_cam_create_node(void)
 {
-	struct device   *cam_dev_front;
-	struct device   *cam_dev_flash;
+	struct device 	*cam_dev_front;
+	struct device 	*cam_dev_flash;
 
 	camera_class = class_create(THIS_MODULE, "camera");
 
@@ -2056,7 +2052,7 @@ struct i2c_board_info msm8930_camera_i2c_boardinfo[] = {
 		.platform_data = &msm_camera_sensor_sr200pc20m_data,
 	},
 #endif
-#if defined(CONFIG_SR030PC50) || defined(CONFIG_SR030PC50_V2)
+#ifdef CONFIG_SR030PC50
 	{
 		I2C_BOARD_INFO("sr030pc50", 0x30),
 		.platform_data = &msm_camera_sensor_sr030pc50_data,

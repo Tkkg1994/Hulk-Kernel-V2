@@ -25,7 +25,7 @@ endif
 AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
 # change@wtl.rsengott
 # FIPS_KERNEL_RAM_BASE is start of kernel text in RAM
-ifeq ($(CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK),y)
+ifeq ($(CONFIG_CRYPTO_FIPS),y)
 AFLAGS_head.o += -DFIPS_KERNEL_RAM_BASE=0x80208000
 endif
 +AFLAGS_head.o := -DTEXT_OFFSET=$(TEXT_OFFSET)
@@ -131,7 +131,7 @@ targets       := vmlinux vmlinux.lds \
 		 font.o font.c head.o misc.o $(OBJS)
 
 # Make sure files are removed during clean
-extra-y		+= piggy.gzip piggy.lzo piggy.lzma piggy.xzkern \
+extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern \
 		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs) 
 
 ifeq ($(CONFIG_FUNCTION_TRACER),y)
@@ -192,6 +192,7 @@ bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
 [ -z "$$bad_syms" ] || \
   ( echo "following symbols must have non local/private scope:" >&2; \
     echo "$$bad_syms" >&2; rm -f $@; false )
+
 check_for_multiple_zreladdr = \
 if [ $(words $(ZRELADDR)) -gt 1 -a "$(CONFIG_AUTO_ZRELADDR)" = "" ]; then \
 	echo 'multiple zreladdrs: $(ZRELADDR)'; \

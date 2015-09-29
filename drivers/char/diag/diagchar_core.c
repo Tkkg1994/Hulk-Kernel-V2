@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -42,13 +42,11 @@
 #include "diag_debugfs.h"
 #include "diag_masks.h"
 #include "diagfwd_bridge.h"
-#include <linux/of.h>
 
 MODULE_DESCRIPTION("Diag Char Driver");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION("1.0");
 
-#define MIN_SIZ_ALLOW 4
 #define INIT	1
 #define EXIT	-1
 struct diagchar_dev *driver;
@@ -74,7 +72,6 @@ static unsigned int threshold_client_limit = 30;
 /* This is the maximum number of pkt registrations supported at initialization*/
 int diag_max_reg = 600;
 int diag_threshold_reg = 750;
-static int enable_diag;
 
 /* Timer variables */
 static struct timer_list drain_timer;
@@ -856,14 +853,7 @@ int diag_switch_logging(unsigned long ioarg)
 		diag_clear_hsic_tbl();
 		driver->mask_check = 0;
 		driver->logging_mode = MEMORY_DEVICE_MODE;
-
-		/*  sub_logging_mode is for MDM, 
-		 *  the other is for MSM8960/MSM8930 */
-#if defined(CONFIG_MACH_JF)
 		driver->sub_logging_mode = UART_MODE;
-#else
-		driver->sub_logging_mode = NO_LOGGING_MODE;
-#endif
 	} else
 		driver->sub_logging_mode = NO_LOGGING_MODE;
 
@@ -989,8 +979,6 @@ long diagchar_ioctl(struct file *filp,
 		for (i = 0; i < MAX_DCI_CLIENTS; i++) {
 			if (driver->dci_client_tbl[i].client == NULL) {
 				driver->dci_client_tbl[i].client = current;
-				driver->dci_client_tbl[i].client_id =
-							driver->dci_client_id;
 				driver->dci_client_tbl[i].list =
 							 dci_params->list;
 				driver->dci_client_tbl[i].signal_type =
@@ -1071,7 +1059,7 @@ long diagchar_ioctl(struct file *filp,
 				 sizeof(struct diag_dci_health_stats)))
 			return -EFAULT;
 		mutex_lock(&dci_health_mutex);
-		i = diag_dci_find_client_index_health(stats.client_id);
+		i = diag_dci_find_client_index(current->tgid);
 		if (i != DCI_CLIENT_INDEX_INVALID) {
 			dci_params = &(driver->dci_client_tbl[i]);
 			stats.dropped_logs = dci_params->dropped_logs;
@@ -1406,10 +1394,6 @@ static int diagchar_write(struct file *file, const char __user *buf,
 	index = 0;
 	/* Get the packet type F3/log/event/Pkt response */
 	err = copy_from_user((&pkt_type), buf, 4);
-	if (err) {
-		pr_alert("diag: copy failed for pkt_type\n");
-		return -EAGAIN;
-	}
 	/* First 4 bytes indicate the type of payload - ignore these */
 	if (count < 4) {
 		pr_err("diag: Client sending short data\n");
@@ -1427,7 +1411,7 @@ static int diagchar_write(struct file *file, const char __user *buf,
 				&& (!driver->usb_connected)) ||
 				(driver->logging_mode == NO_LOGGING_MODE)) {
 		/*Drop the diag payload */
-		pr_debug("diag: Dropping packet, usb is not connected in usb mode and non-dci data type\n");
+		pr_err_ratelimited("diag: Dropping packet, usb is not connected in usb mode and non-dci data type\n");
 		return -EIO;
 	}
 #endif /* DIAG over USB */
@@ -1450,9 +1434,8 @@ static int diagchar_write(struct file *file, const char __user *buf,
 		return err;
 	}
 	if (pkt_type == CALLBACK_DATA_TYPE) {
-		if (payload_size > itemsize ||
-				payload_size <= MIN_SIZ_ALLOW) {
-			pr_err("diag: Dropping packet, invalid packet size. Current payload size %d\n",
+		if (payload_size > itemsize) {
+			pr_err("diag: Dropping packet, packet payload size crosses 4KB limit. Current payload size %d\n",
 				payload_size);
 			driver->dropped_count++;
 			return -EBADMSG;
@@ -1599,11 +1582,6 @@ static int diagchar_write(struct file *file, const char __user *buf,
 		remote_proc = diag_get_remote(*(int *)user_space_data);
 
 		if (remote_proc) {
-			if (payload_size <= MIN_SIZ_ALLOW) {
-				pr_err("diag: Integer underflow in %s, payload size: %d",
-							__func__, payload_size);
-				return -EBADMSG;
-			}
 			token_offset = 4;
 			payload_size -= 4;
 			buf += 4;
@@ -1705,7 +1683,7 @@ static int diagchar_write(struct file *file, const char __user *buf,
 			}
 		}
 #endif
-#if !defined(CONFIG_MACH_JF)
+#if 0
 		/* send masks to 8k now */
 		if (!remote_proc)
 			diag_process_hdlc((void *)
@@ -2020,14 +1998,6 @@ void diagfwd_bridge_fn(int type)
 inline void diagfwd_bridge_fn(int type) { }
 #endif
 
-static int check_diagchar_enabled(char *str)
-{
-	get_option(&str, &enable_diag);
-	pr_debug("%s : enable_diag = %s\n", __func__, ((enable_diag) ? "Yes":"No"));
-	return 0;
-}
-__setup("diag=", check_diagchar_enabled);
-
 static int __init diagchar_init(void)
 {
 	dev_t dev;
@@ -2035,12 +2005,6 @@ static int __init diagchar_init(void)
 
 	pr_debug("diagfwd initializing ..\n");
 	ret = 0;
-
-	if (!enable_diag) {
-		pr_info("diagchar_core isn't enabled.\n");
-		return -EPERM;
-	}
-
 	driver = kzalloc(sizeof(struct diagchar_dev) + 5, GFP_KERNEL);
 #ifdef CONFIG_DIAGFWD_BRIDGE_CODE
 	diag_bridge = kzalloc(MAX_BRIDGES * sizeof(struct diag_bridge_dev),

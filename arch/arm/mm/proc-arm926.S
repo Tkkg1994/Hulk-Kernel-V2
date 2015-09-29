@@ -339,7 +339,7 @@ ENTRY(arm926_dma_unmap_area)
 	ret	lr
 ENDPROC(arm926_dma_unmap_area)
 
-	.globl arm926_flush_kern_cache_louis
+	.globl	arm926_flush_kern_cache_louis
 	.equ	arm926_flush_kern_cache_louis, arm926_flush_kern_cache_all
 
 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)

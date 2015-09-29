@@ -103,7 +103,7 @@ EXPORT_SYMBOL_GPL(dirty_writeback_interval);
 /*
  * The longest time for which data is allowed to remain dirty
  */
-unsigned int dirty_expire_interval = 100; /* centiseconds */
+unsigned int dirty_expire_interval = 50; /* centiseconds */
 
 /*
  * Flag that makes the machine dump writes/reads and block dirtyings.
@@ -267,14 +267,6 @@ void global_dirty_limits(unsigned long *pbackground, unsigned long *pdirty)
 		background = DIV_ROUND_UP(dirty_background_bytes, PAGE_SIZE);
 	else
 		background = (dirty_background_ratio * available_memory) / 100;
-
-#if defined(CONFIG_MIN_DIRTY_THRESH_PAGES) && CONFIG_MIN_DIRTY_THRESH_PAGES > 0
-	if (!vm_dirty_bytes && dirty < CONFIG_MIN_DIRTY_THRESH_PAGES) {
-		dirty = CONFIG_MIN_DIRTY_THRESH_PAGES;
-		if (!dirty_background_bytes)
-			background = dirty / 2;
-	}
-#endif
 
 	if (background >= dirty)
 		background = dirty / 2;
@@ -1433,7 +1425,6 @@ DEFINE_PER_CPU(int, dirty_throttle_leaks) = 0;
 /**
  * balance_dirty_pages_ratelimited - balance dirty memory state
  * @mapping: address_space which was dirtied
- * @nr_pages_dirtied: number of pages which the caller has just dirtied
  *
  * Processes which are dirtying memory should call in here once for each page
  * which was newly dirtied.  The function will periodically check the system's
@@ -1600,6 +1591,7 @@ static int __cpuinit
 ratelimit_handler(struct notifier_block *self, unsigned long action,
 		  void *hcpu)
 {
+
 	switch (action & ~CPU_TASKS_FROZEN) {
 	case CPU_ONLINE:
 	case CPU_DEAD:

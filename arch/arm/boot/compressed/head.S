@@ -420,10 +420,10 @@ wont_overwrite:
  *   sp  = stack pointer
  */
 		orrs	r1, r0, r5
-#ifdef CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK
-		beq not_relocated_copy
-#else
+#ifndef CONFIG_CRYPTO_FIPS
 		beq	not_relocated
+#else
+        beq not_relocated_copy
 #endif
 		add	r11, r11, r0
 		add	r12, r12, r0
@@ -437,7 +437,7 @@ wont_overwrite:
 		add	r2, r2, r0
 		add	r3, r3, r0
 
-#ifdef CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK
+#ifdef CONFIG_CRYPTO_FIPS
         bl copy_compressed
 #endif
 		/*
@@ -535,7 +535,7 @@ call_kernel:
  THUMB(		bx	r4	)		@ entry point is always ARM
 
 		.ltorg
-
+		
 		.align	2
 		.type	LC0, #object
 LC0:		.word	LC0			@ r1
@@ -560,7 +560,7 @@ params:		ldr	r0, =0x10000100		@ params_phys for RPC
  * change@ksingh.sra-dallas - Copying the zImage to a secure location 
  * this copy will be used to computer integrity for FIPS validation
  */
-#ifdef CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK
+#ifdef CONFIG_CRYPTO_FIPS
 not_relocated_copy:
 		bl copy_compressed
 		b not_relocated

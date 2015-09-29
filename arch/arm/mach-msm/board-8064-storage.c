@@ -239,19 +239,11 @@ static struct msm_mmc_pad_pull sdc2_pad_pull_off_cfg[] = {
 #endif
 
 /* SDC3 pad data */
-#if defined(CONFIG_MACH_JFVE_EUR)
-static struct msm_mmc_pad_drv sdc3_pad_drv_on_cfg[] = {
-	{TLMM_HDRV_SDC3_CLK, GPIO_CFG_8MA},
-	{TLMM_HDRV_SDC3_CMD, GPIO_CFG_6MA},
-	{TLMM_HDRV_SDC3_DATA, GPIO_CFG_8MA}
-};
-#else
 static struct msm_mmc_pad_drv sdc3_pad_drv_on_cfg[] = {
 	{TLMM_HDRV_SDC3_CLK, GPIO_CFG_10MA},
 	{TLMM_HDRV_SDC3_CMD, GPIO_CFG_6MA},
 	{TLMM_HDRV_SDC3_DATA, GPIO_CFG_6MA}
 };
-#endif
 
 static struct msm_mmc_pad_drv sdc3_pad_drv_off_cfg[] = {
 	{TLMM_HDRV_SDC3_CLK, GPIO_CFG_2MA},
@@ -460,7 +452,7 @@ static struct mmc_platform_data *apq8064_sdc1_pdata;
 
 #ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
 static unsigned int sdc2_sup_clk_rates[] = {
-	400000, 24000000, 40000000
+	400000, 24000000, 48000000
 };
 
 static struct mmc_platform_data sdc2_data = {
@@ -570,7 +562,6 @@ void __init apq8064_init_mmc(void)
 					ARRAY_SIZE(sdc1_sup_clk_rates_all);
 		}
 		apq8064_add_sdcc(1, apq8064_sdc1_pdata);
-		apq8064_add_uio();
 	}
 #if defined(CONFIG_MACH_JFVE_EUR)
 	apq8064_sdc2_pdata = NULL;

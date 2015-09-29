@@ -169,7 +169,7 @@ static inline void lockdep_copy_map(struct lockdep_map *to,
 	 * the caches and take the performance hit.
 	 *
 	 * XXX it doesn't work well with lockdep_set_class_and_subclass(), since
-	 * that relies on cache abuse.
+	 *     that relies on cache abuse.
 	 */
 	for (i = 0; i < NR_LOCKDEP_CACHING_CLASSES; i++)
 		to->class_cache[i] = NULL;

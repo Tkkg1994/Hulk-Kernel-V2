@@ -6,10 +6,10 @@
 
 lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
 		   csumpartialcopy.o csumpartialcopyuser.o clearbit.o \
-		   delay.o findbit.o memchr.o			      \
-		   memset.o memzero.o setbit.o		              \
-		   findbit.o memchr.o				      \
-		   memset.o memzero.o setbit.o			      \
+		   delay.o findbit.o memchr.o  			      \
+		   memset.o memzero.o setbit.o  	              \
+		   findbit.o memchr.o 	      			      \
+		   memset.o memzero.o setbit.o 			      \
 		   strchr.o strrchr.o                                 \
 		   testchangebit.o testclearbit.o testsetbit.o        \
 		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
@@ -53,7 +53,7 @@ $(obj)/csumpartialcopy.o:	$(obj)/csumpartialcopygeneric.S
 $(obj)/csumpartialcopyuser.o:	$(obj)/csumpartialcopygeneric.S
 
 ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
- NEON_FLAGS			:= -mfloat-abi=hard -mfpu=neon-vfpv4
- CFLAGS_xor-neon.o		+= $(NEON_FLAGS)
- obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
+  NEON_FLAGS			:= -mfloat-abi=hard -mfpu=neon-vfpv4 
+  CFLAGS_xor-neon.o		+= $(NEON_FLAGS)
+  obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
 endif

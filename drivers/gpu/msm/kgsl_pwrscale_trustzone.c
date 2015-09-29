@@ -206,7 +206,6 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 	device->ftbl->power_stats(device, &stats);
 	priv->bin.total_time += stats.total_time;
 	priv->bin.busy_time += stats.busy_time;
-	idle = priv->bin.total_time - priv->bin.busy_time;
 	/* Do not waste CPU cycles running this algorithm if
 	 * the GPU just started, or if less than FLOOR time
 	 * has passed since the last run.
@@ -214,9 +213,6 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 	if ((stats.total_time == 0) ||
 		(priv->bin.total_time < FLOOR))
 		return;
-
-	kgsl_trace_kgsl_tz_params(device, priv->bin.total_time, priv->bin.busy_time,
-			idle, 10);
 
 	/* If there is an extended block of busy processing, set
 	 * frequency to turbo.  Otherwise run the normal algorithm.
@@ -245,25 +241,18 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 			val = __secure_tz_entry3(TZ_UPDATE_ID,
 				pwr->active_pwrlevel,
 				priv->bin.total_time, priv->bin.busy_time);
-
-		kgsl_trace_kgsl_tz_params(device, priv->bin.total_time, priv->bin.busy_time,
-				idle, val);
 	}
 	priv->bin.total_time = 0;
 	priv->bin.busy_time = 0;
-
 
 	/* If the decision is to move to a lower level, make sure the GPU
 	 * frequency drops.
 	 */
 	if (val > 0)
 		val *= pwr->step_mul;
-	if (val) {
+	if (val)
 		kgsl_pwrctrl_pwrlevel_change(device,
 					     pwr->active_pwrlevel + val);
-		//pr_info("TZ idle stat: %d, TZ PL: %d, TZ out: %d\n",
-		// idle, pwr->active_pwrlevel, val);
-	}
 }
 
 static void tz_busy(struct kgsl_device *device,

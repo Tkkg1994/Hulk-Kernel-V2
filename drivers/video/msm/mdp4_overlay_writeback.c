@@ -201,8 +201,8 @@ int mdp4_overlay_writeback_off(struct platform_device *pdev)
 	}
 
 	complete(&vctrl->ov_comp);
-	msleep(20); 			  
-	mdp_clk_ctrl(1);		  
+	msleep(20);
+	mdp_clk_ctrl(1);
 
 	/* sanity check, free pipes besides base layer */
 	mdp4_overlay_unset_mixer(pipe->mixer_num);
@@ -391,7 +391,7 @@ int mdp4_wfd_pipe_commit(struct msm_fb_data_type *mfd,
 	if (rc != 0) {
 		pr_err("%s: mdp4_wfd_dequeue_update failed !! mfd=%x\n",
 			__func__, (int)mfd);
-#if !defined(CONFIG_SEC_PRODUCT_8930)
+
 		pipe = vp->plist;
 		for (i = 0; i < OVERLAY_PIPE_MAX; i++, pipe++) {
 			pipe->pipe_used = 0;
@@ -399,7 +399,6 @@ int mdp4_wfd_pipe_commit(struct msm_fb_data_type *mfd,
 		}
 
 		return cnt;
-#endif /* CONFIG_SEC_PRODUCT_8930 */
 	}
 	/* free previous committed iommu back to pool */
 	mdp4_overlay_iommu_unmap_freelist(mixer);

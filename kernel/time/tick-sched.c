@@ -339,6 +339,7 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 	} else {
 		/* Get the next timer wheel timer */
 		next_jiffies = get_next_timer_interrupt(last_jiffies);
+		delta_jiffies = next_jiffies - last_jiffies;
 		if (rcu_delta_jiffies < delta_jiffies) {
 			next_jiffies = last_jiffies + rcu_delta_jiffies;
 			delta_jiffies = rcu_delta_jiffies;
@@ -529,6 +530,7 @@ void tick_nohz_irq_exit(void)
 ktime_t tick_nohz_get_sleep_length(void)
 {
 	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+
 	return ts->sleep_length;
 }
 

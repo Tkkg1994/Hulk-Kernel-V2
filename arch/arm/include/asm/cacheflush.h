@@ -16,6 +16,7 @@
 #include <asm/shmparam.h>
 #include <asm/cachetype.h>
 #include <asm/outercache.h>
+#include <asm/rodata.h>
 
 #define CACHE_COLOUR(vaddr)	((vaddr & (SHMLBA - 1)) >> PAGE_SHIFT)
 
@@ -49,12 +50,12 @@
  *
  *		Unconditionally clean and invalidate the entire cache.
  *
- *	flush_kern_louis()
+ *     flush_kern_louis()
  *
- *		Flush data cache levels up to the level of unification
- *		inner shareable and invalidate the I-cache.
- *		Only needed from v7 onwards, falls back to flush_cache_all()
- *		for all other processor versions.
+ *             Flush data cache levels up to the level of unification
+ *             inner shareable and invalidate the I-cache.
+ *             Only needed from v7 onwards, falls back to flush_cache_all()
+ *             for all other processor versions.
  *
  *	flush_user_all()
  *
@@ -235,6 +236,7 @@ static inline void __flush_icache_all(void)
 	__flush_icache_preferred();
 	dsb(ishst);
 }
+
 /*
  * Flush caches up to Level of Unification Inner Shareable
  */

@@ -75,7 +75,7 @@ ENTRY(cpu_v7_do_idle)
 ENDPROC(cpu_v7_do_idle)
 
 ENTRY(cpu_v7_dcache_clean_area)
-	ALT_SMP(W(nop))				@ MP extensions imply L1 PTW
+	ALT_SMP(W(nop))			@ MP extensions imply L1 PTW
 	ALT_UP_B(1f)
 	ret	lr
 1:	dcache_line_size r2, r3

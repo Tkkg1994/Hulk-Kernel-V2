@@ -2140,7 +2140,7 @@ static void rcu_prepare_for_idle(int cpu)
 	 * RCU_NONIDLE() or the new idle-loop tracing API within the idle
 	 * loop, then don't take any state-machine actions, unless the
 	 * momentary exit from idle queued additional non-lazy callbacks.
-	 * Instead, repost the rcu_idle_gp_timer if this CPU has callbacks
+	 * Instead, repost the ->idle_gp_timer if this CPU has callbacks
 	 * pending.
 	 */
 	if (!rdtp->idle_first_pass &&

@@ -810,7 +810,6 @@ int usb_wwan_suspend(struct usb_serial *serial, pm_message_t message)
 
 	intfdata->suspended = 1;
 	spin_unlock_irq(&intfdata->susp_lock);
-
 	stop_read_write_urbs(serial);
 
 	return 0;
@@ -870,7 +869,7 @@ int usb_wwan_resume(struct usb_serial *serial)
 		
 		if (port->interrupt_in_urb) {
 			err = usb_submit_urb(port->interrupt_in_urb,
-					GFP_ATOMIC);
+				GFP_ATOMIC);
 			if (err) {
 				dev_err(&port->dev,
 					"%s: submit int urb failed: %d\n",
@@ -878,7 +877,7 @@ int usb_wwan_resume(struct usb_serial *serial)
 				err_count++;
 			}
 		}
-		
+
 		err = play_delayed(port);
 		if (err)
 			err_count++;
@@ -902,6 +901,7 @@ int usb_wwan_resume(struct usb_serial *serial)
 			}
 		}
 	}
+
 
 	if (err_count)
 		return -EIO;

@@ -291,7 +291,7 @@ static void max77693_haptic_power_onoff(int onoff)
 
 	if (!reg_l8) {
 		reg_l8 = regulator_get(NULL, "8921_l8");
-		ret = regulator_set_voltage(reg_l8, 3000000, 3000000);
+		ret = regulator_set_voltage(reg_l8, 1800000, 3000000);
 
 		if (IS_ERR(reg_l8)) {
 			printk(KERN_ERR"could not get 8921_l8, rc = %ld\n",
@@ -5136,10 +5136,8 @@ static void __init apq8064_common_init(void)
 //		if (sec_tsp_synaptics_mode)
 		if(1)
 			S5000_tsp_input_init(lcd_tsp_panel_version);
-#if defined(CONFIG_TOUCHSCREEN_ATMEL_MXTS)
 		else
 			mxt540s_tsp_input_init();
-#endif
 		}
 #endif
 

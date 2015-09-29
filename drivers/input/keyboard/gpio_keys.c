@@ -36,18 +36,8 @@
 #include <linux/i2c/synaptics_rmi.h>
 #endif
 
-#if defined (CONFIG_SEC_PRODUCT_8930)
-#if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI)
+#ifdef CONFIG_MACH_MELIUS
 #include <linux/i2c/synaptics_rmi_msm8930.h>
-#endif
-#endif
-
-
-#if defined (CONFIG_SEC_PRODUCT_8930)
-#if defined(CONFIG_KEYBOARD_GPIO_EXTENDED_RESUME_EVENT)
-extern int wakeup_gpio_num;
-static int force_wakeup_evt;
-#endif
 #endif
 
 struct gpio_button_data {
@@ -60,12 +50,6 @@ struct gpio_button_data {
 	spinlock_t lock;
 	bool disabled;
 	bool key_pressed;
-#ifdef KEY_BOOSTER
-	struct delayed_work	work_dvfs_off;
-	struct delayed_work	work_dvfs_chg;
-	bool dvfs_lock_status;
-	struct mutex		dvfs_lock;
-#endif
 };
 
 struct gpio_keys_drvdata {
@@ -356,80 +340,6 @@ static struct attribute_group gpio_keys_attr_group = {
 	.attrs = gpio_keys_attrs,
 };
 
-#ifdef KEY_BOOSTER
-static void gpio_key_change_dvfs_lock(struct work_struct *work)
-{
-	struct gpio_button_data *bdata =
-		container_of(work,
-			struct gpio_button_data, work_dvfs_chg.work);
-	int retval;
-	mutex_lock(&bdata->dvfs_lock);
-	retval = set_freq_limit(DVFS_TOUCH_ID,
-			MIN_TOUCH_LIMIT_SECOND);
-	if (retval < 0)
-		printk(KERN_ERR
-			"%s: booster change failed(%d).\n",
-			__func__, retval);
-	mutex_unlock(&bdata->dvfs_lock);
-}
-
-static void gpio_key_set_dvfs_off(struct work_struct *work)
-{
-	struct gpio_button_data *bdata =
-		container_of(work,
-			struct gpio_button_data, work_dvfs_off.work);
-	int retval;
-	mutex_lock(&bdata->dvfs_lock);
-	retval = set_freq_limit(DVFS_TOUCH_ID, -1);
-	if (retval < 0)
-		printk(KERN_ERR
-			"%s: booster stop failed(%d).\n",
-			__func__, retval);
-	bdata->dvfs_lock_status = false;
-	mutex_unlock(&bdata->dvfs_lock);
-}
-
-static void gpio_key_set_dvfs_lock(struct gpio_button_data *bdata,
-					uint32_t on)
-{
-	int ret = 0;
-	mutex_lock(&bdata->dvfs_lock);
-	if (on == 0) {
-		if (bdata->dvfs_lock_status) {
-			schedule_delayed_work(&bdata->work_dvfs_off,
-				msecs_to_jiffies(KEY_BOOSTER_OFF_TIME));
-		}
-	} else if (on == 1) {
-		cancel_delayed_work(&bdata->work_dvfs_off);
-		if (!bdata->dvfs_lock_status) {
-			ret = set_freq_limit(DVFS_TOUCH_ID,
-					MIN_TOUCH_LIMIT);
-			if (ret < 0)
-				printk(KERN_ERR
-					"%s: cpu first lock failed(%d)\n",
-					__func__, ret);
-
-			schedule_delayed_work(&bdata->work_dvfs_chg,
-				msecs_to_jiffies(KEY_BOOSTER_CHG_TIME));
-			bdata->dvfs_lock_status = true;
-		}
-	}
-	mutex_unlock(&bdata->dvfs_lock);
-}
-
-
-static int gpio_key_init_dvfs(struct gpio_button_data *bdata)
-{
-	mutex_init(&bdata->dvfs_lock);
-
-	INIT_DELAYED_WORK(&bdata->work_dvfs_off, gpio_key_set_dvfs_off);
-	INIT_DELAYED_WORK(&bdata->work_dvfs_chg, gpio_key_change_dvfs_lock);
-
-	bdata->dvfs_lock_status = false;
-	return 0;
-}
-#endif
-
 #ifdef CONFIG_SENSORS_HALL
 static void flip_cover_work(struct work_struct *work)
 {
@@ -473,7 +383,7 @@ static void flip_cover_work(struct work_struct *work)
 			if(delay_count == delay_exit_count) {
 				printk(KERN_DEBUG "[keys] %s : Run input report delay_count = %d\n",__func__, delay_count);
 				input_report_switch(ddata->input,
-					SW_FLIP, ddata->flip_cover);
+					SW_LID, !ddata->flip_cover);
 				input_sync(ddata->input);
 #if defined(CONFIG_MACH_MELIUS)
 #if defined(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI)
@@ -492,7 +402,7 @@ static void flip_cover_work(struct work_struct *work)
 #else
 
 	input_report_switch(ddata->input,
-		SW_FLIP, ddata->flip_cover);
+		SW_LID, !ddata->flip_cover);
 	input_sync(ddata->input);
 #endif
 }
@@ -517,18 +427,6 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	sec_debug_check_crash_key(button->code, state);
 #endif
 
-#if defined(CONFIG_SEC_PRODUCT_8930)
-#if defined(CONFIG_KEYBOARD_GPIO_EXTENDED_RESUME_EVENT)
-	if (button->support_evt == SUPPORT_RESUME_KEY_EVENT) {
-		if (wakeup_gpio_num != 0 && state == 0) {
-			force_wakeup_evt = FORCE_KEY_REPORT_ON;
-		} else {
-			force_wakeup_evt = FORCE_KEY_REPORT_OFF;
-		}
-	}
-#endif
-#endif
-
 	if (type == EV_ABS) {
 		if (state)
 			input_event(input, type, button->code, button->value);
@@ -538,45 +436,12 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 	input_sync(input);
 }
 
-#if defined (CONFIG_SEC_PRODUCT_8930)
-#if defined(CONFIG_KEYBOARD_GPIO_EXTENDED_RESUME_EVENT)
-static void gpio_keys_gpio_force_report_event(struct gpio_button_data *bdata, int state)
-{
-	const struct gpio_keys_button *button = bdata->button;
-	struct input_dev *input = bdata->input;
-	unsigned int type = button->type ?: EV_KEY;
-
-	printk(KERN_DEBUG "%s forced key[%d] p[%d]events\n", __func__, button->code, state);
-
-#if defined(CONFIG_SEC_DEBUG)
-	sec_debug_check_crash_key(button->code, state);
-#endif
-
-	if (type == EV_ABS) {
-		if (state)
-			input_event(input, type, button->code, button->value);
-	} else {
-			input_event(input, type, button->code, !!state);
-	}
-	input_sync(input);
-}
-#endif
-#endif
 
 static void gpio_keys_gpio_work_func(struct work_struct *work)
 {
 	struct gpio_button_data *bdata =
 		container_of(work, struct gpio_button_data, work);
-#ifdef KEY_BOOSTER
-	const struct gpio_keys_button *button = bdata->button;
-	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
-#endif
-
 	gpio_keys_gpio_report_event(bdata);
-#ifdef KEY_BOOSTER
-	if (button->code == KEY_HOMEPAGE)
-		gpio_key_set_dvfs_lock(bdata, !!state);
-#endif
 }
 
 static void gpio_keys_gpio_timer(unsigned long _data)
@@ -1041,7 +906,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	input->dev.parent = &pdev->dev;
 #ifdef CONFIG_SENSORS_HALL
 	input->evbit[0] |= BIT_MASK(EV_SW);
-	input_set_capability(input, EV_SW, SW_FLIP);
+	input_set_capability(input, EV_SW, SW_LID);
 #endif
 	input->open = gpio_keys_open;
 	input->close = gpio_keys_close;
@@ -1062,13 +927,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 		error = gpio_keys_setup_key(pdev, input, bdata, button);
 		if (error)
 			goto fail2;
-#ifdef KEY_BOOSTER
-		error = gpio_key_init_dvfs(bdata);
-		if (error < 0) {
-			dev_err(dev, "Fail get dvfs level for touch booster\n");
-			goto fail2;
-		}
-#endif
+
 		if (button->wakeup)
 			wakeup = 1;
 	}
@@ -1177,12 +1036,6 @@ static int gpio_keys_resume(struct device *dev)
 	struct gpio_keys_drvdata *ddata = dev_get_drvdata(dev);
 	int i;
 
-#if defined(CONFIG_SEC_PRODUCT_8930)
-#if defined(CONFIG_KEYBOARD_GPIO_EXTENDED_RESUME_EVENT)
-    struct gpio_button_data *bdata_ext;
-#endif
-#endif
-
 	for (i = 0; i < ddata->n_buttons; i++) {
 		struct gpio_button_data *bdata = &ddata->data[i];
 		if (bdata->button->wakeup && device_may_wakeup(dev))
@@ -1192,34 +1045,6 @@ static int gpio_keys_resume(struct device *dev)
 			gpio_keys_gpio_report_event(bdata);
 	}
 	input_sync(ddata->input);
-
-#if defined(CONFIG_SEC_PRODUCT_8930)
-#if defined(CONFIG_KEYBOARD_GPIO_EXTENDED_RESUME_EVENT)
-	for (i = 0; i < ddata->n_buttons; i++) {
-		bdata_ext = &ddata->data[i];
-
-		/* first check support resume event */
-		if (bdata_ext->button->support_evt == SUPPORT_RESUME_KEY_EVENT) {
-			if (force_wakeup_evt == FORCE_KEY_REPORT_ON) {
-				if (bdata_ext->button->gpio == wakeup_gpio_num) {
-					if (gpio_is_valid(bdata_ext->button->gpio)) {
-						/* force key events */
-						printk(KERN_DEBUG "%s force event!!!\n", __func__);
-						gpio_keys_gpio_force_report_event(bdata_ext, 1);
-						mdelay(1);
-						gpio_keys_gpio_force_report_event(bdata_ext, 0);
-					}
-
-					/* clear events */
-					wakeup_gpio_num = 0;
-					force_wakeup_evt = FORCE_KEY_REPORT_OFF;
-				}
-			}
-		}
-	}
-#endif
-#endif
-
 
 	return 0;
 }

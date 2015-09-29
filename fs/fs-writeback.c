@@ -326,7 +326,6 @@ static int write_inode(struct inode *inode, struct writeback_control *wbc)
 		return inode->i_sb->s_op->write_inode(inode, wbc);
 	return 0;
 }
-
 /*
  * Wait for writeback on an inode to complete. Called with i_lock held.
  * Caller must make sure inode cannot go away when we drop i_lock.
@@ -454,7 +453,7 @@ __writeback_single_inode(struct inode *inode, struct bdi_writeback *wb,
 	int ret;
 
 	WARN_ON(!(inode->i_state & I_SYNC));
-
+	
 	ret = do_writepages(mapping, wbc);
 
 	/*
@@ -1010,7 +1009,8 @@ long wb_do_writeback(struct bdi_writeback *wb, int force_wait)
 		if (force_wait)
 			work->sync_mode = WB_SYNC_ALL;
 
-		trace_writeback_exec(bdi, work);
+		/* This trace causes an ICE in gcc4.7 */
+//ggy		trace_writeback_exec(bdi, work);
 
 		wrote += wb_writeback(wb, work);
 
@@ -1053,7 +1053,7 @@ int bdi_writeback_thread(void *data)
 	 */
 	set_user_nice(current, 0);
 
-	trace_writeback_thread_start(bdi);
+//ggy	trace_writeback_thread_start(bdi);
 
 	while (!kthread_freezable_should_stop(NULL)) {
 		/*
@@ -1064,7 +1064,7 @@ int bdi_writeback_thread(void *data)
 
 		pages_written = wb_do_writeback(wb, 0);
 
-		trace_writeback_pages_written(pages_written);
+//ggy		trace_writeback_pages_written(pages_written);
 
 		if (pages_written)
 			wb->last_active = jiffies;
@@ -1091,7 +1091,7 @@ int bdi_writeback_thread(void *data)
 	if (!list_empty(&bdi->work_list))
 		wb_do_writeback(wb, 1);
 
-	trace_writeback_thread_stop(bdi);
+//ggy	trace_writeback_thread_stop(bdi);
 	return 0;
 }
 
@@ -1221,6 +1221,8 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 			bool wakeup_bdi = false;
 			bdi = inode_to_bdi(inode);
 
+			spin_unlock(&inode->i_lock);
+			spin_lock(&bdi->wb.list_lock);
 			if (bdi_cap_writeback_dirty(bdi)) {
 				WARN(!test_bit(BDI_registered, &bdi->state),
 				     "bdi-%s not registered\n", bdi->name);
@@ -1235,8 +1237,6 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 					wakeup_bdi = true;
 			}
 
-			spin_unlock(&inode->i_lock);
-			spin_lock(&bdi->wb.list_lock);
 			inode->dirtied_when = jiffies;
 			list_move(&inode->i_wb_list, &bdi->wb.b_dirty);
 			spin_unlock(&bdi->wb.list_lock);

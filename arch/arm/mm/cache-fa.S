@@ -241,7 +241,7 @@ ENTRY(fa_dma_unmap_area)
 	ret	lr
 ENDPROC(fa_dma_unmap_area)
 
-	.globl fa_flush_kern_cache_louis
+	.globl	fa_flush_kern_cache_louis
 	.equ	fa_flush_kern_cache_louis, fa_flush_kern_cache_all
 
 	__INITDATA

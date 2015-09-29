@@ -15,9 +15,7 @@
 #ifdef CONFIG_USB_HOST_NOTIFY
 #include "../../arch/arm/mach-msm/board-8064.h"
 #endif
-#ifdef CONFIG_FORCE_FAST_CHARGE
 #include <linux/fastchg.h>
-#endif
 
 #define ENABLE 1
 #define DISABLE 0
@@ -228,11 +226,7 @@ static void max77693_set_input_current(struct max77693_charger_data *charger,
 	int chg_state;
 
 	mutex_lock(&charger->ops_lock);
-	reg_data = 0;
-	reg_data = (1 << CHGIN_SHIFT);
-	max77693_update_reg(charger->max77693->i2c, MAX77693_CHG_REG_CHG_INT_MASK, reg_data,
-			CHGIN_MASK);
-
+	disable_irq(charger->irq_chgin);
 	if (charger->cable_type == POWER_SUPPLY_TYPE_WIRELESS)
 		set_reg = MAX77693_CHG_REG_CHG_CNFG_10;
 	else
@@ -345,10 +339,7 @@ set_input_current:
 	max77693_write_reg(charger->max77693->i2c,
 		set_reg, set_current_reg);
 exit:
-	reg_data = 0;
-	reg_data = (0 << CHGIN_SHIFT);
-	max77693_update_reg(charger->max77693->i2c, MAX77693_CHG_REG_CHG_INT_MASK, reg_data,
-			CHGIN_MASK);
+	enable_irq(charger->irq_chgin);
 	mutex_unlock(&charger->ops_lock);
 }
 
@@ -476,11 +467,7 @@ static void max77693_recovery_work(struct work_struct *work)
 		(chgin_dtls == 0x3) && (chg_dtls != 0x8) && (byp_dtls == 0x0))) {
 		pr_info("%s: try to recovery, cnt(%d)\n", __func__,
 				(chg_data->soft_reg_recovery_cnt + 1));
-#ifdef CONFIG_FORCE_FAST_CHARGE
-		if (screen_on_current_limit && chg_data->siop_level < 100 &&
-#else
 		if (chg_data->siop_level < 100 &&
-#endif
 				chg_data->cable_type == POWER_SUPPLY_TYPE_MAINS) {
 			pr_info("%s : LCD on status and revocer current\n", __func__);
 			max77693_set_input_current(chg_data,
@@ -762,6 +749,9 @@ static int sec_chg_set_property(struct power_supply *psy,
 		POWER_SUPPLY_TYPE_WIRELESS].input_current_limit;
 	u8 chg_cnfg_00;
 
+	/* check and unlock */
+	check_charger_unlock_state(charger);
+
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
 		charger->status = val->intval;
@@ -829,11 +819,8 @@ static int sec_chg_set_property(struct power_supply *psy,
 			else
 				set_charging_current_max =
 					charger->charging_current_max;
-#ifdef CONFIG_FORCE_FAST_CHARGE
-			if (screen_on_current_limit && charger->siop_level < 100 &&
-#else
+
 			if (charger->siop_level < 100 &&
-#endif
 					val->intval == POWER_SUPPLY_TYPE_MAINS) {
 				set_charging_current_max = SIOP_INPUT_LIMIT_CURRENT;
 				if (set_charging_current > SIOP_CHARGING_LIMIT_CURRENT)
@@ -883,21 +870,14 @@ static int sec_chg_set_property(struct power_supply *psy,
 
 			/* do forced set charging current */
 			if (charger->cable_type == POWER_SUPPLY_TYPE_MAINS) {
-#ifdef CONFIG_FORCE_FAST_CHARGE
-				if (screen_on_current_limit && charger->siop_level < 100 )
-#else
 				if (charger->siop_level < 100 )
-#endif
 					set_charging_current_max =
 						SIOP_INPUT_LIMIT_CURRENT;
 				else
 					set_charging_current_max =
 						charger->charging_current_max;
-#ifdef CONFIG_FORCE_FAST_CHARGE
-				if (screen_on_current_limit && charger->siop_level < 100 && current_now > SIOP_CHARGING_LIMIT_CURRENT)
-#else
+
 				if (charger->siop_level < 100 && current_now > SIOP_CHARGING_LIMIT_CURRENT)
-#endif
 					current_now = SIOP_CHARGING_LIMIT_CURRENT;
 				max77693_set_input_current(charger,
 						set_charging_current_max);
@@ -1167,7 +1147,7 @@ static irqreturn_t wpc_charger_irq(int irq, void *data)
 	if (chg_data->wc_w_state)
 		delay = msecs_to_jiffies(500);
 	else
-		delay = msecs_to_jiffies(200);
+		delay = msecs_to_jiffies(0);
 #endif
 	queue_delayed_work(chg_data->wqueue, &chg_data->wpc_work,
 			delay);
@@ -1262,12 +1242,8 @@ static void max77693_chgin_isr_work(struct work_struct *work)
 	int battery_health;
 	union power_supply_propval value;
 	int stable_count = 0;
-	u8 reg_data;
 
-	reg_data = 0;
-	reg_data = (1 << CHGIN_SHIFT);
-	max77693_update_reg(charger->max77693->i2c, MAX77693_CHG_REG_CHG_INT_MASK, reg_data,
-			CHGIN_MASK);
+	disable_irq(charger->irq_chgin);
 
 	while (1) {
 		psy_do_property("battery", get,
@@ -1344,10 +1320,7 @@ static void max77693_chgin_isr_work(struct work_struct *work)
 		prev_chgin_dtls = chgin_dtls;
 		msleep(100);
 	}
-	reg_data = 0;
-	reg_data = (0 << CHGIN_SHIFT);
-	max77693_update_reg(charger->max77693->i2c, MAX77693_CHG_REG_CHG_INT_MASK, reg_data,
-			CHGIN_MASK);
+	enable_irq(charger->irq_chgin);
 }
 
 static irqreturn_t max77693_chgin_irq(int irq, void *data)

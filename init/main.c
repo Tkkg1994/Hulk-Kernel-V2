@@ -497,7 +497,7 @@ static void __init mm_init(void)
 	vmalloc_init();
 }
 
-#ifdef CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK
+#ifdef CONFIG_CRYPTO_FIPS
 /* change@ksingh.sra-dallas - in kernel 3.4 and + 
  * the mmu clears the unused/unreserved memory with default RAM initial sticky 
  * bit data.
@@ -537,7 +537,7 @@ static void __init integrity_mem_reserve(void) {
 	printk(KERN_NOTICE "FIPS integrity_mem_reservoir = %ld\n", integrity_mem_reservoir);
 }
 // change@ksingh.sra-dallas - end
-#endif // CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK
+#endif // CONFIG_CRYPTO_FIPS
 
 asmlinkage void __init start_kernel(void)
 {
@@ -589,12 +589,12 @@ asmlinkage void __init start_kernel(void)
 
 	jump_label_init();
 
-#ifdef CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK
+#ifdef CONFIG_CRYPTO_FIPS	
 	/* change@ksingh.sra-dallas
 	 * marks the zImage copy area as reserve before mmu can clear it
 	 */
  	integrity_mem_reserve();
-#endif // CONFIG_CRYPTO_FIPS_OLD_INTEGRITY_CHECK
+#endif // CONFIG_CRYPTO_FIPS
 	/*
 	 * These use large bootmem allocations and must precede
 	 * kmem_cache_init()

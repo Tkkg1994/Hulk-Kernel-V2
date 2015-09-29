@@ -71,7 +71,7 @@ struct writeback_control {
 	loff_t range_end;
 
 	enum writeback_sync_modes sync_mode;
-
+	
 	unsigned for_kupdate:1;		/* A kupdate writeback */
 	unsigned for_background:1;	/* A background writeback */
 	unsigned tagged_writepages:1;	/* tag-and-write to avoid livelock */

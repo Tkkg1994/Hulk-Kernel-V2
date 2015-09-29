@@ -45,12 +45,6 @@ extern void sec_getlog_supply_kloginfo(void *klog_buf);
 extern void sec_gaf_supply_rqinfo(unsigned short curr_offset,
 				  unsigned short rq_offset);
 extern int sec_debug_is_enabled(void);
-#ifdef CONFIG_SEC_PERIPHERAL_SECURE_CHK
-extern void sec_peripheral_secure_check_fail(void);
-#endif
-#ifndef CONFIG_MACH_JF
-extern int sec_debug_is_enabled_for_ssr(void);
-#endif
 #else
 static inline int sec_debug_init(void)
 {
@@ -298,12 +292,6 @@ static inline void sec_debug_fuelgauge_log(unsigned int voltage,
 #define KERNEL_SEC_DEBUG_LEVEL_LOW	(0x574F4C44)
 #define KERNEL_SEC_DEBUG_LEVEL_MID	(0x44494D44)
 #define KERNEL_SEC_DEBUG_LEVEL_HIGH	(0x47494844)
-
-#ifdef CONFIG_SEC_MONITOR_BATTERY_REMOVAL
-extern bool kernel_sec_set_normal_pwroff(int value);
-extern int kernel_sec_get_normal_pwroff(void);
-#endif
-
 extern bool kernel_sec_set_debug_level(int level);
 extern int kernel_sec_get_debug_level(void);
 extern int ssr_panic_handler_for_sec_dbg(void);
@@ -327,6 +315,7 @@ extern void sec_debug_subsys_fill_fbinfo(int idx, void *fb, u32 xres,
   * minor version changes should not affect LK behavior
   */
 #define SEC_DEBUG_SUBSYS_MAGIC3 0x00010004
+
 
 #define TZBSP_CPU_COUNT           4
 /* CPU context for the monitor. */
@@ -568,7 +557,7 @@ extern int sec_debug_subsys_set_logger_info(
 	struct sec_debug_subsys_logger_log_info *log_info);
 int sec_debug_save_die_info(const char *str, struct pt_regs *regs);
 int sec_debug_save_panic_info(const char *str, unsigned int caller);
-extern void sec_debug_set_qc_dload_magic(int on);
+
 extern uint32_t global_pvs;
 extern struct class *sec_class;
 

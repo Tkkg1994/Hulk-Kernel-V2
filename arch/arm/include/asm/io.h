@@ -284,11 +284,11 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
 					cpu_to_le16(v),c))
 #define writel_relaxed(v,c)	((void)__raw_writel((__force u32) \
 					cpu_to_le32(v),c))
-#define writell_relaxed(v, c) ((void)__raw_writell((__force u64) \
+#define writell_relaxed(v, c)	((void)__raw_writell((__force u64) \
 					cpu_to_le64(v), c))
-#define writel_relaxed_no_log(v, c) ((void)__raw_writel_no_log((__force u32) \
+#define writel_relaxed_no_log(v, c)  ((void)__raw_writel_no_log((__force u32) \
 					cpu_to_le32(v), c))
-#define writell_relaxed_no_log(v, c) ((void)__raw_writell_no_log((__force u64) \
+#define writell_relaxed_no_log(v, c)  ((void)__raw_writell_no_log((__force u64) \
 					cpu_to_le64(v), c))
 
 #define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(); __v; })
@@ -344,7 +344,7 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
 #define iowrite8(v,p)	({ __iowmb(); (void)__raw_writeb(v, p); })
 #define iowrite16(v,p)	({ __iowmb(); (void)__raw_writew((__force __u16)cpu_to_le16(v), p); })
 #define iowrite32(v,p)	({ __iowmb(); (void)__raw_writel((__force __u32)cpu_to_le32(v), p); })
-#define iowrite64(v, p) ({ __iowmb(); (void)__raw_writell((__force __u64)cpu_to_le64(v), p); })
+#define iowrite64(v, p)	({ __iowmb(); (void)__raw_writell((__force __u64)cpu_to_le64(v), p); })
 
 #define iowrite16be(v,p) ({ __iowmb(); (void)__raw_writew((__force __u16)cpu_to_be16(v), p); })
 #define iowrite32be(v,p) ({ __iowmb(); (void)__raw_writel((__force __u32)cpu_to_be32(v), p); })

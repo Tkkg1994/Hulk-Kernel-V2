@@ -29,7 +29,7 @@
  */
 #define atomic_read(v)	(*(volatile int *)&(v)->counter)
 #define atomic_set(v,i)	(((v)->counter) = (i))
-#define cpu_relaxed_read_atomic(v) atomic_read(v)
+#define cpu_relaxed_read_atomic(v)	atomic_read(v)
 
 #if __LINUX_ARM_ARCH__ >= 6
 
@@ -122,7 +122,6 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
 {
 	int oldval;
 	unsigned long res;
-
 
 	smp_mb();
 	prefetchw(&ptr->counter);
@@ -252,7 +251,8 @@ static inline int __atomic_add_unless(atomic_t *v, int a, int u)
 		c = old;
 	return c;
 }
-#endif		/* __LINUX_ARM_ARCH__ */
+
+#endif /* __LINUX_ARM_ARCH__ */
 
 #define atomic_xchg(v, new) (xchg(&((v)->counter), new))
 
@@ -278,9 +278,10 @@ typedef struct {
 } atomic64_t;
 
 #define ATOMIC64_INIT(i) { (i) }
-//
+
+//                                                                                 
 static inline long long atomic64_read(const atomic64_t *v)
-//
+//                                                                                 
 {
 	long long result;
 

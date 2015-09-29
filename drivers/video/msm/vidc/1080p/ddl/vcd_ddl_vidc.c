@@ -605,20 +605,15 @@ void ddl_vidc_encode_init_codec(struct ddl_client_context *ddl)
 	const u32 recon_bufs = 4;
 	u32 h263_cpfc_enable = false;
 	u32 scaled_frame_rate, ltr_enable;
+/* MMRND_AVRC. Start */
 	u32 pic_order_count = false;
+/* MMRND_AVRC. End */
 
 	ddl_vidc_encode_set_profile_level(ddl);
 	vidc_1080p_set_encode_frame_size(encoder->frame_size.width,
 		encoder->frame_size.height);
 	vidc_1080p_encode_set_qp_params(encoder->qp_range.max_qp,
 		encoder->qp_range.min_qp);
-	vidc_sm_set_i_frame_qp(&ddl->shared_mem[ddl->command_channel],
-		encoder->qp_range.max_qp,
-		encoder->qp_range.min_qp);
-	if (encoder->session_qp.i_frame_qp < encoder->qp_range.min_qp)
-		encoder->session_qp.i_frame_qp = encoder->qp_range.min_qp;
-	if (encoder->session_qp.i_frame_qp > encoder->qp_range.max_qp)
-		encoder->session_qp.i_frame_qp = encoder->qp_range.max_qp;
 	vidc_1080p_encode_set_rc_config(encoder->rc_level.frame_level_rc,
 		encoder->rc_level.mb_level_rc,
 		encoder->session_qp.i_frame_qp);
@@ -651,8 +646,15 @@ void ddl_vidc_encode_init_codec(struct ddl_client_context *ddl)
 		[ddl->command_channel], hdr_ext_control,
 		r_cframe_skip, false, 0,
 		h263_cpfc_enable, encoder->sps_pps.sps_pps_for_idr_enable_flag,
+/* MMRND_AVRC. Start */
+#if 1
 		pic_order_count, encoder->closed_gop, encoder->
 		avc_delimiter_enable, encoder->vui_timinginfo_enable,
+#else		
+		encoder->closed_gop, encoder->avc_delimiter_enable,
+		encoder->vui_timinginfo_enable,
+#endif
+/* MMRND_AVRC. End */
 		encoder->bitstream_restrict_enable, ltr_enable);
 	if (encoder->vui_timinginfo_enable) {
 		vidc_sm_set_h264_encoder_timing_info(

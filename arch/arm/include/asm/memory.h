@@ -139,8 +139,8 @@
 
 /*
  * PLAT_PHYS_OFFSET is the offset (from zero) of the start of physical
- * memory. This is used for XIP and NoMMU kernels, or by kernels which
- * have their own mach/memory.h. Assembly code must always use
+ * memory.  This is used for XIP and NoMMU kernels, or by kernels which
+ * have their own mach/memory.h.  Assembly code must always use
  * PLAT_PHYS_OFFSET and not PHYS_OFFSET.
  */
 #ifndef PLAT_PHYS_OFFSET
@@ -192,8 +192,8 @@ static inline unsigned long __phys_to_virt(unsigned long x)
 
 #define PHYS_OFFSET	PLAT_PHYS_OFFSET
 
-#define __virt_to_phys(x) ((x) - PAGE_OFFSET + PHYS_OFFSET)
-#define __phys_to_virt(x) ((x) - PHYS_OFFSET + PAGE_OFFSET)
+#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
+#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
 #endif
 #endif
 

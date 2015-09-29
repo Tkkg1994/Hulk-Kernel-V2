@@ -1,20 +1,18 @@
 /*
- * Originally from linux/arch/arm/lib/delay.S
+ *  Originally from linux/arch/arm/lib/delay.S
  *
- * Copyright (C) 1995, 1996 Russell King
- * Copyright (c) 2010, The Linux Foundation. All rights reserved.
- * Copyright (C) 1993 Linus Torvalds
- * Copyright (C) 1997 Martin Mares <mj@atrey.karlin.mff.cuni.cz>
- * Copyright (C) 2005-2006 Atmel Corporation
+ *  Copyright (C) 1995, 1996 Russell King
+ *  Copyright (c) 2010, The Linux Foundation. All rights reserved.
+ *  Copyright (C) 1993 Linus Torvalds
+ *  Copyright (C) 1997 Martin Mares <mj@atrey.karlin.mff.cuni.cz>
+ *  Copyright (C) 2005-2006 Atmel Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
- *
- * Author: Will Deacon <will.deacon@arm.com>
  */
-#include <linux/delay.h>
 #include <linux/module.h>
+#include <linux/delay.h>
 #include <linux/timex.h>
 
 /*
@@ -82,8 +80,8 @@ void __const_udelay(unsigned long xloops)
 EXPORT_SYMBOL(__const_udelay);
 
 /*
- * usecs <= 2000
- * HZ <= 1000
+ * usecs  <= 2000
+ * HZ  <= 1000
  */
 void __udelay(unsigned long usecs)
 {

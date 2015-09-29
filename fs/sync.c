@@ -24,7 +24,7 @@
 			SYNC_FILE_RANGE_WAIT_AFTER)
 
 #ifdef CONFIG_ASYNC_FSYNC
-#define FLAG_ASYNC_FSYNC 0x1
+#define FLAG_ASYNC_FSYNC        0x1
 static struct workqueue_struct *fsync_workqueue = NULL;
 struct fsync_work {
 	struct work_struct work;
@@ -171,7 +171,6 @@ SYSCALL_DEFINE0(sync)
 	return 0;
 }
 
-
 static void do_sync_work(struct work_struct *work)
 {
 	/*
@@ -315,7 +314,7 @@ static int do_fsync(unsigned int fd, int datasync)
 #endif
 
 	int fput_needed;
-
+	
 	file = fget_light(fd, &fput_needed);
 	if (file) {
 		ktime_t fsync_t, fsync_diff;

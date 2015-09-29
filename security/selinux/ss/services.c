@@ -735,9 +735,6 @@ out:
 	kfree(n);
 	kfree(t);
 
-#ifdef CONFIG_ALWAYS_ENFORCE
-	selinux_enforcing = 1;
-#endif
 	if (!selinux_enforcing)
 		return 0;
 	return -EPERM;
@@ -1234,7 +1231,7 @@ static int security_context_to_sid_core(const char *scontext, u32 scontext_len,
 	struct context context;
 	int rc = 0;
 
-	/* An empty security context is never valid */
+	/* An empty security context is never valid. */
 	if (!scontext_len)
 		return -EINVAL;
 
@@ -1360,9 +1357,6 @@ out:
 	kfree(s);
 	kfree(t);
 	kfree(n);
-#ifdef CONFIG_ALWAYS_ENFORCE
-        selinux_enforcing = 1;
-#endif
 	if (!selinux_enforcing)
 		return 0;
 	return -EACCES;
@@ -1629,9 +1623,7 @@ static inline int convert_context_handle_invalid_context(struct context *context
 {
 	char *s;
 	u32 len;
-#ifdef CONFIG_ALWAYS_ENFORCE
-        selinux_enforcing = 1;
-#endif
+
 	if (selinux_enforcing)
 		return -EINVAL;
 
@@ -2259,7 +2251,7 @@ out:
  * The caller must acquire the policy_rwlock before calling this function.
  */
 static inline int __security_genfs_sid(const char *fstype,
-				       char *path,
+		      		       char *path,
 				       u16 orig_sclass,
 				       u32 *sid)
 {
@@ -2309,7 +2301,7 @@ out:
 }
 
 /**
- * security_genfs_sid - Obtain a SID for a file in a filesystem
+ * __security_genfs_sid - Helper to obtain a SID for a file in a filesystem
  * @fstype: filesystem type
  * @path: path from root of mount
  * @sclass: file security class
@@ -2317,6 +2309,8 @@ out:
  *
  * Acquire policy_rwlock before calling __security_genfs_sid() and release
  * it afterward.
+ *
+ * The caller must acquire the policy_rwlock before calling this function.
  */
 int security_genfs_sid(const char *fstype,
 		       char *path,

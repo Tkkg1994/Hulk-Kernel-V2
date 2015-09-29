@@ -281,6 +281,7 @@ extern unsigned long preset_lpj;
 /*
  * Convert various time units to each other:
  */
+
 /*
  * Avoid unnecessary multiplications/divisions in the
  * two most common HZ cases:

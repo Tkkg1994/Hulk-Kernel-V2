@@ -214,8 +214,8 @@ static void sensor_power_on_vdd(int, int);
 #define PCIE_PWR_EN_PMIC_GPIO 13
 #define PCIE_RST_N_PMIC_MPP 1
 
-#ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND
-int id_set_two_phase_freq(int cpufreq);
+#ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND  
+int id_set_two_phase_freq(int cpufreq); 
 #endif 
 
 static int sec_tsp_synaptics_mode;
@@ -5451,10 +5451,8 @@ static void __init apq8064_common_init(void)
 	if (!poweroff_charging) {
 		if (sec_tsp_synaptics_mode)
 			S5000_tsp_input_init(lcd_tsp_panel_version);
-#if defined(CONFIG_TOUCHSCREEN_ATMEL_MXTS)	
 		else
 			mxt540s_tsp_input_init();
-#endif
 		}
 #endif
 

@@ -1076,8 +1076,9 @@ void umount_tree(struct mount *mnt, int propagate, struct list_head *kill)
 		list_del_init(&p->mnt_expire);
 		list_del_init(&p->mnt_list);
 		__touch_mnt_namespace(p->mnt_ns);
+		if (p->mnt_ns)
+			__mnt_make_shortterm(p);
 		p->mnt_ns = NULL;
-		__mnt_make_shortterm(p);
 		if (mnt_has_parent(p)) {
 			p->mnt_parent->mnt_ghosts++;
 			dentry_reset_mounted(p->mnt_mountpoint);
@@ -1875,7 +1876,7 @@ static int do_new_mount(struct path *path, char *type, int flags,
 	    !strcmp(path->dentry->d_name.name, "data")) ||
 	    (!strcmp(type, "fuse") &&
 	    !strcmp(path->dentry->d_name.name, "emulated"))))
-		mnt->mnt_sb->fsync_flags |= FLAG_ASYNC_FSYNC;
+                mnt->mnt_sb->fsync_flags |= FLAG_ASYNC_FSYNC;
 #endif
 	return err;
 }

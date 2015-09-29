@@ -105,7 +105,7 @@ void unlock_policy_rwsem_##mode(int cpu)				\
 	BUG_ON(policy_cpu == -1);					\
 	up_##mode(&per_cpu(cpu_policy_rwsem, policy_cpu));		\
 }
-
+ 
 unlock_policy_rwsem(read, cpu);
 unlock_policy_rwsem(write, cpu);
 
@@ -224,6 +224,7 @@ struct cpufreq_policy *cpufreq_cpu_get(unsigned int cpu)
 {
 	if (cpufreq_disabled())
 		return NULL;
+
 	return __cpufreq_cpu_get(cpu, false);
 }
 EXPORT_SYMBOL_GPL(cpufreq_cpu_get);
@@ -244,6 +245,7 @@ void cpufreq_cpu_put(struct cpufreq_policy *data)
 {
 	if (cpufreq_disabled())
 		return;
+
 	__cpufreq_cpu_put(data, false);
 }
 EXPORT_SYMBOL_GPL(cpufreq_cpu_put);
@@ -494,6 +496,7 @@ static ssize_t store_##file_name					\
 	ret = cpufreq_get_policy(&new_policy, policy->cpu);		\
 	if (ret)							\
 		return -EINVAL;						\
+									\
 	new_policy.min = new_policy.user_policy.min;			\
 	new_policy.max = new_policy.user_policy.max;			\
 									\
@@ -504,9 +507,9 @@ static ssize_t store_##file_name					\
 	ret = cpufreq_driver->verify(&new_policy);			\
 	if (ret)							\
 		pr_err("cpufreq: Frequency verification failed\n");	\
+									\
 	policy->user_policy.min = new_policy.min;			\
 	policy->user_policy.max = new_policy.max;			\
-									\
 	ret = __cpufreq_set_policy(policy, &new_policy);		\
 									\
 	return ret ? ret : count;					\
@@ -528,6 +531,7 @@ ssize_t store_GPU_mV_table(struct cpufreq_policy *policy, const char *buf, size_
 	set_gpu_vdd_levels(u);
 	return count;
 }
+
 
 /**
  * show_cpuinfo_cur_freq - current CPU frequency as detected by hardware
@@ -762,6 +766,7 @@ static ssize_t store_vdd_levels(struct kobject *a, struct attribute *b, const ch
 	return count;
 }
 
+
 cpufreq_freq_attr_ro_perm(cpuinfo_cur_freq, 0400);
 cpufreq_freq_attr_ro(cpuinfo_min_freq);
 cpufreq_freq_attr_ro(cpuinfo_max_freq);
@@ -928,6 +933,16 @@ static int cpufreq_add_dev_interface(unsigned int cpu,
 				   &dev->kobj, "cpufreq");
 	if (ret)
 		return ret;
+
+	/* create cpu device kset */
+	if (!cpudev_kset) {
+		cpudev_kset = kset_create_and_add("kset", NULL, &dev->kobj);
+		BUG_ON(!cpudev_kset);
+		dev->kobj.kset = cpudev_kset;
+	}
+
+	/* send uevent when cpu device is added */
+	kobject_uevent(&dev->kobj, KOBJ_ADD);
 
 	/* set up files for this cpu device */
 	drv_attr = cpufreq_driver->attr;
@@ -1100,9 +1115,8 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 	for_each_online_cpu(sibling) {
 		struct cpufreq_policy *cp = per_cpu(cpufreq_cpu_data, sibling);
 		if (cp && cp->governor &&
-		   (cpumask_test_cpu(cpu, cp->related_cpus))) {
+		    (cpumask_test_cpu(cpu, cp->related_cpus))) {
 			policy->governor = cp->governor;
-
 			found = 1;
 			break;
 		}
@@ -1118,7 +1132,7 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 		pr_debug("initialization failed\n");
 		goto err_unlock_policy;
 	}
-
+	
 	/* related cpus should atleast have policy->cpus */
 	cpumask_or(policy->related_cpus, policy->related_cpus, policy->cpus);
 
@@ -1573,10 +1587,10 @@ static struct syscore_ops cpufreq_syscore_ops = {
 };
 
 /**
- * cpufreq_get_current_driver - return current driver's name
+ *	cpufreq_get_current_driver - return current driver's name
  *
- * Return the name string of the currently loaded cpufreq driver
- * or NULL, if none.
+ *	Return the name string of the currently loaded cpufreq driver
+ *	or NULL, if none.
  */
 const char *cpufreq_get_current_driver(void)
 {
@@ -2051,7 +2065,7 @@ static int __cpuinit cpufreq_cpu_callback(struct notifier_block *nfb,
 
 					if (target_freq != policy->cur)
 						__cpufreq_driver_target(policy, target_freq, CPUFREQ_RELATION_L);
-					
+
 					cpufreq_cpu_put(policy);
 				}
 			}

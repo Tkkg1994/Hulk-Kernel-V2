@@ -120,7 +120,7 @@ void machine_kexec(struct kimage *image)
 	    pr_err("kexec: error: multiple CPUs still online\n");
 	    return;
 	}
-
+	
 	page_list = image->head & PAGE_MASK;
 
 	/* we need both effective and real address here */

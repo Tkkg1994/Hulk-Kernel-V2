@@ -35,6 +35,8 @@
 #include <linux/debugfs.h>
 #include <linux/dma-buf.h>
 #include <linux/msm_ion.h>
+#include <trace/events/kmem.h>
+
 
 #include <mach/iommu_domains.h>
 #include "ion_priv.h"
@@ -438,9 +440,16 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		if (secure_allocation &&
 			(heap->type != (enum ion_heap_type) ION_HEAP_TYPE_CP))
 			continue;
+		trace_ion_alloc_buffer_start(client->name, heap->name, len,
+					     heap_mask, flags);
 		buffer = ion_buffer_create(heap, dev, len, align, flags);
+		trace_ion_alloc_buffer_end(client->name, heap->name, len,
+					   heap_mask, flags);
 		if (!IS_ERR_OR_NULL(buffer))
 			break;
+
+		trace_ion_alloc_buffer_fallback(client->name, heap->name, len,
+					    heap_mask, flags, PTR_ERR(buffer));
 		if (dbg_str_idx < MAX_DBG_STR_LEN) {
 			unsigned int len_left = MAX_DBG_STR_LEN-dbg_str_idx-1;
 			int ret_value = snprintf(&dbg_str[dbg_str_idx],
@@ -459,11 +468,16 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	}
 	up_read(&dev->lock);
 
-	if (buffer == NULL)
+	if (buffer == NULL) {
+		trace_ion_alloc_buffer_fail(client->name, dbg_str, len,
+					    heap_mask, flags, -ENODEV);
 		return ERR_PTR(-ENODEV);
+	}
 
 	if (IS_ERR(buffer)) {
-		pr_info("ION is unable to allocate 0x%x bytes (alignment: "
+		trace_ion_alloc_buffer_fail(client->name, dbg_str, len,
+					    heap_mask, flags, PTR_ERR(buffer));
+		pr_debug("ION is unable to allocate 0x%x bytes (alignment: "
 			 "0x%x) from heap(s) %sfor client %s with heap "
 			 "mask 0x%x\n",
 			len, align, dbg_str, client->name, client->heap_mask);
@@ -708,12 +722,6 @@ int ion_map_iommu(struct ion_client *client, struct ion_handle *handle,
 			if (iommu_map->flags & ION_IOMMU_UNMAP_DELAYED)
 				kref_get(&iommu_map->ref);
 		}
-#if !defined(CONFIG_MSM_IOMMU) && defined(CONFIG_SEC_PRODUCT_8960)
-		else {
-            ret = -EINVAL;
-            goto out;
-        }
-#endif
 	} else {
 		if (iommu_map->flags != iommu_flags) {
 			pr_err("%s: handle %p is already mapped with iommu flags %lx, trying to map with flags %lx\n",

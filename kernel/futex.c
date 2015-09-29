@@ -597,6 +597,56 @@ void exit_pi_state_list(struct task_struct *curr)
 }
 
 /*
+* We need to check the following states:
+*
+*      Waiter | pi_state | pi->owner | uTID      | uODIED | ?
+*
+* [1]  NULL   | ---      | ---       | 0         | 0/1    | Valid
+* [2]  NULL   | ---      | ---       | >0        | 0/1    | Valid
+*
+* [3]  Found  | NULL     | --        | Any       | 0/1    | Invalid
+*
+* [4]  Found  | Found    | NULL      | 0         | 1      | Valid
+* [5]  Found  | Found    | NULL      | >0        | 1      | Invalid
+*
+* [6]  Found  | Found    | task      | 0         | 1      | Valid
+*
+* [7]  Found  | Found    | NULL      | Any       | 0      | Invalid
+*
+* [8]  Found  | Found    | task      | ==taskTID | 0/1    | Valid
+* [9]  Found  | Found    | task      | 0         | 0      | Invalid
+* [10] Found  | Found    | task      | !=taskTID | 0/1    | Invalid
+*
+* [1]	Indicates that the kernel can acquire the futex atomically. We
+*	came came here due to a stale FUTEX_WAITERS/FUTEX_OWNER_DIED bit.
+*
+* [2]	Valid, if TID does not belong to a kernel thread. If no matching
+*      thread is found then it indicates that the owner TID has died.
+*
+* [3]	Invalid. The waiter is queued on a non PI futex
+*
+* [4]	Valid state after exit_robust_list(), which sets the user space
+*	value to FUTEX_WAITERS | FUTEX_OWNER_DIED.
+*
+* [5]	The user space value got manipulated between exit_robust_list()
+*	and exit_pi_state_list()
+*
+* [6]	Valid state after exit_pi_state_list() which sets the new owner in
+*	the pi_state but cannot access the user space value.
+*
+* [7]	pi_state->owner can only be NULL when the OWNER_DIED bit is set.
+*
+* [8]	Owner and user space value match
+*
+* [9]	There is no transient state which sets the user space TID to 0
+*	except exit_robust_list(), but this is indicated by the
+*	FUTEX_OWNER_DIED bit. See [4]
+*
+* [10] There is no transient state which leaves owner and user space
+*	TID out of sync.
+*/
+
+/*
  * We need to check the following states:
  *
  *      Waiter | pi_state | pi->owner | uTID      | uODIED | ?
@@ -724,13 +774,14 @@ lookup_pi_state(u32 uval, struct futex_hash_bucket *hb,
 			 * futex value. If pi state exists then the
 			 * owner TID must be the same as the user
 			 * space TID. [9/10]
-			 */
+ 			 */
 			if (pid != task_pid_vnr(pi_state->owner))
 				return -EINVAL;
-
+ 
 		out_state:
 			atomic_inc(&pi_state->refcount);
 			*ps = pi_state;
+
 			return 0;
 		}
 	}
@@ -1388,6 +1439,13 @@ static int futex_requeue(u32 __user *uaddr1, unsigned int flags,
 			return -EINVAL;
 
 		/*
+		 * Requeue PI only works on two distinct uaddrs. This
+		 * check is only valid for private futexec. See below.
+		 */
+		if (uaddr1 == uaddr2)
+			return -EINVAL;
+
+		/*
 		 * requeue_pi requires a pi_state, try to allocate it now
 		 * without any locks in case it fails.
 		 */
@@ -1427,6 +1485,15 @@ retry:
 
 	/*
 	 * The check above which compares uaddrs is not sufficient for
+	 * shared futexes. We need to compare the keys:
+	 */
+	if (requeue_pi && match_futex(&key1, &key2)) {
+		ret = -EINVAL;
+		goto out_put_keys;
+	}
+
+	/*
+	 * The check above which compares uaddrs is not sufficient for 
 	 * shared futexes. We need to compare the keys:
 	 */
 	if (requeue_pi && match_futex(&key1, &key2)) {
@@ -2473,15 +2540,6 @@ static int futex_wait_requeue_pi(u32 __user *uaddr, unsigned int flags,
 	 */
 	if (match_futex(&q.key, &key2)) {
 		queue_unlock(&q, hb);
-		ret = -EINVAL;
-		goto out_put_keys;
-	}
-
-	/*
-	 * The check above which compares uaddrs is not sufficient for
-	 * shared futexes. We need to compare the keys:
-	 */
-	if (match_futex(&q.key, &key2)) {
 		ret = -EINVAL;
 		goto out_put_keys;
 	}

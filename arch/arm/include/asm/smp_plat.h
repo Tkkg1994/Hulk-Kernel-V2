@@ -59,7 +59,6 @@ extern int __cpu_logical_map[];
  * multiple from its base address. For more
  * information check arch/arm/kernel/sleep.S
  */
-
 struct mpidr_hash {
 	u32	mask; /* used by sleep.S */
 	u32	shift_aff[3]; /* used by sleep.S */

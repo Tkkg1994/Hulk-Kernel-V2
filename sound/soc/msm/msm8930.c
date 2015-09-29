@@ -547,6 +547,7 @@ static int msm8930_enable_codec_ext_clk(
 	int r = 0;
 	int rtn;
 	pr_debug("%s: enable = %d\n", __func__, enable);
+	printk("%s Debashis6 \n",__func__);	
 
 	printk("Audio Team System Revision:%d \n",system_rev);	
 
@@ -599,6 +600,7 @@ static int msm8930_enable_codec_ext_clk(
 		}
 	}
 	//mutex_unlock(&cdc_mclk_mutex);
+	printk("%s Debashis6 \n",__func__);		
 	return r;
 }
 /*
@@ -633,6 +635,7 @@ static int msm8930_mclk_event(struct snd_soc_dapm_widget *w,
 			pr_err("%s: Failed to request gpio %d\n", __func__,
 					GPIO_AUDIO_MCLK);
 		}
+printk("%s Debashis6 \n",__func__);		
 		return msm8930_enable_codec_ext_clk(w->codec, 1, true);
 	case SND_SOC_DAPM_POST_PMD:
 #if defined (CONFIG_WCD9304_CLK_9600)
@@ -915,10 +918,10 @@ static int msm8930_btsco_rate_put(struct snd_kcontrol *kcontrol,
 {
 
 	switch (ucontrol->value.integer.value[0]) {
-	case 0:
+	case 8000:
 		msm8930_btsco_rate = BTSCO_RATE_8KHZ;
 		break;
-	case 1:
+	case 16000:
 		msm8930_btsco_rate = BTSCO_RATE_16KHZ;
 		break;
 	default:
@@ -1056,7 +1059,7 @@ static void *def_sitar_mbhc_cal(void)
 #undef S
 #define S(X, Y) ((SITAR_MBHC_CAL_PLUG_TYPE_PTR(sitar_cal)->X) = (Y))
 	S(v_no_mic, 30);
-	S(v_hs_max, 1650);
+	S(v_hs_max, 1500);
 #undef S
 #define S(X, Y) ((SITAR_MBHC_CAL_BTN_DET_PTR(sitar_cal)->X) = (Y))
 	S(c[0], 62);
@@ -1481,16 +1484,7 @@ static int msm8930_hdmi_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 
 	struct snd_interval *channels = hw_param_interval(params,
 					SNDRV_PCM_HW_PARAM_CHANNELS);
-#if defined(CONFIG_MACH_MELIUS_SKT) || defined(CONFIG_MACH_MELIUS_KTT) || defined(CONFIG_MACH_MELIUS_LGT) || defined(CONFIG_MACH_MELIUS)
-    if (!hdmi_rate_variable)
-		rate->min = rate->max = 48000;
 
-	if (channels->max < 2)
-		channels->min = channels->max = 2;
-
-	if (channels->min != channels->max)
-		channels->min = channels->max;
-#else
 	if (!hdmi_rate_variable)
 		rate->min = rate->max = 48000;
 	channels->min = channels->max = msm_hdmi_rx_ch;
@@ -1499,7 +1493,6 @@ static int msm8930_hdmi_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 
  	if (channels->min != channels->max)
 		channels->min = channels->max;
-#endif
 
 	return 0;
 }
@@ -1986,6 +1979,7 @@ static int msm8930_i2s_startup(struct snd_pcm_substream *substream)
 			pr_err("set format for codec dai failed\n");
 
 	}
+printk("%s Debashis5 \n",__func__);	
 	return ret;
 }
 
@@ -2674,10 +2668,12 @@ static void msm8930_free_audio_gpios(void)
 static int __init msm8930_audio_init(void)
 {
 	int ret;
+printk("%s Debashis\n",__func__);
 	if (!soc_class_is_msm8930()) {
 		pr_err("%s: Not the right machine type\n", __func__);
 		return -ENODEV ;
 	}
+printk("%s Debashis1\n",__func__);	
 #ifndef CONFIG_SLIMBUS_MSM_CTRL
 	msm8930_dai_list = kzalloc(sizeof(msm8930_dai) +
 			2 * sizeof(struct snd_soc_dai_link), GFP_KERNEL);
@@ -2731,6 +2727,7 @@ static int __init msm8930_audio_init(void)
 #ifdef CONFIG_RADIO_USE_MI2S
 	atomic_set(&mi2s_rsc_ref, 0);
 #endif
+printk("%s Debashis3\n",__func__);
 	return ret;
 
 }

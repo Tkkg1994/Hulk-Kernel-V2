@@ -349,7 +349,7 @@ early_param("coherent_pool", early_coherent_pool);
  */
 static int __init coherent_init(void)
 {
-	pgprot_t prot = pgprot_dmacoherent(PAGE_KERNEL);
+	pgprot_t prot = pgprot_dmacoherent(pgprot_kernel);
 	size_t size = coherent_pool_size;
 	struct page *page;
 	void *ptr;
@@ -411,7 +411,7 @@ void __init dma_contiguous_remap(void)
 		map.type = MT_MEMORY_DMA_READY;
 
 		/*
-		 *  Clear previous low-memory mapping to ensure that the
+		 * Clear previous low-memory mapping to ensure that the
 		 * TLB does not see any conflicting entries, then flush
 		 * the TLB of the old entries before creating new mappings.
 		 *
@@ -419,6 +419,7 @@ void __init dma_contiguous_remap(void)
 		 * (even though they may be rare) can not cause any problems,
 		 * and ensures that this code is architecturally compliant.
 		 */
+
 		for (addr = __phys_to_virt(start); addr < __phys_to_virt(end);
 		     addr += PMD_SIZE)
 			pmd_clear(pmd_off_k(addr));
@@ -689,7 +690,7 @@ static void __free_from_contiguous(struct device *dev, struct page *page,
 				   void *cpu_addr, size_t size)
 {
 	if (!PageHighMem(page))
-		__dma_remap(page, size, PAGE_KERNEL, false);
+		__dma_remap(page, size, pgprot_kernel, false);
 	else
 		__dma_free_remap(cpu_addr, size, true);
 	dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT);
@@ -796,7 +797,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 		    gfp_t gfp, struct dma_attrs *attrs)
 {
-	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
+	pgprot_t prot = __get_dma_pgprot(attrs, pgprot_kernel);
 	void *memory;
 	bool no_kernel_mapping = dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING,
 					attrs);
@@ -1312,13 +1313,13 @@ static int __iommu_remove_mapping(struct device *dev, dma_addr_t iova, size_t si
 static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
 	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
 {
-	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
+	pgprot_t prot = __get_dma_pgprot(attrs, pgprot_kernel);
 	struct page **pages;
 	void *addr = NULL;
 
 	/* Following is a work-around (a.k.a. hack) to prevent pages
 	 * with __GFP_COMP being passed to split_page() which cannot
-	 * handle them. The real problem is that this flag probably
+	 * handle them.  The real problem is that this flag probably
 	 * should be 0 on ARM as it is not supported on this
 	 * platform--see CONFIG_HUGETLB_PAGE. */
 	gfp &= ~(__GFP_COMP);

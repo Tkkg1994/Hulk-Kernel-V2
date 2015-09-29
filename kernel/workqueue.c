@@ -604,10 +604,7 @@ static struct cpu_workqueue_struct *get_work_cwq(struct work_struct *work)
 	if (data & WORK_STRUCT_CWQ)
 		return (void *)(data & WORK_STRUCT_WQ_DATA_MASK);
 	else
-	{
-		WARN_ON_ONCE(1);
 		return NULL;
-	}
 }
 
 static struct global_cwq *get_work_gcwq(struct work_struct *work)
@@ -1262,7 +1259,7 @@ static void __queue_work(unsigned int cpu, struct workqueue_struct *wq,
 			cpu = raw_smp_processor_id();
 
 		/*
-		 * It's multi cpu. If @work was previously on a different
+		 * It's multi cpu.  If @work was previously on a different
 		 * cpu, it might still be running there, in which case the
 		 * work needs to be queued on that cpu to guarantee
 		 * non-reentrancy.
@@ -1561,8 +1558,14 @@ static void worker_enter_idle(struct worker *worker)
 	if (too_many_workers(pool) && !timer_pending(&pool->idle_timer))
 		mod_timer(&pool->idle_timer, jiffies + IDLE_WORKER_TIMEOUT);
 
-	/* sanity check nr_running */
-	WARN_ON_ONCE(pool->nr_workers == pool->nr_idle &&
+	/*
+	 * Sanity check nr_running.  Because gcwq_unbind_fn() releases
+	 * gcwq->lock between setting %WORKER_UNBOUND and zapping
+	 * nr_running, the warning may trigger spuriously.  Check iff
+	 * unbind is not in progress.
+	 */
+	WARN_ON_ONCE(!(gcwq->flags & GCWQ_DISASSOCIATED) &&
+		     pool->nr_workers == pool->nr_idle &&
 		     atomic_read(get_pool_nr_running(pool)));
 }
 

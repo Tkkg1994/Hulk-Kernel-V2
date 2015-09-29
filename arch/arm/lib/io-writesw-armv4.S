@@ -96,5 +96,5 @@ ENTRY(__raw_writesw)
 		tst	r2, #1
 3:		movne	ip, r3, lsr #8
 		strneh	ip, [r0]
-		reteq	lr
+		ret	lr
 ENDPROC(__raw_writesw)

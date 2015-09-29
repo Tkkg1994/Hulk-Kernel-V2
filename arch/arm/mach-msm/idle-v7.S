@@ -186,6 +186,7 @@ ENTRY(msm_pm_collapse)
 	ldr	r1, [r1]
 	cmp	r1, #0
 	blxne	r1
+
 skip:
 	ldr	r1, =msm_pm_disable_l2_fn
 	ldr	r1, [r1]
@@ -355,7 +356,6 @@ msm_pm_pa_to_va:
 	blxne	r1
 	dmb
 #if defined(CONFIG_MSM_JTAG) || defined(CONFIG_MSM_JTAG_MM)
-	stmfd   sp!, {lr}
 	bl      msm_jtag_restore_state
 #endif
 	ldmfd   sp!, {lr}

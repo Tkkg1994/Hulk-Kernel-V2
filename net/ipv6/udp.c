@@ -427,7 +427,7 @@ try_again:
 			ip_cmsg_recv(msg, skb);
 	} else {
 		if (np->rxopt.all)
-			ip6_datagram_recv_ctl(sk, msg, skb);
+			datagram_recv_ctl(sk, msg, skb);
 	}
 
 	err = copied;
@@ -1096,7 +1096,7 @@ do_udp_sendmsg:
 		memset(opt, 0, sizeof(struct ipv6_txoptions));
 		opt->tot_len = sizeof(*opt);
 
-		err = ip6_datagram_send_ctl(sock_net(sk), sk, msg, &fl6, opt,
+		err = datagram_send_ctl(sock_net(sk), sk, msg, &fl6, opt,
 					&hlimit, &tclass, &dontfrag);
 		if (err < 0) {
 			fl6_sock_release(flowlabel);

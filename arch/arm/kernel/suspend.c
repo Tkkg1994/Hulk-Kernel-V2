@@ -41,7 +41,7 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
 	 * are to be retrieved with the MMU off that
 	 * data must be cleaned from all cache levels
 	 * to main memory using "area" cache primitives.
-	 */
+	*/
 	__cpuc_flush_dcache_area(ctx, ptrsz);
 	__cpuc_flush_dcache_area(save_ptr, sizeof(*save_ptr));
 
@@ -72,6 +72,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
 	ret = __cpu_suspend(arg, fn, __mpidr);
 	if (ret == 0) {
 		cpu_switch_mm(mm->pgd, mm);
+		local_flush_bp_all();
 		local_flush_tlb_all();
 	} else {
 		local_flush_tlb_all_non_is();
@@ -96,3 +97,4 @@ static int cpu_suspend_alloc_sp(void)
 	return 0;
 }
 early_initcall(cpu_suspend_alloc_sp);
+ 

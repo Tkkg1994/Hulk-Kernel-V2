@@ -805,7 +805,7 @@ static ssize_t fsg_show_nofua(struct device *dev, struct device_attribute *attr,
 }
 
 static ssize_t fsg_show_cdrom (struct device *dev, struct device_attribute *attr,
-				char *buf)
+			       char *buf)
 {
 	struct fsg_lun *curlun = fsg_lun_from_dev(dev);
 

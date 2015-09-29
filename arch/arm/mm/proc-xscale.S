@@ -410,7 +410,7 @@ ENTRY(xscale_dma_unmap_area)
 	ret	lr
 ENDPROC(xscale_dma_unmap_area)
 
-	.globl xscale_flush_kern_cache_louis
+	.globl	xscale_flush_kern_cache_louis
 	.equ	xscale_flush_kern_cache_louis, xscale_flush_kern_cache_all
 
 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)

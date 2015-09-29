@@ -24,9 +24,9 @@
 #define CR_L4	(1 << 15)	/* LDR pc can set T bit			*/
 #define CR_DT	(1 << 16)
 #ifdef CONFIG_MMU
-#define CR_HA	(1 << 17)	/* Hardware management of Access Flag	*/
+#define CR_HA	(1 << 17)	/* Hardware management of Access Flag   */
 #else
-#define CR_BR	(1 << 17)	/* MPU Background region enable (PMSA)	*/
+#define CR_BR	(1 << 17)	/* MPU Background region enable (PMSA)  */
 #endif
 #define CR_IT	(1 << 18)
 #define CR_ST	(1 << 19)

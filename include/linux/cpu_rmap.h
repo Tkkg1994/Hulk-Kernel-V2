@@ -14,6 +14,7 @@
 
 /**
  * struct cpu_rmap - CPU affinity reverse-map
+ * @refcount: kref for object
  * @size: Number of objects to be reverse-mapped
  * @used: Number of objects added
  * @obj: Pointer to array of object pointers
@@ -21,7 +22,7 @@
  *      based on affinity masks
  */
 struct cpu_rmap {
-	struct		kref refcount;
+	struct kref	refcount;
 	u16		size, used;
 	void		**obj;
 	struct {
@@ -32,7 +33,6 @@ struct cpu_rmap {
 #define CPU_RMAP_DIST_INF 0xffff
 
 extern struct cpu_rmap *alloc_cpu_rmap(unsigned int size, gfp_t flags);
-
 extern int cpu_rmap_put(struct cpu_rmap *rmap);
 
 extern int cpu_rmap_add(struct cpu_rmap *rmap, void *obj);

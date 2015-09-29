@@ -28,23 +28,26 @@ struct msm_thermal_data {
 	uint32_t core_control_mask;
 };
 
+#ifdef CONFIG_MAKO_THERMAL
+struct msm_thermal_stat {
+    u64 time_low_start;
+    u64 time_mid_start;
+    u64 time_max_start;
+    u64 time_low;
+    u64 time_mid;
+    u64 time_max;
+};
+#endif
+
 #if defined (CONFIG_THERMAL_MONITOR) || defined (CONFIG_INTELLI_THERMAL)
 extern int msm_thermal_init(struct msm_thermal_data *pdata);
 extern int msm_thermal_device_init(void);
-extern int msm_thermal_set_frequency(uint32_t cpu, uint32_t freq,
-	bool is_max);
 #else
 static inline int msm_thermal_init(struct msm_thermal_data *pdata)
 {
 	return -ENOSYS;
 }
 static inline int msm_thermal_device_init(void)
-{
-	return -ENOSYS;
-}
-
-static inline int msm_thermal_set_frequency(uint32_t cpu, uint32_t freq,
-	bool is_max)
 {
 	return -ENOSYS;
 }

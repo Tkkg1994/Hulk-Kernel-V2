@@ -15,6 +15,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/device.h>
+#include <linux/sysfs_helpers.h>
 #include <linux/i2c.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
@@ -24,7 +25,6 @@
 #include <linux/leds-an30259a.h>
 #include <linux/workqueue.h>
 #include <linux/wakelock.h>
-#include <linux/sysfs_helpers.h>
 
 /* AN30259A register map */
 #define AN30259A_REG_SRESET		0x00
@@ -893,6 +893,7 @@ static ssize_t store_leds_property(struct device *dev,
 	return len;
 }
 
+
 /* below nodes is SAMSUNG specific nodes */
 static DEVICE_ATTR(led_r, 0664, NULL, store_led_r);
 static DEVICE_ATTR(led_g, 0664, NULL, store_led_g);
@@ -981,8 +982,7 @@ static int __devinit an30259a_initialize(struct i2c_client *client,
 			&common_led_attr_group);
 
 	if (ret < 0) {
-		dev_err(dev, "can not register sysfs attribute for led channel : %d\n", channel);
-		led_classdev_unregister(&led->cdev);
+		dev_err(dev, "can not register sysfs attribute\n");
 		return ret;
 	}
 
@@ -991,13 +991,6 @@ static int __devinit an30259a_initialize(struct i2c_client *client,
 	return 0;
 }
 
-//if one led will fail to register than all led registration will fail
-static void an30259a_deinitialize(struct an30259a_led *led, int channel)
-{
-	sysfs_remove_group(&led->cdev.dev->kobj,&common_led_attr_group);
-	led_classdev_unregister(&led->cdev);
-	cancel_work_sync(&led->brightness_work);
-}
 
 static int __devinit an30259a_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
@@ -1029,11 +1022,7 @@ static int __devinit an30259a_probe(struct i2c_client *client,
 		ret = an30259a_initialize(client, &data->leds[i], i);
 
 		if (ret < 0) {
-			dev_err(&client->adapter->dev, "failure on initialization at led channel:%d\n", i);
-			while(i>0) { 
-					i--;
-					an30259a_deinitialize(&data->leds[i], i);
-			}
+			dev_err(&client->adapter->dev, "failure on initialization\n");
 			goto exit;
 		}
 		INIT_WORK(&(data->leds[i].brightness_work),

@@ -156,16 +156,6 @@ config CHARGER_SMB347
 	 This driver source code implemented
 	 all functions for SMB347 charger.
 
-config CHARGER_SMB358
-        tristate "SMB358 charger driver"
-	default n
-        depends on BATTERY_SAMSUNG
-        help
-         Say Y to include support
-         for SMB358 charger driver.
-         This driver source code implemented
-         all functions for SMB358 charger.
-
 config CHARGER_BQ24157
 	tristate "BQ24157 charger driver"
 	default n
@@ -241,6 +231,7 @@ config SAMSUNG_BATTERY_FACTORY
 	  this featuren must disabled user binary
 	  stability test etc..
 
+if MACH_MELIUS
 config CHARGER_MAX77XXX
 	tristate "MAX77693 or MAX77803 battery charger support"
 	depends on MFD_MAX77693 && I2C
@@ -249,4 +240,5 @@ config CHARGER_MAX77XXX
 	  MAX77803 incluse muic, pmic, haptic, led,
 	  flash driver.
 	  You have to define MFD_MAX77693
+endif
 

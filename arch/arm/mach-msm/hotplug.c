@@ -195,7 +195,7 @@ static int __init init_hotplug(void)
 
 	rc = register_hotcpu_notifier(&hotplug_rtb_notifier);
 	if (rc)
-		return (rc);
+		return rc;
 
 	return register_hotcpu_notifier(&hotplug_cpu_check_notifier);
 }

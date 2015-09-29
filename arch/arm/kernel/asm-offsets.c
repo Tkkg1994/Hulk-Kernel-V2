@@ -38,13 +38,13 @@
  *            (http://gcc.gnu.org/PR8896) and incorrect structure
  *	      initialisation in fs/jffs2/erase.c
  * GCC 4.8.0-4.8.2: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=58854
- * miscompiles find_get_entry(), and can result in EXT3 and EXT4
- * filesystem corruption (possibly other FS too).
+ *	      miscompiles find_get_entry(), and can result in EXT3 and EXT4
+ *	      filesystem corruption (possibly other FS too).
  */
 #ifdef __GNUC__
 #if (__GNUC__ == 3 && __GNUC_MINOR__ < 3)
 #error Your compiler is too buggy; it is known to miscompile kernels.
-#error Known good compilers: 3.3, 4.x
+#error    Known good compilers: 3.3, 4.x
 #endif
 #if GCC_VERSION >= 40800 && GCC_VERSION < 40803
 #error Your compiler is too buggy; it is known to miscompile kernels
@@ -116,7 +116,7 @@ int main(void)
   BLANK();
 #endif
 #ifdef CONFIG_CPU_HAS_ASID
-  DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id));
+  DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id.counter));
   BLANK();
 #endif
   DEFINE(VMA_VM_MM,		offsetof(struct vm_area_struct, vm_mm));

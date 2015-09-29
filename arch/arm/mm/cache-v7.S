@@ -79,12 +79,12 @@ ENTRY(v7_flush_icache_all)
 	ret	lr
 ENDPROC(v7_flush_icache_all)
 
-/*
- * v7_flush_dcache_louis()
+ /*
+ *     v7_flush_dcache_louis()
  *
- * Flush the D-cache up to the Level of Unification Inner Shareable
+ *     Flush the D-cache up to the Level of Unification Inner Shareable
  *
- * Corrupted registers: r0-r7, r9-r11 (r6 only in Thumb mode)
+ *     Corrupted registers: r0-r7, r9-r11 (r6 only in Thumb mode)
  */
 
 ENTRY(v7_flush_dcache_louis)
@@ -194,7 +194,7 @@ ENTRY(v7_flush_kern_cache_all)
 	ret	lr
 ENDPROC(v7_flush_kern_cache_all)
 
-/*
+ /*
  *     v7_flush_kern_cache_louis(void)
  *
  *     Flush the data cache up to Level of Unification Inner Shareable.

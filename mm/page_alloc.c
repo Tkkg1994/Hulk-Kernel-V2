@@ -1361,17 +1361,6 @@ void free_hot_cold_page(struct page *page, int cold)
 	int migratetype;
 	int wasMlocked = __TestClearPageMlocked(page);
 
-#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
-	/*
-	   struct scfs_sb_info *sbi;
-
-	   if (PageScfslower(page) || PageNocache(page)) {
-	   sbi = SCFS_S(page->mapping->host->i_sb);
-	   sbi->scfs_lowerpage_reclaim_count++;
-	   }
-	 */
-#endif
-
 	if (!free_pages_prepare(page, 0))
 		return;
 
@@ -5364,9 +5353,6 @@ void setup_per_zone_wmarks(void)
  */
 static void __meminit calculate_zone_inactive_ratio(struct zone *zone)
 {
-#ifdef CONFIG_FIX_INACTIVE_RATIO
-	zone->inactive_ratio = 1;
-#else
 	unsigned int gb, ratio;
 
 	/* Zone size in gigabytes */
@@ -5377,7 +5363,6 @@ static void __meminit calculate_zone_inactive_ratio(struct zone *zone)
 		ratio = 1;
 
 	zone->inactive_ratio = ratio;
-#endif
 }
 
 static void __meminit setup_per_zone_inactive_ratio(void)
@@ -5686,7 +5671,7 @@ static inline int pfn_to_bitidx(struct zone *zone, unsigned long pfn)
 	pfn &= (PAGES_PER_SECTION-1);
 	return (pfn >> pageblock_order) * NR_PAGEBLOCK_BITS;
 #else
-	pfn = pfn - zone->zone_start_pfn;
+	pfn = pfn - round_down(zone->zone_start_pfn, pageblock_nr_pages);
 	return (pfn >> pageblock_order) * NR_PAGEBLOCK_BITS;
 #endif /* CONFIG_SPARSEMEM */
 }
@@ -6213,10 +6198,6 @@ static struct trace_print_flags pageflag_names[] = {
 #endif
 #ifdef CONFIG_MEMORY_FAILURE
 	{1UL << PG_hwpoison,		"hwpoison"	},
-#endif
-#ifdef CONFIG_SCFS_LOWER_PAGECACHE_INVALIDATION
-	{1UL << PG_scfslower,		"scfslower"	},
-	{1UL << PG_nocache,		"nocache"	},
 #endif
 	{-1UL,				NULL		},
 };

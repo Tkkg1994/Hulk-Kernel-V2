@@ -341,7 +341,6 @@ int blk_queue_start_tag(struct request_queue *q, struct request *rq)
 		default:
 			max_depth -= 2;
 		}
-			
 		if (q->in_flight[BLK_RW_ASYNC] > max_depth)
 			return 1;
 	}

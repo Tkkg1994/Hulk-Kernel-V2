@@ -63,6 +63,7 @@ EXPORT_SYMBOL(jiffies_64);
 #define TVR_SIZE (1 << TVR_BITS)
 #define TVN_MASK (TVN_SIZE - 1)
 #define TVR_MASK (TVR_SIZE - 1)
+#define MAX_TVAL ((unsigned long)((1ULL << (TVR_BITS + 4*TVN_BITS)) - 1))
 
 struct tvec {
 	struct list_head vec[TVN_SIZE];
@@ -88,9 +89,7 @@ struct tvec_base {
 struct tvec_base boot_tvec_bases;
 EXPORT_SYMBOL(boot_tvec_bases);
 static DEFINE_PER_CPU(struct tvec_base *, tvec_bases) = &boot_tvec_bases;
-#ifdef CONFIG_MACH_JF
 static DEFINE_PER_CPU(int, tvec_base_lock_init) = {-1};
-#endif
 
 /* Functions below help us manage 'deferrable' flag */
 static inline unsigned int tbase_get_deferrable(struct tvec_base *base)
@@ -364,11 +363,12 @@ __internal_add_timer(struct tvec_base *base, struct timer_list *timer)
 		vec = base->tv1.vec + (base->timer_jiffies & TVR_MASK);
 	} else {
 		int i;
-		/* If the timeout is larger than 0xffffffff on 64-bit
-		 * architectures then we use the maximum timeout:
+		/* If the timeout is larger than MAX_TVAL (on 64-bit
+		 * architectures or with CONFIG_BASE_SMALL=1) then we
+		 * use the maximum timeout.
 		 */
-		if (idx > 0xffffffffUL) {
-			idx = 0xffffffffUL;
+		if (idx > MAX_TVAL) {
+			idx = MAX_TVAL;
 			expires = idx + base->timer_jiffies;
 		}
 		i = (expires >> (TVR_BITS + 3 * TVN_BITS)) & TVN_MASK;
@@ -896,7 +896,7 @@ EXPORT_SYMBOL(mod_timer);
  * and to ensure that the timer is scheduled on the current CPU.
  *
  * Note that this does not prevent the timer from being migrated
- * when the current CPU goes offline. If this is a problem for
+ * when the current CPU goes offline.  If this is a problem for
  * you, use CPU-hotplug notifiers to handle it correctly, for
  * example, cancelling the timer when the corresponding CPU goes
  * offline.
@@ -1673,9 +1673,7 @@ static int __cpuinit init_timers_cpu(int cpu)
 	int j;
 	struct tvec_base *base;
 	static char __cpuinitdata tvec_base_done[NR_CPUS];
-#ifdef CONFIG_MACH_JF
 	int *lock_init = &per_cpu(tvec_base_lock_init, cpu);
-#endif
 
 	if (!tvec_base_done[cpu]) {
 		static char boot_done;
@@ -1707,21 +1705,17 @@ static int __cpuinit init_timers_cpu(int cpu)
 			boot_done = 1;
 			base = &boot_tvec_bases;
 		}
-#ifndef CONFIG_MACH_JF
-		spin_lock_init(&base->lock);
-#endif
 		tvec_base_done[cpu] = 1;
 	} else {
 		base = per_cpu(tvec_bases, cpu);
 	}
 
-#ifdef CONFIG_MACH_JF
 	if ((*lock_init) != cpu) {
 		*lock_init = cpu;
 		spin_lock_init(&base->lock);
 		printk(KERN_INFO "tvec base lock initialized for cpu%d\n", cpu);
 	}
-#endif
+
 	for (j = 0; j < TVN_SIZE; j++) {
 		INIT_LIST_HEAD(base->tv5.vec + j);
 		INIT_LIST_HEAD(base->tv4.vec + j);
@@ -1822,8 +1816,7 @@ void __init init_timers(void)
 	BUILD_BUG_ON(__alignof__(struct tvec_base) & TIMER_FLAG_MASK);
 
 	err = timer_cpu_notify(&timers_nb, (unsigned long)CPU_UP_PREPARE,
-				(void *)(long)smp_processor_id());
-
+			       (void *)(long)smp_processor_id());
 	init_timer_stats();
 
 	BUG_ON(err != NOTIFY_OK);
