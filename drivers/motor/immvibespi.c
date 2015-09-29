@@ -8,10 +8,10 @@
 **     to control PWM duty cycle, amp enable/disable, save IVT file, etc...
 **
 ** Portions Copyright (c) 2008-2010 Immersion Corporation. All Rights Reserved.
-**          Copyright (c) 2013 The CyanogenMod Project
-**                        Daniel Hillenbrand <codeworkx@cyanogenmod.com>
-**                        Dan Pasanen <dan.pasanen@gmail.com>
-**                        Shareef Ali <shareefalis@cyanogenmod.org>
+** Copyright (c) 2013 The CyanogenMod Project
+** Daniel Hillenbrand <codeworkx@cyanogenmod.com>
+** Dan Pasanen <dan.pasanen@gmail.com>
+** Shareef Ali <shareefalis@cyanogenmod.org>
 **
 ** This file contains Original Code and/or Modifications of Original Code
 ** as defined in and that are subject to the GNU Public License v2 -
@@ -34,10 +34,10 @@
 #include <linux/gpio.h>
 #include "tspdrv.h"
 
-#define LEVEL_MAX           100
-#define LEVEL_MIN           0
-#define LEVEL_DEFAULT       50
-#define LEVEL_THRESHOLD     75
+#define LEVEL_MAX	100
+#define LEVEL_MIN	0
+#define LEVEL_DEFAULT	50
+#define LEVEL_THRESHOLD	75
 
 /*
 ** This SPI supports only one actuator.
@@ -59,7 +59,6 @@ struct pm_gpio vib_pwm = {
 				.inv_int_pol = 0,
 			};
 
-
 unsigned long pwm_val = 100;
 
 static int32_t vibe_set_pwm_freq(int nForce)
@@ -78,6 +77,8 @@ static int32_t vibe_set_pwm_freq(int nForce)
 #if defined(CONFIG_MOTOR_DRV_MAX77693)
 #if defined(CONFIG_MACH_JF_DCM)
 		g_nforce_32 = ((nForce * g_nlra_gp_clk_pwm_mul) >> 8) + 22;
+#elif defined(CONFIG_MACH_JACTIVE_EUR) || defined(CONFIG_MACH_JACTIVE_ATT)
+		g_nforce_32 = ((nForce * g_nlra_gp_clk_pwm_mul) >> 8) + 1;
 #else
 		g_nforce_32 = ((nForce * g_nlra_gp_clk_pwm_mul) >> 8) + 10;
 #endif
@@ -148,7 +149,7 @@ static int32_t ImmVibeSPI_ForceOut_AmpDisable(u_int8_t nActuatorIndex)
 			gpio_set_value(vibrator_drvdata.vib_pwm_gpio, \
 			    VIBRATION_OFF);
 		}
-		printk(KERN_DEBUG "tspdrv: %s\n", __func__);
+//		printk(KERN_DEBUG "tspdrv: %s\n", __func__);
 #if defined(CONFIG_MOTOR_DRV_MAX77693)
 		max77693_vibtonz_en(0);
 #endif
@@ -171,7 +172,7 @@ static int32_t ImmVibeSPI_ForceOut_AmpEnable(u_int8_t nActuatorIndex)
 			vib_pwm_gpio, 2, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, \
 			GPIO_CFG_2MA), 1);
 		}
-		printk(KERN_DEBUG "tspdrv: %s\n", __func__);
+//		printk(KERN_DEBUG "tspdrv: %s\n", __func__);
 #if defined(CONFIG_MOTOR_DRV_MAX77693)
 		max77693_vibtonz_en(1);
 #endif
