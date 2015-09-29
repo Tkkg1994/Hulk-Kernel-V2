@@ -12,11 +12,9 @@
 
 #ifdef CONFIG_POWERSUSPEND
 #include <linux/powersuspend.h>
-#endif
 #include <linux/syscalls.h>
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
 #endif
+
 #include "power.h"
 
 static suspend_state_t autosleep_state;
