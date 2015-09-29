@@ -20,6 +20,12 @@
 #include <linux/log2.h>
 #include <linux/pm_runtime.h>
 
+#ifdef CONFIG_BLOCK_SUPPORT_STLOG
+#include <linux/stlog.h>
+#else
+#define ST_LOG(fmt,...)
+#endif
+
 #include "blk.h"
 
 static DEFINE_MUTEX(block_class_lock);
@@ -517,6 +523,8 @@ static void register_disk(struct gendisk *disk)
 	int first_minor 	= disk->first_minor;
 #endif
 
+	ddev->parent = disk->driverfs_dev;
+
 	dev_set_name(ddev, "%s", disk->disk_name);
 
 	/* delay uevents, until we scanned partition table */
@@ -639,6 +647,10 @@ void del_gendisk(struct gendisk *disk)
 {
 	struct disk_part_iter piter;
 	struct hd_struct *part;
+
+#ifdef CONFIG_BLOCK_SUPPORT_STLOG
+	struct device *dev;
+#endif
 
 	disk_del_events(disk);
 

@@ -22,6 +22,10 @@
 #include <linux/cpufreq.h>
 #endif
 
+#include <linux/mfd/pm8xxx/misc.h>
+#include <mach/sec_debug.h>
+#include <mach/restart.h>
+
 #define MAX_BUF 100
 
 DEFINE_MUTEX(pm_mutex);

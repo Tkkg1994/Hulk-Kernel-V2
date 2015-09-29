@@ -479,7 +479,7 @@ void hrtick_start(struct rq *rq, u64 delay)
 
 	if (rq == this_rq()) {
 		__hrtimer_start_range_ns(timer, ns_to_ktime(delay), 0,
-						 HRTIMER_MODE_REL_PINNED, 0);
+						HRTIMER_MODE_REL_PINNED, 0);
 	} else if (!rq->hrtick_csd_pending) {
 		__smp_call_function_single(cpu_of(rq), &rq->hrtick_csd, 0);
 		rq->hrtick_csd_pending = 1;
@@ -1525,7 +1525,7 @@ ttwu_do_wakeup(struct rq *rq, struct task_struct *p, int wake_flags)
 
 		if (rq->avg_idle > max)
 			rq->avg_idle = max;
-		
+
 		rq->idle_stamp = 0;
 	}
 #endif
