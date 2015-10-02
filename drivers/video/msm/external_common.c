@@ -1327,7 +1327,7 @@ static const uint8 *hdmi_edid_find_block(const uint8 *in_buf,
 	uint32 offset = start_offset;
 	uint32 end_dbc_offset = in_buf[2];
 
-	if(offset >= 128 || (end_dbc_offset >= (128-offset)))
+	if (offset >= 128 || (end_dbc_offset >= (128-offset)))
 		return NULL;
 	*len = 0;
 
@@ -1642,16 +1642,16 @@ static void hdmi_edid_detail_desc(const uint8 *data_buf, uint32 *disp_mode)
 
 static void limit_supported_video_format(uint32 *video_format)
 {
-	switch(sp_get_link_bw()){
+	switch (sp_get_link_bw()) {
 	case 0x0a:
-		if((*video_format == HDMI_VFRMT_1920x1080p60_16_9) ||
-			(*video_format == HDMI_VFRMT_2880x480p60_4_3)||
+		if ((*video_format == HDMI_VFRMT_1920x1080p60_16_9) ||
+			(*video_format == HDMI_VFRMT_2880x480p60_4_3) ||
 			(*video_format == HDMI_VFRMT_2880x480p60_16_9) ||
 			(*video_format == HDMI_VFRMT_1280x720p120_16_9))
 
 			*video_format = HDMI_VFRMT_1280x720p60_16_9;
-		else if((*video_format == HDMI_VFRMT_1920x1080p50_16_9) ||
-			(*video_format == HDMI_VFRMT_2880x576p50_4_3)||
+		else if ((*video_format == HDMI_VFRMT_1920x1080p50_16_9) ||
+			(*video_format == HDMI_VFRMT_2880x576p50_4_3) ||
 			(*video_format == HDMI_VFRMT_2880x576p50_16_9) ||
 			(*video_format == HDMI_VFRMT_1280x720p100_16_9))
 
@@ -1663,7 +1663,7 @@ static void limit_supported_video_format(uint32 *video_format)
 			*video_format = HDMI_VFRMT_1920x1080i60_16_9;
 		break;
 	case 0x06:
-		if(*video_format != HDMI_VFRMT_640x480p60_4_3)
+		if (*video_format != HDMI_VFRMT_640x480p60_4_3)
 			*video_format = HDMI_VFRMT_640x480p60_4_3;
 		break;
 	case 0x14:
