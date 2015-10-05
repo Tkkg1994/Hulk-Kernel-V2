@@ -47,7 +47,7 @@
 #ifdef USING_CONSUMERIR_SERVICE 
 #include <linux/miscdevice.h>
 #endif
-#include "barcode_emul_ice4.h"
+#include "barcode_emul_ice4_ged.h"
 #include <linux/err.h>
 #if defined(CONFIG_MACH_JF_DCM)
 #include <mach/apq8064-gpio.h>
