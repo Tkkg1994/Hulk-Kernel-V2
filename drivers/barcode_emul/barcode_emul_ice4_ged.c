@@ -619,7 +619,7 @@ static ssize_t barcode_ver_check_show(struct device *dev,
 
 	return sprintf(buf, "%d\n", fw_ver+14);
 }
-static DEVICE_ATTR(barcode_ver_check, 0664, barcode_ver_check_show, NULL);
+static DEVICE_ATTR(barcode_ver_check, 0444, barcode_ver_check_show, NULL);
 
 static ssize_t barcode_led_status_show(struct device *dev,
 		struct device_attribute *attr,
@@ -631,7 +631,7 @@ static ssize_t barcode_led_status_show(struct device *dev,
 	status = status & 0x1;
 	return sprintf(buf, "%d\n", status);
 }
-static DEVICE_ATTR(barcode_led_status, 0664, barcode_led_status_show, NULL);
+static DEVICE_ATTR(barcode_led_status, 0444, barcode_led_status_show, NULL);
 
 #if defined(CONFIG_IR_REMOCON_FPGA)
 static void irda_add_checksum_length(struct barcode_emul_data *ir_data,
@@ -986,9 +986,9 @@ static ssize_t irda_test_show(struct device *dev, struct device_attribute *attr,
 }
 
 static struct device_attribute ir_attrs[] = {
-	__ATTR(check_ir, S_IRUGO|S_IWUSR|S_IWGRP, check_ir_show, NULL),
+	__ATTR(check_ir, S_IRUGO, check_ir_show, NULL),
 	__ATTR(ir_send, S_IRUGO|S_IWUSR|S_IWGRP, remocon_show, remocon_store),
-	__ATTR(ir_send_result, S_IRUGO|S_IWUSR|S_IWGRP, remocon_ack, NULL),
+	__ATTR(ir_send_result, S_IRUGO, remocon_ack, NULL),
 	__ATTR(irda_test, S_IRUGO|S_IWUSR|S_IWGRP, irda_test_show, irda_test_store)
 };
 #endif
