@@ -502,6 +502,7 @@ static ssize_t write(struct file *file, const char *buf, size_t count,
 			** (Should never happen).
 			*/
 			DbgOut((KERN_EMERG "tspdrv: invalid buffer index.\n"));
+			return 0;
 		}
 
 		/* Check bit depth */
@@ -522,6 +523,7 @@ static ssize_t write(struct file *file, const char *buf, size_t count,
 			** (Should never happen).
 			*/
 			DbgOut((KERN_EMERG "tspdrv: invalid data size.\n"));
+			return 0;
 		}
 
 		/* Check actuator index */
@@ -639,8 +641,10 @@ static long ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		** If a stop was requested, ignore the request as the amp
 		** will be disabled by the timer proc when it's ready
 		*/
-		if (!g_bstoprequested)
-			ImmVibeSPI_ForceOut_AmpDisable(arg);
+		g_bstoprequested = true;
+		/* Last data processing to disable amp and stop timer */
+		VibeOSKernelProcessData(NULL);
+		g_bisplaying = false;
 		wake_unlock(&vib_wake_lock);
 		break;
 
