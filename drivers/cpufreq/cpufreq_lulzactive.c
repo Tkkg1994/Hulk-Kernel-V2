@@ -29,7 +29,7 @@
 #include <linux/timer.h>
 #include <linux/workqueue.h>
 #include <linux/kthread.h>
-#include <linux/earlysuspend.h>
+#include <linux/powersuspend.h>
 #include <asm/cputime.h>
 #include <linux/suspend.h>
 
@@ -96,12 +96,12 @@ static unsigned long down_sample_time_awake;
  */
 static unsigned long debug_mode;
 enum {
-	LULZACTIVE_DEBUG_EARLY_SUSPEND=1,
+	LULZACTIVE_DEBUG_POWER_SUSPEND=1,
 	LULZACTIVE_DEBUG_START_STOP=2,
 	LULZACTIVE_DEBUG_LOAD=4,
 	LULZACTIVE_DEBUG_SUSPEND=8,
 };
-//#define DEFAULT_DEBUG_MODE (LULZACTIVE_DEBUG_EARLY_SUSPEND | LULZACTIVE_DEBUG_START_STOP | LULZACTIVE_DEBUG_SUSPEND)
+//#define DEFAULT_DEBUG_MODE (LULZACTIVE_DEBUG_POWER_SUSPEND | LULZACTIVE_DEBUG_START_STOP | LULZACTIVE_DEBUG_SUSPEND)
 #define DEFAULT_DEBUG_MODE (0)
 
 /*
@@ -139,7 +139,7 @@ static unsigned long pump_down_step;
  * Use minimum frequency while suspended.
  */
 static unsigned int suspending;
-static unsigned int early_suspended;
+static unsigned int power_suspended;
 
 #define SCREEN_OFF_LOWEST_STEP		0xffffffff
 #define DEFAULT_SCREEN_OFF_MIN_STEP 3
@@ -267,7 +267,7 @@ static inline void fix_screen_off_min_step(struct cpufreq_lulzactive_cpuinfo *pc
 static inline unsigned int adjust_screen_off_freq(
 		struct cpufreq_lulzactive_cpuinfo *pcpu, unsigned int freq) {
 
-	if (early_suspended && freq > pcpu->freq_table[screen_off_min_step].frequency) {
+	if (power_suspended && freq > pcpu->freq_table[screen_off_min_step].frequency) {
 		freq = pcpu->freq_table[screen_off_min_step].frequency;
 		pcpu->target_freq = pcpu->policy->cur;
 
@@ -361,7 +361,7 @@ static void cpufreq_lulzactive_timer(unsigned long data)
 	/*
 	 * START lulzactive algorithm section
 	 */
-	if (early_suspended) {
+	if (power_suspended) {
 		new_freq = pcpu->policy->min;
 		pcpu->target_freq = pcpu->policy->cur;
 	}
@@ -462,11 +462,11 @@ static void cpufreq_lulzactive_timer(unsigned long data)
 		LOGI("suspending: cpu_load=%d%% new_freq=%u ppcpu->policy->cur=%u\n",
 				cpu_load, new_freq, pcpu->policy->cur);
 	}
-	if (early_suspended && !suspending && (debug_mode & LULZACTIVE_DEBUG_LOAD)) {
-		LOGI("early_suspended: cpu_load=%d%% new_freq=%u ppcpu->policy->cur=%u\n",
+	if (power_suspended && !suspending && (debug_mode & LULZACTIVE_DEBUG_LOAD)) {
+		LOGI("power_suspended: cpu_load=%d%% new_freq=%u ppcpu->policy->cur=%u\n",
 				cpu_load, new_freq, pcpu->policy->cur);
 	}
-	if ((debug_mode & LULZACTIVE_DEBUG_LOAD) && !early_suspended && !suspending) {
+	if ((debug_mode & LULZACTIVE_DEBUG_LOAD) && !power_suspended && !suspending) {
 		LOGI("cpu_load=%d%% new_freq=%u pcpu->target_freq=%u pcpu->policy->cur=%u\n",
 				cpu_load, new_freq, pcpu->target_freq, pcpu->policy->cur);
 	}
@@ -1020,11 +1020,11 @@ static int cpufreq_governor_lulzactive(struct cpufreq_policy *new_policy,
  * The minimum amount of time to spend at a frequency before we can step down.
  */
 
-static void lulzactive_early_suspend(struct early_suspend *handler) {
+static void lulzactive_power_suspend(struct power_suspend *handler) {
 	struct cpufreq_lulzactive_cpuinfo *pcpu;
 	unsigned int min_freq, max_freq;
 
-	early_suspended = 1;
+	power_suspended = 1;
 	up_sample_time_awake = up_sample_time;
 	up_sample_time = DEFAULT_UP_SAMPLE_TIME_SLEEP;
 	down_sample_time_awake = down_sample_time;
@@ -1034,7 +1034,7 @@ static void lulzactive_early_suspend(struct early_suspend *handler) {
 	dec_cpu_load_awake = dec_cpu_load;
 	dec_cpu_load = 100;
 
-	if (debug_mode & LULZACTIVE_DEBUG_EARLY_SUSPEND) {
+	if (debug_mode & LULZACTIVE_DEBUG_POWER_SUSPEND) {
 		LOGI("%s\n", __func__);
 
 		pcpu = &per_cpu(cpuinfo, 0);
@@ -1048,22 +1048,21 @@ static void lulzactive_early_suspend(struct early_suspend *handler) {
 	}
 }
 
-static void lulzactive_late_resume(struct early_suspend *handler) {
-	early_suspended = 0;
+static void lulzactive_late_resume(struct power_suspend *handler) {
+	power_suspended = 0;
 	up_sample_time = up_sample_time_awake;
 	down_sample_time = down_sample_time_awake;
 	inc_cpu_load = 	inc_cpu_load_awake;
 	dec_cpu_load = 	dec_cpu_load_awake;
 
-	if (debug_mode & LULZACTIVE_DEBUG_EARLY_SUSPEND) {
+	if (debug_mode & LULZACTIVE_DEBUG_POWER_SUSPEND) {
 		LOGI("%s\n", __func__);
 	}
 }
 
-static struct early_suspend lulzactive_power_suspend = {
-		.suspend = lulzactive_early_suspend,
+static struct power_suspend lulzactive_lulz_power_suspend = {
+		.suspend = lulzactive_power_suspend,
 		.resume = lulzactive_late_resume,
-		.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1,
 };
 
 static int lulzactive_pm_notifier_event(struct notifier_block *this,
@@ -1132,7 +1131,7 @@ static int __init cpufreq_lulzactive_init(void)
 	pump_up_step = DEFAULT_PUMP_UP_STEP;
 	pump_down_step = DEFAULT_PUMP_DOWN_STEP;
 	debug_mode = DEFAULT_DEBUG_MODE;
-	early_suspended = 0;
+	power_suspended = 0;
 	suspending = 0;
 	screen_off_min_step = DEFAULT_SCREEN_OFF_MIN_STEP;
 
@@ -1171,7 +1170,7 @@ static int __init cpufreq_lulzactive_init(void)
 	spin_lock_init(&up_cpumask_lock);
 
 	register_pm_notifier(&lulzactive_pm_notifier);
-	register_early_suspend(&lulzactive_power_suspend);
+	register_power_suspend(&lulzactive_lulz_power_suspend);
 
 	return cpufreq_register_governor(&cpufreq_gov_lulzactive);
 
@@ -1189,7 +1188,7 @@ module_init(cpufreq_lulzactive_init);
 static void __exit cpufreq_lulzactive_exit(void)
 {
 	cpufreq_unregister_governor(&cpufreq_gov_lulzactive);
-	unregister_early_suspend(&lulzactive_power_suspend);
+	unregister_power_suspend(&lulzactive_lulz_power_suspend);
 	unregister_pm_notifier(&lulzactive_pm_notifier);
 	kthread_stop(up_task);
 	put_task_struct(up_task);
