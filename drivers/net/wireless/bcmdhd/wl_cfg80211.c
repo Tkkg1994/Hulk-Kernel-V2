@@ -9468,7 +9468,7 @@ wl_notify_sched_scan_results(struct bcm_cfg80211 *cfg, struct net_device *ndev,
 			p2p_scan(cfg) = false;
 		}
 
-		wl_set_drv_status(wl, SCANNING, ndev);
+		wl_set_drv_status(cfg, SCANNING, ndev);
 #ifdef CUSTOM_SET_SHORT_DWELL_TIME
 		net_set_short_dwell_time(ndev, FALSE);
 #endif

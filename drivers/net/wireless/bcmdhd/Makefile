@@ -147,7 +147,11 @@ DHDCFLAGS += -DWL_NEWCFG_PRIVCMD_SUPPORT
 # m: module type driver
 # y: built-in type driver
 ##########################
+ifeq ($(CONFIG_MODULES),y)
 DRIVER_TYPE ?= m
+else
+DRIVER_TYPE ?= y
+endif
 
 DHDCFLAGS += -DCUSTOM_SET_SHORT_DWELL_TIME
 

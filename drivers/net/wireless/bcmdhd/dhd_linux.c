@@ -5992,7 +5992,6 @@ void dhd_detach(dhd_pub_t *dhdp)
 		if (dhdp->prot)
 			dhd_prot_detach(dhdp);
 	}
-#if defined(CONFIG_POWERSUSPEND) && defined(DHD_USE_POWERSUSPEND)
 
 #ifdef ARP_OFFLOAD_SUPPORT
 	if (dhd_inetaddr_notifier_registered) {
@@ -6005,7 +6004,7 @@ void dhd_detach(dhd_pub_t *dhdp)
 		unregister_inet6addr_notifier(&dhd_inet6addr_notifier);
 	}
 
-#if defined(CONFIG_HAS_EARLYSUSPEND) && defined(DHD_USE_EARLYSUSPEND)
+#if defined(CONFIG_POWERSUSPEND) && defined(DHD_USE_POWERSUSPEND)
 	if (dhd->dhd_state & DHD_ATTACH_STATE_EARLYSUSPEND_DONE) {
 		if (dhd->power_suspend.suspend)
 			unregister_power_suspend(&dhd->power_suspend);
